@@ -97,10 +97,18 @@ if [ "$MODE" = "global" ]; then
   mkdir -p "$TARGET/worklogs/.collecting"
 
   # 권한
-  echo "[4/4] 실행 권한 및 git hooks 설정"
+  echo "[4/5] 실행 권한 및 git hooks 설정"
   chmod +x "$TARGET/hooks/"*.sh 2>/dev/null || true
   chmod +x "$TARGET/git-hooks/"* 2>/dev/null || true
   git config --global core.hooksPath "$TARGET/git-hooks"
+
+  # ccusage 설치
+  echo "[5/5] ccusage 설치 (토큰 추적용)"
+  if command -v ccusage >/dev/null 2>&1; then
+    echo "  이미 설치됨: $(ccusage --version 2>/dev/null || echo 'OK')"
+  else
+    npm install -g ccusage 2>/dev/null && echo "  ccusage 설치 완료" || echo "  ⚠️ ccusage 설치 실패 (npx로 대체 가능)"
+  fi
 
   rmdir "$BACKUP" 2>/dev/null || true
 

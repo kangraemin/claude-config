@@ -27,7 +27,7 @@
 ### 계산 순서
 
 1. `date +%s`로 현재 unix timestamp 가져오기
-2. `npx ccusage@latest session --json`으로 현재 세션 토큰 수집
+2. `ccusage session --json`으로 현재 세션 토큰 수집 (없으면 `npx ccusage@latest session --json`)
 3. `cat .worklogs/.snapshot`으로 이전 스냅샷 읽기
 4. delta 계산:
    - **토큰 delta** = 현재 totalTokens - 스냅샷 totalTokens
