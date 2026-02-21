@@ -16,6 +16,10 @@
 !commands/
 !commands/**
 
+# guides
+!guides/
+!guides/**
+
 # rules
 !rules/
 !rules/**
