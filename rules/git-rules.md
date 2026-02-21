@@ -29,10 +29,6 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 - `style`: 포맷팅 (코드 변경 없음)
 - `perf`: 성능 개선
 
-### scope (선택)
-- 변경된 모듈 또는 기능
-- 예: `feat(검색):`, `fix(저장):`, `chore(의존성):`
-
 ### 설명 (description)
 - **무엇을 왜 변경했는지** 명확하게 적는다.
 - 단순 "수정" 금지. 구체적으로 적는다.
@@ -40,12 +36,12 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>
 
 **좋은 예:**
 ```
-feat(검색): 자연어 시맨틱 검색 기능 추가
-fix(저장): Share Extension에서 URL 파싱 실패하는 문제 수정
-refactor(AI): 요약 서비스 Protocol 분리 및 DI 적용
+feat: 자연어 시맨틱 검색 기능 추가
+fix: Share Extension에서 URL 파싱 실패하는 문제 수정
+refactor: 요약 서비스 Protocol 분리 및 DI 적용
 docs: 개발 가이드에 테스트 규칙 추가
-test(검색): 빈 쿼리 입력 시 전체 결과 반환 테스트 추가
-chore(의존성): TCA 1.x → 2.0 업데이트
+test: 빈 쿼리 입력 시 전체 결과 반환 테스트 추가
+chore: TCA 1.x → 2.0 업데이트
 ```
 
 **나쁜 예:**
@@ -70,7 +66,7 @@ fix: bug fix                  ← 영어, 내용 없음
 - 반드시 HEREDOC 사용:
 ```bash
 git commit -m "$(cat <<'EOF'
-feat(검색): 자연어 시맨틱 검색 기능 추가
+feat: 자연어 시맨틱 검색 기능 추가
 
 NLContextualEmbedding 기반 벡터 유사도 검색 구현
 
@@ -98,7 +94,7 @@ EOF
 
 ### 제목
 - 70자 이내
-- 커밋 분류와 동일한 형식: `feat(검색): 자연어 시맨틱 검색 기능 추가`
+- 커밋 분류와 동일한 형식: `feat: 자연어 시맨틱 검색 기능 추가`
 - **한글로 작성한다.**
 
 ### 본문
