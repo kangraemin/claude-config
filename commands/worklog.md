@@ -14,7 +14,7 @@
 
 ## 토큰/시간 계산
 
-### 스냅샷 파일: `.worklogs/.snapshot`
+### 스냅샷 파일: `<프로젝트>/.worklogs/.snapshot`
 
 ```json
 {
@@ -24,14 +24,24 @@
 }
 ```
 
-### 계산 방법
+### 계산 순서
 
-1. `npx ccusage@latest session --json`으로 현재 세션 토큰 수집
-2. `.worklogs/.snapshot` 읽기 (없으면 delta = 전체값)
-3. **토큰 delta** = 현재 totalTokens - 스냅샷 totalTokens
-4. **비용 delta** = 현재 totalCost - 스냅샷 totalCost
-5. **소요 시간** = 현재 timestamp - 스냅샷 timestamp
-6. 워크로그 작성 후 현재 값으로 스냅샷 갱신
+1. `date +%s`로 현재 unix timestamp 가져오기
+2. `npx ccusage@latest session --json`으로 현재 세션 토큰 수집
+3. `cat .worklogs/.snapshot`으로 이전 스냅샷 읽기
+4. delta 계산:
+   - **토큰 delta** = 현재 totalTokens - 스냅샷 totalTokens
+   - **비용 delta** = 현재 totalCost - 스냅샷 totalCost
+   - **소요 시간** = 현재 timestamp - 스냅샷 timestamp → 분 단위로 변환
+5. 워크로그에 delta 값 기록
+6. 스냅샷 갱신: `echo '{"timestamp":NOW,"totalTokens":NOW,"totalCost":NOW}' > .worklogs/.snapshot`
+
+스냅샷이 없으면 (첫 실행) delta 대신 전체값 표시하고 스냅샷 생성.
+
+### 중요
+
+- 소요 시간은 **반드시 스냅샷 timestamp에서 계산**한다. 추정하지 않는다.
+- 스냅샷 갱신은 **워크로그 작성 후** 반드시 실행한다.
 
 ## 엔트리 포맷
 
