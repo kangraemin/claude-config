@@ -10,11 +10,11 @@ TIME=$(date +"%H:%M:%S")
 STAGED_NON_WORKLOG=$(git diff --cached --name-only | grep -v '.worklogs/')
 [ -z "$STAGED_NON_WORKLOG" ] && exit 0
 
-# --- 워크로그 생성 ---
-LOG_DIR="$REPO_ROOT/.worklogs/$DATE"
+# --- 워크로그: 날짜별 단일 파일에 append ---
+LOG_DIR="$REPO_ROOT/.worklogs"
 mkdir -p "$LOG_DIR"
 
-LOG_FILE="$LOG_DIR/${TIME}.md"
+LOG_FILE="$LOG_DIR/${DATE}.md"
 
 # staged 파일 목록
 CHANGED_FILES=$(git diff --cached --name-only)
@@ -29,26 +29,36 @@ DIFF_LINES=$(git diff --cached --no-color 2>/dev/null | wc -l | tr -d ' ')
 DIFF_TRUNCATED=""
 [ "$DIFF_LINES" -gt 200 ] && DIFF_TRUNCATED=" (전체 ${DIFF_LINES}줄 중 200줄만 표시)"
 
-cat > "$LOG_FILE" << REPORT
-# Worklog: $(basename "$REPO_ROOT")
-- **날짜**: $DATE $TIME
-- **프로젝트**: $(basename "$REPO_ROOT")
+# 파일이 없으면 헤더 생성
+if [ ! -f "$LOG_FILE" ]; then
+  cat > "$LOG_FILE" << HEADER
+# Worklog: $(basename "$REPO_ROOT") — $DATE
 
-## 변경된 파일 (${FILE_COUNT}개)
+HEADER
+fi
+
+# 커밋 엔트리 append
+cat >> "$LOG_FILE" << ENTRY
+---
+
+## $TIME
+
+### 변경된 파일 (${FILE_COUNT}개)
 \`\`\`
 $CHANGED_FILES
 \`\`\`
 
-## 변경 통계
+### 변경 통계
 \`\`\`
 $DIFF_STAT
 \`\`\`
 
-## Diff${DIFF_TRUNCATED}
+### Diff${DIFF_TRUNCATED}
 \`\`\`diff
 $DIFF_FULL
 \`\`\`
-REPORT
+
+ENTRY
 
 # 워크로그를 staging에 추가 → 같은 커밋에 포함됨
 git add "$LOG_FILE" 2>/dev/null
