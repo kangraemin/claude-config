@@ -1,3 +1,7 @@
+---
+description: Pull Request 생성
+---
+
 # /pr
 
 `~/.claude/rules/git-rules.md`의 PR 규칙을 따른다.

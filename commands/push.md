@@ -1,3 +1,7 @@
+---
+description: 리모트에 푸시
+---
+
 # /push
 
 `~/.claude/rules/git-rules.md`의 푸시 규칙을 따른다.

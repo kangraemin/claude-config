@@ -1,4 +1,8 @@
-# /status — 현재 Git 상태 요약
+---
+description: 현재 Git 상태 요약
+---
+
+# /status
 
 다음 정보를 한눈에 보여준다:
 

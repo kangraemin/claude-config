@@ -1,3 +1,7 @@
+---
+description: 변경사항을 커밋하고 푸시
+---
+
 # /commit
 
 `~/.claude/rules/git-rules.md`의 커밋 규칙을 따른다.

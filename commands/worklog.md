@@ -1,3 +1,7 @@
+---
+description: 워크로그 작성
+---
+
 # /worklog
 
 `~/.claude/rules/worklog-rules.md`의 규칙을 따른다.
