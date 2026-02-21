@@ -13,7 +13,7 @@ description: 에이전트 팀으로 개발 시작
 ### Step 1: 사전 확인
 
 1. 프로젝트 루트에 `DEVELOPMENT_GUIDE.md`가 있는지 확인한다.
-   - 없으면: "DEVELOPMENT_GUIDE.md가 없습니다. `/init-project`로 먼저 프로젝트를 셋업하세요." 안내 후 중단.
+   - 없으면: `/init-project` 플로우를 먼저 실행한다 (대화하며 가이드 생성). 완료 후 Step 2로 진행.
 2. `docs/PHASES.md`가 있는지 확인한다.
    - 있으면: 현재 진행 상태를 파악하고 이어서 진행.
    - 없으면: Step 2로 (Phase 설계부터).
