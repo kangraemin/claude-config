@@ -8,7 +8,7 @@
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 DATE=$(date +"%Y-%m-%d")
-TIME=$(date +"%H:%M:%S")
+TIME=$(date +"%H:%M")
 
 # staged 파일이 .worklogs/ 뿐이면 스킵 (무한루프 방지)
 STAGED_NON_WORKLOG=$(git diff --cached --name-only | grep -v '.worklogs/')

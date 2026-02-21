@@ -25,7 +25,7 @@
 
 ---
 
-## HH:MM:SS
+## HH:MM
 
 ### 요청사항
 - 사용자가 요청한 내용 정리
@@ -46,7 +46,7 @@
 
 ---
 
-## HH:MM:SS (auto)          ← fallback (auto-commit)
+## HH:MM (auto)          ← fallback (auto-commit)
 
 ### 변경된 파일 (N개)
 ### 변경 통계
