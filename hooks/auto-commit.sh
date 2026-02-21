@@ -1,19 +1,16 @@
 #!/bin/bash
-# SessionEnd: 변경사항 있으면 자동 commit + push + 워크로그 생성
+# SessionEnd: 변경사항 있으면 워크로그 생성 + 자동 commit + push
 
 INPUT=$(cat)
 CWD=$(echo "$INPUT" | jq -r '.cwd')
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // ""')
 COLLECT_FILE="$HOME/.claude/worklogs/.collecting/$SESSION_ID.jsonl"
-DATE=$(date +"%Y-%m-%d")
-TIME=$(date +"%H:%M")
 
 cd "$CWD" 2>/dev/null || exit 0
 
 # git 레포가 아니면 스킵
 git rev-parse --is-inside-work-tree &>/dev/null || exit 0
-REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
 
 # 이 세션에서 변경한 파일만 추출
 CHANGED_FILES=""
@@ -27,117 +24,39 @@ fi
 # 변경된 파일이 없으면 스킵
 [ -z "$CHANGED_FILES" ] && exit 0
 
-# git diff 확인 (실제로 변경사항이 있는지)
+# git diff 확인
 HAS_CHANGES=false
 while IFS= read -r file; do
   [ -z "$file" ] && continue
   REL_PATH=$(realpath --relative-to="$CWD" "$file" 2>/dev/null || echo "$file")
   if git diff --quiet -- "$REL_PATH" 2>/dev/null; then
     if ! git diff --cached --quiet -- "$REL_PATH" 2>/dev/null; then
-      HAS_CHANGES=true
-      break
+      HAS_CHANGES=true; break
     fi
   else
-    HAS_CHANGES=true
-    break
+    HAS_CHANGES=true; break
   fi
   if git ls-files --others --exclude-standard -- "$REL_PATH" 2>/dev/null | grep -q .; then
-    HAS_CHANGES=true
-    break
+    HAS_CHANGES=true; break
   fi
 done <<< "$CHANGED_FILES"
 
 $HAS_CHANGES || exit 0
 
-# --- 워크로그 생성 (커밋 전에 만들어서 함께 커밋) ---
-LOG_DIR="$REPO_ROOT/.worklogs/$DATE"
-mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/${TIME}_${SESSION_ID:0:8}.md"
+# --- 워크로그 생성 ---
+LOG_FILE=$(echo "{\"session_id\":\"$SESSION_ID\",\"cwd\":\"$CWD\",\"transcript_path\":\"$TRANSCRIPT\"}" | "$HOME/.claude/hooks/generate-worklog.sh")
 
-# 토큰 사용량
-TOTAL_INPUT=0; TOTAL_OUTPUT=0; CACHE_READ=0; CACHE_CREATE=0
-if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
-  TOTAL_INPUT=$(jq -s '[.[].message.usage.input_tokens // 0] | add // 0' "$TRANSCRIPT" 2>/dev/null || echo 0)
-  TOTAL_OUTPUT=$(jq -s '[.[].message.usage.output_tokens // 0] | add // 0' "$TRANSCRIPT" 2>/dev/null || echo 0)
-  CACHE_READ=$(jq -s '[.[].message.usage.cache_read_input_tokens // 0] | add // 0' "$TRANSCRIPT" 2>/dev/null || echo 0)
-  CACHE_CREATE=$(jq -s '[.[].message.usage.cache_creation_input_tokens // 0] | add // 0' "$TRANSCRIPT" 2>/dev/null || echo 0)
-fi
-
-# 사용자 요청
-USER_MESSAGES=""
-if [ -n "$TRANSCRIPT" ] && [ -f "$TRANSCRIPT" ]; then
-  USER_MESSAGES=$(jq -r '
-    select(.type == "human" or .role == "user") |
-    if .message.content then
-      if (.message.content | type) == "string" then .message.content
-      elif (.message.content | type) == "array" then
-        [.message.content[] | select(.type == "text") | .text] | join("\n")
-      else empty end
-    elif .content then
-      if (.content | type) == "string" then .content
-      elif (.content | type) == "array" then
-        [.content[] | select(.type == "text") | .text] | join("\n")
-      else empty end
-    else empty end
-  ' "$TRANSCRIPT" 2>/dev/null | head -c 3000)
-fi
-
-# 도구 통계
-TOOL_STATS=""
-[ -f "$COLLECT_FILE" ] && TOOL_STATS=$(jq -r '.tool' "$COLLECT_FILE" 2>/dev/null | sort | uniq -c | sort -rn)
-
-# Bash 명령어
-BASH_COMMANDS=""
-[ -f "$COLLECT_FILE" ] && BASH_COMMANDS=$(jq -r 'select(.tool == "Bash") | .input.command // empty' "$COLLECT_FILE" 2>/dev/null | head -30)
-
-cat > "$LOG_FILE" << REPORT
-# Worklog: $(basename "$REPO_ROOT")
-- **날짜**: $DATE $TIME
-- **세션**: \`$SESSION_ID\`
-- **프로젝트 경로**: $CWD
-
-## 토큰 사용량
-| 항목 | 토큰 수 |
-|------|---------|
-| Input | $TOTAL_INPUT |
-| Output | $TOTAL_OUTPUT |
-| Cache Read | $CACHE_READ |
-| Cache Create | $CACHE_CREATE |
-| **합계** | **$(($TOTAL_INPUT + $TOTAL_OUTPUT))** |
-
-## 사용자 요청
-\`\`\`
-$USER_MESSAGES
-\`\`\`
-
-## 도구 사용 통계
-\`\`\`
-$TOOL_STATS
-\`\`\`
-
-## 변경된 파일
-\`\`\`
-$CHANGED_FILES
-\`\`\`
-
-## 실행된 명령어
-\`\`\`
-${BASH_COMMANDS:-없음}
-\`\`\`
-REPORT
-
-# --- 스테이징 (변경 파일 + 워크로그) ---
+# --- 스테이징 ---
 while IFS= read -r file; do
   [ -z "$file" ] && continue
   REL_PATH=$(realpath --relative-to="$CWD" "$file" 2>/dev/null || echo "$file")
   git add "$REL_PATH" 2>/dev/null
 done <<< "$CHANGED_FILES"
-git add "$LOG_FILE" 2>/dev/null
+[ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] && git add "$LOG_FILE" 2>/dev/null
 
-# staged 변경사항 확인
 git diff --cached --quiet && exit 0
 
-# 커밋
+# --- 커밋 ---
 FILE_SUMMARY=$(git diff --cached --name-only | grep -v '.worklogs/' | head -10 | tr '\n' ', ' | sed 's/,$//')
 FILE_COUNT=$(git diff --cached --name-only | grep -v '.worklogs/' | wc -l | tr -d ' ')
 
@@ -149,7 +68,7 @@ Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>"
 
 git commit -m "$COMMIT_MSG" --no-verify 2>/dev/null || exit 0
 
-# 푸시
+# --- 푸시 ---
 REMOTE=$(git remote 2>/dev/null | head -1)
 BRANCH=$(git branch --show-current 2>/dev/null)
 if [ -n "$REMOTE" ] && [ -n "$BRANCH" ]; then
