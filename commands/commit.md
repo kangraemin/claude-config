@@ -8,6 +8,7 @@
 4. git-rules.md의 커밋 규칙에 따라 메시지 작성
 5. 변경 파일 개별 `git add`
 6. HEREDOC으로 커밋 실행
-7. `git status`로 결과 확인
+7. `git push` (커밋과 푸시는 항상 세트)
+8. `git status`로 결과 확인
 
-워크로그는 git post-commit 훅이 자동 생성한다. 별도 처리 불필요.
+워크로그는 git pre-commit 훅이 자동 생성한다. 별도 처리 불필요.
