@@ -15,6 +15,17 @@
         ]
       }
     ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/auto-commit.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "hooks": [
@@ -22,11 +33,6 @@
             "type": "command",
             "command": "$HOME/.claude/hooks/session-end.sh",
             "timeout": 15
-          },
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/auto-commit.sh",
-            "timeout": 30
           }
         ]
       }
