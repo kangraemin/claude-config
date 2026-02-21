@@ -8,14 +8,15 @@
 
 | 상황 | 작성자 | 내용 |
 |------|--------|------|
-| `/commit` 또는 Claude 커밋 | Claude | 요청사항, 작업내용, 변경통계, 토큰 |
+| `/commit` 또는 Claude 커밋 | Claude (`/worklog`) | 요청사항, 작업내용, 변경통계, 토큰(delta), 소요시간 |
 | auto-commit (SessionEnd) | pre-commit 훅 | 변경파일, 변경통계만 (fallback) |
 
 ## 2. 저장 위치
 
 ```
 <프로젝트>/.worklogs/
-  └── YYYY-MM-DD.md    ← 날짜별 단일 파일, 커밋마다 append
+  ├── YYYY-MM-DD.md    ← 날짜별 단일 파일, 커밋마다 append
+  └── .snapshot         ← 토큰/시간 스냅샷 (git 추적 안 함)
 ```
 
 ## 3. 파일 구조
@@ -28,11 +29,10 @@
 ## HH:MM
 
 ### 요청사항
-- 사용자가 요청한 내용 정리
+- 사용자가 요청한 내용
 
 ### 작업 내용
-- 어떤 작업을 했는지 요약
-- 주요 변경점
+- 간결한 작업 요약
 
 ### 변경 통계
 \`\`\`
@@ -41,38 +41,35 @@
 
 ### 토큰 사용량
 - 모델: claude-opus-4-6
-- 총 토큰: 1,234,567
-- 비용: $1.23
-
----
-
-## HH:MM (auto)          ← fallback (auto-commit)
-
-### 변경된 파일 (N개)
-### 변경 통계
+- 이번 작업: 500,000 토큰 / $0.50
+- 소요 시간: 12분
+- 일일 누적: 29,760,365 토큰 / $17.87
 ```
 
-## 4. 워크로그 내용
+## 4. 토큰/시간 delta 계산
 
-| 섹션 | 내용 | 소스 |
-|------|------|------|
-| 요청사항 | 사용자가 이 커밋 범위에서 요청한 것 | Claude 대화 컨텍스트 |
-| 작업 내용 | 무슨 작업을 했는지 + 주요 변경점 | Claude 분석 + diff |
-| 변경 통계 | 파일별 추가/삭제 줄 수 | `git diff --cached --stat` |
-| 토큰 사용량 | 모델, 토큰 수, 비용 | `npx ccusage@latest session --json` |
+### 스냅샷 파일: `.worklogs/.snapshot`
 
-## 5. 토큰 데이터
-
-```bash
-npx ccusage@latest session --json
+```json
+{
+  "timestamp": 1740100000,
+  "totalTokens": 29760365,
+  "totalCost": 17.87
+}
 ```
 
-- 세션별 토큰 사용량 (input/output/cache/total)
-- 비용 (USD)
-- 사용 모델
-- ccusage 실패 시 "데이터 없음" 표기
+### 계산 방법
 
-## 6. .gitignore 설정
+1. `npx ccusage@latest session --json`으로 현재 토큰 수집
+2. `.worklogs/.snapshot` 읽기
+3. **토큰 delta** = 현재 - 스냅샷
+4. **비용 delta** = 현재 - 스냅샷
+5. **소요 시간** = 현재 timestamp - 스냅샷 timestamp
+6. 워크로그 작성 후 스냅샷 갱신
+
+스냅샷이 없으면 (첫 실행) delta 대신 전체값 표시.
+
+## 5. .gitignore 설정
 
 화이트리스트 방식 레포:
 ```gitignore
@@ -80,16 +77,19 @@ npx ccusage@latest session --json
 !.worklogs/**
 ```
 
-일반 레포: 별도 설정 불필요.
+`.worklogs/.snapshot`은 git 추적하지 않음:
+```gitignore
+.worklogs/.snapshot
+```
 
-## 7. 제한 사항
+## 6. 제한 사항
 
 - pre-commit hook은 항상 `exit 0` (워크로그 실패가 커밋을 막으면 안 됨)
 - Claude가 워크로그를 staged하면 훅은 fallback 생략
-- 토큰 데이터는 일일 누적 스냅샷
+- ccusage 실패 시 "데이터 없음" 표기
 
-## 8. 구현 위치
+## 7. 구현 위치
 
+- **커맨드**: `~/.claude/commands/worklog.md`
 - **hook (fallback)**: `~/.claude/git-hooks/pre-commit`
-- **커맨드**: `~/.claude/commands/commit.md`
 - **글로벌 적용**: `git config --global core.hooksPath ~/.claude/git-hooks`

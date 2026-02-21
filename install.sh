@@ -9,6 +9,28 @@ set -e
 REPO="https://github.com/kangraemin/claude-config.git"
 MODE="${1:-}"
 
+# --- 의존성 체크 ---
+echo "=== 의존성 확인 ==="
+MISSING=0
+for cmd in git node jq gh; do
+  if command -v "$cmd" >/dev/null 2>&1; then
+    echo "  ✓ $cmd"
+  else
+    echo "  ✗ $cmd — 설치 필요"
+    MISSING=1
+  fi
+done
+
+if [ "$MISSING" -eq 1 ]; then
+  echo ""
+  echo "누락된 의존성을 설치한 후 다시 실행해주세요."
+  echo "  - node: https://nodejs.org/ (ccusage 토큰 추적용)"
+  echo "  - jq: brew install jq (hooks 데이터 처리용)"
+  echo "  - gh: brew install gh (GitHub PR/이슈용)"
+  exit 1
+fi
+echo ""
+
 # --- 모드 선택 ---
 if [ "$MODE" = "--local" ]; then
   MODE="local"
@@ -75,15 +97,18 @@ if [ "$MODE" = "global" ]; then
   mkdir -p "$TARGET/worklogs/.collecting"
 
   # 권한
-  echo "[4/4] 실행 권한 설정"
+  echo "[4/4] 실행 권한 및 git hooks 설정"
   chmod +x "$TARGET/hooks/"*.sh 2>/dev/null || true
+  chmod +x "$TARGET/git-hooks/"* 2>/dev/null || true
+  git config --global core.hooksPath "$TARGET/git-hooks"
 
   rmdir "$BACKUP" 2>/dev/null || true
 
   echo ""
   echo "=== 전역 설치 완료! ==="
   echo ""
-  echo "포함: agents/ commands/ rules/ hooks/"
+  echo "포함: agents/ commands/ rules/ hooks/ git-hooks/"
+  echo "git hooksPath: $TARGET/git-hooks"
   echo "업데이트: cd ~/.claude && git pull"
 
 # =============================================================
