@@ -51,13 +51,13 @@ done <<< "$CHANGED_FILES"
 
 git diff --cached --quiet && exit 0
 
-# 커밋 (post-commit 훅이 워크로그 자동 생성)
+# 커밋 (pre-commit 훅이 워크로그 자동 생성)
 FILE_SUMMARY=$(git diff --cached --name-only | head -10 | tr '\n' ', ' | sed 's/,$//')
 FILE_COUNT=$(git diff --cached --name-only | wc -l | tr -d ' ')
 
-git commit --no-verify -m "chore(claude): auto-commit session ${SESSION_ID:0:8}
+git commit -m "chore(claude): 세션 종료 자동 커밋 ${SESSION_ID:0:8}
 
-Changed $FILE_COUNT file(s): $FILE_SUMMARY
+변경 ${FILE_COUNT}개 파일: $FILE_SUMMARY
 
 Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>" 2>/dev/null || exit 0
 

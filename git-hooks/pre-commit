@@ -4,10 +4,9 @@
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 DATE=$(date +"%Y-%m-%d")
-TIME=$(date +"%H:%M")
+TIME=$(date +"%H:%M:%S")
 
-# 워크로그 관련 커밋이면 스킵 (auto-commit 등)
-# staged 파일이 .worklogs/ 뿐이면 스킵
+# staged 파일이 .worklogs/ 뿐이면 스킵 (무한루프 방지)
 STAGED_NON_WORKLOG=$(git diff --cached --name-only | grep -v '.worklogs/')
 [ -z "$STAGED_NON_WORKLOG" ] && exit 0
 
@@ -15,45 +14,39 @@ STAGED_NON_WORKLOG=$(git diff --cached --name-only | grep -v '.worklogs/')
 LOG_DIR="$REPO_ROOT/.worklogs/$DATE"
 mkdir -p "$LOG_DIR"
 
-COMMIT_HASH_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "initial")
-LOG_FILE="$LOG_DIR/${TIME}_${COMMIT_HASH_SHORT}.md"
+LOG_FILE="$LOG_DIR/${TIME}.md"
 
 # staged 파일 목록
 CHANGED_FILES=$(git diff --cached --name-only)
 FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
 
-# 세션 수집 데이터 활용
-COLLECT_DIR="$HOME/.claude/worklogs/.collecting"
-COLLECT_FILE=""
-if [ -d "$COLLECT_DIR" ]; then
-  COLLECT_FILE=$(ls -t "$COLLECT_DIR"/*.jsonl 2>/dev/null | head -1)
-fi
+# staged diff 요약 (stat)
+DIFF_STAT=$(git diff --cached --stat)
 
-TOOL_STATS=""
-BASH_COMMANDS=""
-if [ -n "$COLLECT_FILE" ] && [ -f "$COLLECT_FILE" ]; then
-  TOOL_STATS=$(jq -r '.tool' "$COLLECT_FILE" 2>/dev/null | sort | uniq -c | sort -rn)
-  BASH_COMMANDS=$(jq -r 'select(.tool == "Bash") | .input.command // empty' "$COLLECT_FILE" 2>/dev/null | head -20)
-fi
+# staged diff 전체 (너무 길면 잘라냄)
+DIFF_FULL=$(git diff --cached --no-color 2>/dev/null | head -200)
+DIFF_LINES=$(git diff --cached --no-color 2>/dev/null | wc -l | tr -d ' ')
+DIFF_TRUNCATED=""
+[ "$DIFF_LINES" -gt 200 ] && DIFF_TRUNCATED=" (전체 ${DIFF_LINES}줄 중 200줄만 표시)"
 
 cat > "$LOG_FILE" << REPORT
 # Worklog: $(basename "$REPO_ROOT")
 - **날짜**: $DATE $TIME
-- **프로젝트**: $REPO_ROOT
+- **프로젝트**: $(basename "$REPO_ROOT")
 
-## 변경된 파일 ($FILE_COUNT개)
+## 변경된 파일 (${FILE_COUNT}개)
 \`\`\`
 $CHANGED_FILES
 \`\`\`
 
-## 도구 사용 통계
+## 변경 통계
 \`\`\`
-${TOOL_STATS:-수집 데이터 없음}
+$DIFF_STAT
 \`\`\`
 
-## 실행된 명령어
-\`\`\`
-${BASH_COMMANDS:-수집 데이터 없음}
+## Diff${DIFF_TRUNCATED}
+\`\`\`diff
+$DIFF_FULL
 \`\`\`
 REPORT
 

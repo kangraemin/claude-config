@@ -32,3 +32,7 @@
 !projects/-Users-ram/
 !projects/-Users-ram/memory/
 !projects/-Users-ram/memory/**
+
+# worklogs
+!.worklogs/
+!.worklogs/**
