@@ -47,7 +47,7 @@
     "allow": [
       "WebSearch",
       "WebFetch",
-      "Bash(git *)",
+      "Bash(*)",
       "Write",
       "Edit"
     ]
