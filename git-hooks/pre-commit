@@ -1,28 +1,31 @@
 #!/bin/bash
-# git post-commit hook: 커밋할 때마다 워크로그 생성
+# git pre-commit hook: 커밋 직전에 워크로그 생성 → 같은 커밋에 포함
 # 글로벌 적용: git config --global core.hooksPath ~/.claude/git-hooks
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 DATE=$(date +"%Y-%m-%d")
 TIME=$(date +"%H:%M")
-COMMIT_HASH=$(git rev-parse --short HEAD)
-COMMIT_MSG=$(git log -1 --pretty=%B)
-CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD)
-FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
 
-# 워크로그 커밋 자체는 워크로그를 생성하지 않음 (무한루프 방지)
-echo "$COMMIT_MSG" | grep -q '^\[worklog\]' && exit 0
+# 워크로그 관련 커밋이면 스킵 (auto-commit 등)
+# staged 파일이 .worklogs/ 뿐이면 스킵
+STAGED_NON_WORKLOG=$(git diff --cached --name-only | grep -v '.worklogs/')
+[ -z "$STAGED_NON_WORKLOG" ] && exit 0
 
 # --- 워크로그 생성 ---
 LOG_DIR="$REPO_ROOT/.worklogs/$DATE"
 mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/${TIME}_${COMMIT_HASH}.md"
 
-# 세션 수집 데이터가 있으면 활용
+COMMIT_HASH_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "initial")
+LOG_FILE="$LOG_DIR/${TIME}_${COMMIT_HASH_SHORT}.md"
+
+# staged 파일 목록
+CHANGED_FILES=$(git diff --cached --name-only)
+FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
+
+# 세션 수집 데이터 활용
 COLLECT_DIR="$HOME/.claude/worklogs/.collecting"
 COLLECT_FILE=""
 if [ -d "$COLLECT_DIR" ]; then
-  # 가장 최근 세션 파일
   COLLECT_FILE=$(ls -t "$COLLECT_DIR"/*.jsonl 2>/dev/null | head -1)
 fi
 
@@ -36,13 +39,7 @@ fi
 cat > "$LOG_FILE" << REPORT
 # Worklog: $(basename "$REPO_ROOT")
 - **날짜**: $DATE $TIME
-- **커밋**: \`$COMMIT_HASH\`
 - **프로젝트**: $REPO_ROOT
-
-## 커밋 메시지
-\`\`\`
-$COMMIT_MSG
-\`\`\`
 
 ## 변경된 파일 ($FILE_COUNT개)
 \`\`\`
@@ -60,8 +57,7 @@ ${BASH_COMMANDS:-수집 데이터 없음}
 \`\`\`
 REPORT
 
-# 워크로그를 별도 커밋으로 추가
+# 워크로그를 staging에 추가 → 같은 커밋에 포함됨
 git add "$LOG_FILE" 2>/dev/null
-git commit --no-verify -m "[worklog] $DATE $TIME $COMMIT_HASH" 2>/dev/null || true
 
 exit 0
