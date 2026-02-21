@@ -3,6 +3,7 @@
 
 # 추적 대상
 !.gitignore
+!install.sh
 !CLAUDE.md
 !settings.json
 
