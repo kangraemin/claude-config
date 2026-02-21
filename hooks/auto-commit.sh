@@ -30,4 +30,4 @@ fi
 [ "$HAS_CHANGES" = "false" ] && exit 0
 
 # 변경 있으면 block → Claude가 커밋 처리
-echo '{"decision":"block","reason":"커밋되지 않은 변경사항이 있습니다. git diff와 git status를 확인하고, ~/.claude/rules/git-rules.md 규칙에 따라 의미있는 한글 커밋 메시지로 커밋 + 푸시하세요."}'
+echo '{"decision":"block","reason":"커밋되지 않은 변경사항이 있습니다. /commit 플로우를 실행하세요 (워크로그 작성 포함)."}'
