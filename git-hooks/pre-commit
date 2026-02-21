@@ -1,6 +1,10 @@
 #!/bin/bash
-# git pre-commit hook: 커밋 직전에 워크로그 생성 → 같은 커밋에 포함
+# git pre-commit hook: 워크로그를 커밋에 포함
 # 글로벌 적용: git config --global core.hooksPath ~/.claude/git-hooks
+#
+# 워크로그 작성 주체:
+#   - Claude /commit 플로우: Claude가 직접 작성 (요청사항, 작업요약, 토큰 등)
+#   - auto-commit 등: 이 훅이 fallback으로 기본 정보만 작성
 
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 DATE=$(date +"%Y-%m-%d")
@@ -10,24 +14,20 @@ TIME=$(date +"%H:%M:%S")
 STAGED_NON_WORKLOG=$(git diff --cached --name-only | grep -v '.worklogs/')
 [ -z "$STAGED_NON_WORKLOG" ] && exit 0
 
-# --- 워크로그: 날짜별 단일 파일에 append ---
 LOG_DIR="$REPO_ROOT/.worklogs"
 mkdir -p "$LOG_DIR"
-
 LOG_FILE="$LOG_DIR/${DATE}.md"
 
-# staged 파일 목록
+# 워크로그 파일이 이미 staged에 있으면 Claude가 작성한 것 → git add만
+if git diff --cached --name-only | grep -q '.worklogs/'; then
+  exit 0
+fi
+
+# --- fallback: Claude가 안 쓴 경우 (auto-commit 등) 기본 정보만 ---
+
 CHANGED_FILES=$(git diff --cached --name-only)
 FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
-
-# staged diff 요약 (stat)
 DIFF_STAT=$(git diff --cached --stat)
-
-# staged diff 전체 (너무 길면 잘라냄)
-DIFF_FULL=$(git diff --cached --no-color 2>/dev/null | head -200)
-DIFF_LINES=$(git diff --cached --no-color 2>/dev/null | wc -l | tr -d ' ')
-DIFF_TRUNCATED=""
-[ "$DIFF_LINES" -gt 200 ] && DIFF_TRUNCATED=" (전체 ${DIFF_LINES}줄 중 200줄만 표시)"
 
 # 파일이 없으면 헤더 생성
 if [ ! -f "$LOG_FILE" ]; then
@@ -37,11 +37,10 @@ if [ ! -f "$LOG_FILE" ]; then
 HEADER
 fi
 
-# 커밋 엔트리 append
 cat >> "$LOG_FILE" << ENTRY
 ---
 
-## $TIME
+## $TIME (auto)
 
 ### 변경된 파일 (${FILE_COUNT}개)
 \`\`\`
@@ -53,14 +52,8 @@ $CHANGED_FILES
 $DIFF_STAT
 \`\`\`
 
-### Diff${DIFF_TRUNCATED}
-\`\`\`diff
-$DIFF_FULL
-\`\`\`
-
 ENTRY
 
-# 워크로그를 staging에 추가 → 같은 커밋에 포함됨
 git add "$LOG_FILE" 2>/dev/null
 
 exit 0
