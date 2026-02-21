@@ -1,53 +1,33 @@
 #!/bin/bash
-# Stop: 커밋 안 된 변경사항 자동 commit + push (안전장치)
+# Stop 훅: 커밋 안 된 변경사항이 있으면 Claude에게 커밋하도록 block
 
 INPUT=$(cat)
 CWD=$(echo "$INPUT" | jq -r '.cwd')
 STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
 
-# Stop 훅 재진입 방지
+# 재진입 방지 (이미 커밋 처리 중이면 통과)
 [ "$STOP_HOOK_ACTIVE" = "true" ] && exit 0
 
 cd "$CWD" 2>/dev/null || exit 0
 
-# git 레포가 아니면 스킵
+# git 레포가 아니면 통과
 git rev-parse --is-inside-work-tree &>/dev/null || exit 0
 
-# 변경사항 확인 (unstaged + untracked)
-if git diff --quiet 2>/dev/null && git diff --cached --quiet 2>/dev/null; then
-  # staged/unstaged 변경 없음, untracked 확인
+# 변경사항 확인
+HAS_CHANGES=false
+
+# staged/unstaged 변경
+git diff --quiet 2>/dev/null || HAS_CHANGES=true
+git diff --cached --quiet 2>/dev/null || HAS_CHANGES=true
+
+# untracked 파일
+if [ "$HAS_CHANGES" = "false" ]; then
   UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null)
-  [ -z "$UNTRACKED" ] && exit 0
+  [ -n "$UNTRACKED" ] && HAS_CHANGES=true
 fi
 
-# 모든 변경사항 스테이징 (tracked 파일만)
-git add -u 2>/dev/null
+# 변경 없으면 통과
+[ "$HAS_CHANGES" = "false" ] && exit 0
 
-# untracked 파일도 추가 (.env, credentials 등 제외)
-git ls-files --others --exclude-standard 2>/dev/null | while IFS= read -r file; do
-  case "$file" in
-    *.env|*.key|*.pem|*credentials*|*Secrets/*) continue ;;
-    *) git add "$file" 2>/dev/null ;;
-  esac
-done
-
-git diff --cached --quiet && exit 0
-
-# 커밋
-FILE_SUMMARY=$(git diff --cached --name-only | head -10 | tr '\n' ', ' | sed 's/,$//')
-FILE_COUNT=$(git diff --cached --name-only | wc -l | tr -d ' ')
-
-git commit -m "chore(auto): Stop 자동 커밋
-
-변경 ${FILE_COUNT}개 파일: $FILE_SUMMARY
-
-Co-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>" 2>/dev/null || exit 0
-
-# 푸시
-REMOTE=$(git remote 2>/dev/null | head -1)
-BRANCH=$(git branch --show-current 2>/dev/null)
-if [ -n "$REMOTE" ] && [ -n "$BRANCH" ]; then
-  git push "$REMOTE" "$BRANCH" 2>/dev/null || true
-fi
-
-exit 0
+# 변경 있으면 block → Claude가 커밋 처리
+echo '{"decision":"block","reason":"커밋되지 않은 변경사항이 있습니다. git diff와 git status를 확인하고, ~/.claude/rules/git-rules.md 규칙에 따라 의미있는 한글 커밋 메시지로 커밋 + 푸시하세요."}'
