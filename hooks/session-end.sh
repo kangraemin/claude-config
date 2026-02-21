@@ -1,20 +1,26 @@
 #!/bin/bash
-# SessionEnd: 트랜스크립트 + 수집 데이터 파싱 → 대화 요약 마크다운 생성
+# SessionEnd: 트랜스크립트 + 수집 데이터 파싱 → 프로젝트 내 워크로그 생성
 
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
 CWD=$(echo "$INPUT" | jq -r '.cwd')
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // ""')
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 DATE=$(date +"%Y-%m-%d")
 TIME=$(date +"%H:%M")
 
 PROJECT=$(basename "$CWD")
-LOG_DIR="$HOME/.claude/worklogs/$DATE"
-mkdir -p "$LOG_DIR"
-LOG_FILE="$LOG_DIR/${TIME}_${PROJECT}_${SESSION_ID:0:8}.md"
-
 COLLECT_FILE="$HOME/.claude/worklogs/.collecting/$SESSION_ID.jsonl"
+
+# --- 워크로그 저장 경로: 프로젝트 내 .worklogs/ ---
+# git 레포면 레포 루트에, 아니면 CWD에 저장
+REPO_ROOT=$(cd "$CWD" 2>/dev/null && git rev-parse --show-toplevel 2>/dev/null)
+if [ -n "$REPO_ROOT" ]; then
+  LOG_DIR="$REPO_ROOT/.worklogs/$DATE"
+else
+  LOG_DIR="$CWD/.worklogs/$DATE"
+fi
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/${TIME}_${SESSION_ID:0:8}.md"
 
 # --- 1. 토큰 사용량 ---
 TOTAL_INPUT=0
@@ -59,7 +65,6 @@ fi
 # --- 4. 변경된 파일 목록 ---
 CHANGED_FILES=""
 if [ -f "$COLLECT_FILE" ]; then
-  # Write/Edit 도구에서 파일 경로 추출
   CHANGED_FILES=$(jq -r '
     select(.tool == "Write" or .tool == "Edit") |
     .input.file_path // .input.path // empty
@@ -114,8 +119,8 @@ REPORT
 # 임시 수집 파일 정리
 rm -f "$COLLECT_FILE"
 
-# 일별 인덱스 업데이트
-INDEX="$HOME/.claude/worklogs/$DATE/index.md"
-echo "- [$TIME $PROJECT](./${TIME}_${PROJECT}_${SESSION_ID:0:8}.md) — in:$TOTAL_INPUT out:$TOTAL_OUTPUT" >> "$INDEX"
+# 인덱스 업데이트 (프로젝트 내)
+INDEX="$LOG_DIR/../index.md"
+echo "- [$DATE $TIME](./$DATE/${TIME}_${SESSION_ID:0:8}.md) — in:$TOTAL_INPUT out:$TOTAL_OUTPUT" >> "$INDEX"
 
 exit 0
