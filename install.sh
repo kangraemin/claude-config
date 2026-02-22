@@ -24,9 +24,17 @@ done
 if [ "$MISSING" -eq 1 ]; then
   echo ""
   echo "누락된 의존성을 설치한 후 다시 실행해주세요."
-  echo "  - node: https://nodejs.org/ (ccusage 토큰 추적용)"
-  echo "  - jq: brew install jq (hooks 데이터 처리용)"
-  echo "  - gh: brew install gh (GitHub PR/이슈용)"
+  echo "  - node: https://nodejs.org/"
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+      echo "  - jq: winget install jqlang.jq"
+      echo "  - gh: winget install GitHub.cli"
+      ;;
+    *)
+      echo "  - jq: brew install jq"
+      echo "  - gh: brew install gh"
+      ;;
+  esac
   exit 1
 fi
 echo ""
