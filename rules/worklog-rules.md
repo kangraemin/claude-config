@@ -8,8 +8,8 @@
 
 | 상황 | 작성자 | 내용 |
 |------|--------|------|
-| `/commit` 또는 Claude 커밋 | Claude (`/worklog`) | 요청사항, 작업내용, 변경통계, 토큰(delta), 소요시간 |
-| auto-commit (SessionEnd) | pre-commit 훅 | 변경파일, 변경통계만 (fallback) |
+| `/commit` 또는 Claude 커밋 | Claude (`/worklog`) | 요청사항, 작업내용, 변경파일, 토큰(delta), 소요시간 |
+| auto-commit (SessionEnd) | pre-commit 훅 | 변경파일 목록만 (fallback) |
 
 ## 2. 저장 위치
 
@@ -34,10 +34,9 @@
 ### 작업 내용
 - 간결한 작업 요약
 
-### 변경 통계
-\`\`\`
-(git diff --cached --stat)
-\`\`\`
+### 변경 파일
+- `파일명`: 이 파일에서 한 작업 한 줄 설명
+- `파일명`: 이 파일에서 한 작업 한 줄 설명
 
 ### 토큰 사용량
 - 모델: claude-opus-4-6

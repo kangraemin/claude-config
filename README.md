@@ -153,8 +153,8 @@ Lead: Step 완료 확인 → 다음 Step 또는 Phase
 ### 작업 내용
 - 작업 요약
 
-### 변경 통계
-(git diff --cached --stat)
+### 변경 파일
+- `파일명`: 이 파일에서 한 작업 한 줄 설명
 
 ### 토큰 사용량
 - 이번 작업: 1,234,567 토큰 / $1.23
@@ -163,7 +163,7 @@ Lead: Step 완료 확인 → 다음 Step 또는 Phase
 ```
 
 - **`/commit` 경유**: 요청사항 + 작업내용 + ccusage 토큰 delta 기록
-- **auto-commit (fallback)**: pre-commit 훅이 변경통계만 기록
+- **auto-commit (fallback)**: pre-commit 훅이 변경파일 목록만 기록
 - **토큰 delta**: `.worklogs/.snapshot`에 이전 값 저장 → 차이 계산
 
 ## 업데이트
