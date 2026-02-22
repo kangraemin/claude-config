@@ -1,0 +1,69 @@
+#!/bin/bash
+# commit-msg hook: pre-commit fallback 워크로그를 커밋 메시지로 보강
+#
+# 흐름:
+#   1. pre-commit에서 (auto) fallback 워크로그 생성
+#   2. 이 훅에서 커밋 메시지를 읽어 "작업 내용" 추가
+#   3. git add로 워크로그 재스테이징
+
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+DATE=$(date +"%Y-%m-%d")
+
+LOG_DIR="$REPO_ROOT/.worklogs"
+LOG_FILE="$LOG_DIR/${DATE}.md"
+
+# 워크로그 파일 없으면 스킵
+[ ! -f "$LOG_FILE" ] && exit 0
+
+# 최근 항목이 (auto)가 아니면 스킵 (Claude가 직접 작성한 경우)
+grep -q "(auto)" "$LOG_FILE" || exit 0
+
+# 커밋 메시지 읽기 ($1 = .git/COMMIT_EDITMSG 경로)
+COMMIT_MSG_FILE="$1"
+[ ! -f "$COMMIT_MSG_FILE" ] && exit 0
+
+# 커밋 메시지 첫 줄 (headline)
+HEADLINE=$(head -1 "$COMMIT_MSG_FILE" | sed 's/^[[:space:]]*//')
+[ -z "$HEADLINE" ] && exit 0
+
+# 커밋 메시지 본문 (Co-Authored-By, 빈줄 제외)
+BODY=$(tail -n +3 "$COMMIT_MSG_FILE" | grep -v "^$" | grep -v "Co-Authored-By")
+
+# 작업 내용 블록 생성
+TMPFILE=$(mktemp)
+{
+  echo "### 작업 내용"
+  echo "- ${HEADLINE}"
+  if [ -n "$BODY" ]; then
+    echo "$BODY" | while IFS= read -r line; do
+      echo "- ${line}"
+    done
+  fi
+  echo ""
+} > "$TMPFILE"
+
+# 마지막 "### 변경된 파일" 앞에 삽입
+python3 - "$LOG_FILE" "$TMPFILE" << 'PYEOF'
+import sys
+
+log_path = sys.argv[1]
+insert_path = sys.argv[2]
+
+with open(log_path, 'r') as f:
+    content = f.read()
+
+with open(insert_path, 'r') as f:
+    insert_block = f.read()
+
+marker = '### 변경된 파일'
+idx = content.rfind(marker)
+if idx != -1:
+    content = content[:idx] + insert_block + content[idx:]
+    with open(log_path, 'w') as f:
+        f.write(content)
+PYEOF
+
+rm -f "$TMPFILE"
+git add "$LOG_FILE" 2>/dev/null
+
+exit 0
