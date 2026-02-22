@@ -2,6 +2,36 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch",
+      "Bash(*)",
+      "Write",
+      "Edit",
+      "Read"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(rm -fr:*)"
+    ],
+    "ask": [
+      "Bash(sudo:*)",
+      "Bash(chmod 777:*)",
+      "Bash(npm publish:*)",
+      "Bash(eval:*)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(**/*credential*)",
+      "Read(**/*secret*)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
@@ -43,34 +73,7 @@
     "command": "~/.claude/statusline.sh"
   },
   "skipDangerousModePermissionPrompt": true,
-  "permissions": {
-    "allow": [
-      "WebSearch",
-      "WebFetch",
-      "Bash(*)",
-      "Write",
-      "Edit",
-      "Read"
-    ],
-    "deny": [
-      "Bash(rm -rf:*)",
-      "Bash(rm -fr:*)"
-    ],
-    "ask": [
-      "Bash(sudo:*)",
-      "Bash(chmod 777:*)",
-      "Bash(npm publish:*)",
-      "Bash(eval:*)",
-      "Read(.env)",
-      "Read(.env.*)",
-      "Read(**/.env)",
-      "Read(**/.env.*)",
-      "Read(~/.ssh/**)",
-      "Read(~/.aws/**)",
-      "Read(**/*credential*)",
-      "Read(**/*secret*)",
-      "Read(**/*.pem)",
-      "Read(**/*.key)"
-    ]
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true
   }
 }
