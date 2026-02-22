@@ -9,7 +9,7 @@
 | 상황 | 작성자 | 내용 |
 |------|--------|------|
 | `/commit` 또는 Claude 커밋 | Claude (`/worklog`) | 요청사항, 작업내용, 변경파일, 토큰(delta), 소요시간 |
-| auto-commit (SessionEnd) | pre-commit 훅 | 변경파일 목록만 (fallback) |
+| auto-commit (SessionEnd) | pre-commit 훅 | 변경된 파일 목록 + 변경통계 (fallback) |
 
 ## 2. 저장 위치
 
@@ -20,6 +20,8 @@
 ```
 
 ## 3. 파일 구조
+
+### Claude 작성 (`/worklog`)
 
 ```markdown
 # Worklog: <프로젝트명> — YYYY-MM-DD
@@ -45,6 +47,25 @@
 - 일일 누적: 29,760,365 토큰 / $17.87
 ```
 
+### auto-commit fallback (pre-commit 훅)
+
+```markdown
+---
+
+## HH:MM (auto)
+
+### 변경된 파일 (N개)
+\`\`\`
+파일1
+파일2
+\`\`\`
+
+### 변경 통계
+\`\`\`
+(git diff --cached --stat 결과)
+\`\`\`
+```
+
 ## 4. 토큰/시간 delta 계산
 
 ### 스냅샷 파일: `.worklogs/.snapshot`
@@ -59,14 +80,22 @@
 
 ### 계산 방법
 
-1. `npx ccusage@latest session --json`으로 현재 토큰 수집
-2. `.worklogs/.snapshot` 읽기
-3. **토큰 delta** = 현재 - 스냅샷
-4. **비용 delta** = 현재 - 스냅샷
-5. **소요 시간** = 현재 timestamp - 스냅샷 timestamp
-6. 워크로그 작성 후 스냅샷 갱신
+1. `date +%s`로 현재 unix timestamp 가져오기
+2. `ccusage session --json`으로 현재 세션 토큰 수집 (없으면 `npx ccusage@latest session --json`)
+3. `.worklogs/.snapshot` 읽기
+4. delta 계산:
+   - **토큰 delta** = 현재 totalTokens - 스냅샷 totalTokens
+   - **비용 delta** = 현재 totalCost - 스냅샷 totalCost
+   - **소요 시간** = 현재 timestamp - 스냅샷 timestamp → 분 단위로 변환
+5. 워크로그 작성 후 스냅샷 갱신
+6. 스냅샷 갱신: `echo '{"timestamp":NOW,"totalTokens":NOW,"totalCost":NOW}' > .worklogs/.snapshot`
 
-스냅샷이 없으면 (첫 실행) delta 대신 전체값 표시.
+스냅샷이 없으면 (첫 실행) delta 대신 전체값 표시하고 스냅샷 생성.
+
+### 주의
+
+- 소요 시간은 **반드시 스냅샷 timestamp에서 계산**한다. 추정하지 않는다.
+- 스냅샷 갱신은 **워크로그 작성 후** 반드시 실행한다.
 
 ## 5. .gitignore 설정
 
