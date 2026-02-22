@@ -59,9 +59,11 @@ with open(log_path, 'r') as f:
 with open(insert_path, 'r') as f:
     insert_block = f.read()
 
-marker = '### 변경 파일'
-idx = content.rfind(marker)
-if idx != -1:
+import re
+# 줄 시작 위치의 '### 변경 파일'만 매칭 (설명 텍스트 내 매칭 방지)
+matches = list(re.finditer(r'^### 변경 파일', content, re.MULTILINE))
+if matches:
+    idx = matches[-1].start()
     content = content[:idx] + insert_block + content[idx:]
     with open(log_path, 'w') as f:
         f.write(content)
