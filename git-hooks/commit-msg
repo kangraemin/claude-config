@@ -46,8 +46,12 @@ TMPFILE=$(mktemp)
   echo ""
 } > "$TMPFILE"
 
-# 마지막 "### 변경된 파일" 앞에 삽입
-python3 - "$LOG_FILE" "$TMPFILE" << 'PYEOF'
+# Python 바이너리 탐색 (Windows 호환)
+PYTHON=$(command -v python3 || command -v python || command -v py)
+[ -z "$PYTHON" ] && { rm -f "$TMPFILE"; exit 0; }
+
+# 마지막 "### 변경 파일" 앞에 삽입
+$PYTHON - "$LOG_FILE" "$TMPFILE" << 'PYEOF'
 import sys
 
 log_path = sys.argv[1]
