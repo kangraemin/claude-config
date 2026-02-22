@@ -64,6 +64,8 @@ if idx != -1:
 PYEOF
 
 rm -f "$TMPFILE"
-git add "$LOG_FILE" 2>/dev/null
+
+# git add하지 않음 — commit-msg 시점에서 staging은 현재 커밋에 포함 안 됨.
+# 보강된 워크로그는 디스크에 남고, 다음 커밋의 pre-commit에서 자동 포함.
 
 exit 0
