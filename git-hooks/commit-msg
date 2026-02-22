@@ -18,6 +18,10 @@ LOG_FILE="$LOG_DIR/${DATE}.md"
 # 최근 항목이 (auto)가 아니면 스킵 (Claude가 직접 작성한 경우)
 grep -q "(auto)" "$LOG_FILE" || exit 0
 
+# staged 파일이 .worklogs/ 뿐이면 스킵 (워크로그만 커밋하는 경우 무한루프 방지)
+STAGED_NON_WORKLOG=$(git diff --cached --name-only | grep -v '.worklogs/')
+[ -z "$STAGED_NON_WORKLOG" ] && exit 0
+
 # 커밋 메시지 읽기 ($1 = .git/COMMIT_EDITMSG 경로)
 COMMIT_MSG_FILE="$1"
 [ ! -f "$COMMIT_MSG_FILE" ] && exit 0
