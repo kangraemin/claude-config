@@ -59,7 +59,7 @@ with open(log_path, 'r') as f:
 with open(insert_path, 'r') as f:
     insert_block = f.read()
 
-marker = '### 변경된 파일'
+marker = '### 변경 파일'
 idx = content.rfind(marker)
 if idx != -1:
     content = content[:idx] + insert_block + content[idx:]

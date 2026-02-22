@@ -26,8 +26,7 @@ fi
 # --- fallback: Claude가 안 쓴 경우 (auto-commit 등) 기본 정보만 ---
 
 CHANGED_FILES=$(git diff --cached --name-only)
-FILE_COUNT=$(echo "$CHANGED_FILES" | wc -l | tr -d ' ')
-DIFF_STAT=$(git diff --cached --stat)
+FILE_LIST=$(echo "$CHANGED_FILES" | while IFS= read -r f; do echo "- \`$f\`"; done)
 
 # 파일이 없으면 헤더 생성
 if [ ! -f "$LOG_FILE" ]; then
@@ -42,15 +41,8 @@ cat >> "$LOG_FILE" << ENTRY
 
 ## $TIME (auto)
 
-### 변경된 파일 (${FILE_COUNT}개)
-\`\`\`
-$CHANGED_FILES
-\`\`\`
-
-### 변경 통계
-\`\`\`
-$DIFF_STAT
-\`\`\`
+### 변경 파일
+$FILE_LIST
 
 ENTRY
 

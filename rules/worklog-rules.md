@@ -9,7 +9,7 @@
 | 상황 | 작성자 | 내용 |
 |------|--------|------|
 | `/commit` 또는 Claude 커밋 | Claude (`/worklog`) | 요청사항, 작업내용, 변경파일, 토큰(delta), 소요시간 |
-| auto-commit (SessionEnd) | pre-commit 훅 | 변경된 파일 목록 + 변경통계 (fallback) |
+| auto-commit (SessionEnd) | pre-commit 훅 | 변경파일 목록 (fallback) |
 
 ## 2. 저장 위치
 
@@ -54,16 +54,9 @@
 
 ## HH:MM (auto)
 
-### 변경된 파일 (N개)
-\`\`\`
-파일1
-파일2
-\`\`\`
-
-### 변경 통계
-\`\`\`
-(git diff --cached --stat 결과)
-\`\`\`
+### 변경 파일
+- `파일1`
+- `파일2`
 ```
 
 ## 4. 토큰/시간 delta 계산
