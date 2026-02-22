@@ -13,6 +13,11 @@ cd "$CWD" 2>/dev/null || exit 0
 # git 레포가 아니면 통과
 git rev-parse --is-inside-work-tree &>/dev/null || exit 0
 
+# .worklogs/만 변경된 경우는 무시 (commit-msg 훅 보강분)
+CHANGED=$(git diff --name-only 2>/dev/null; git diff --cached --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null)
+NON_WORKLOG=$(echo "$CHANGED" | grep -v '.worklogs/' | grep -v '^$')
+[ -z "$NON_WORKLOG" ] && exit 0
+
 # 변경사항 확인
 HAS_CHANGES=false
 
