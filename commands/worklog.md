@@ -38,26 +38,11 @@ description: 워크로그 작성
 2. `ccusage session --json`으로 현재 세션 토큰 수집 (없으면 `npx ccusage@latest session --json`)
 3. `cat .worklogs/.snapshot`으로 이전 스냅샷 읽기
 4. **소요 시간 계산** (실제 Claude 작업 시간):
-   - 현재 세션 JSONL 파일에서 `durationMs` 필드를 가진 엔트리 추출
-   - 스냅샷 timestamp 이후(`timestamp >`) 엔트리만 필터
-   - `durationMs` 합산 → 분 단위로 변환 (반올림)
-   - JSONL 경로: `~/.claude/projects/<프로젝트경로인코딩>/*.jsonl` (최신 파일)
    ```bash
-   # 예시: 스냅샷 이후 durationMs 합산
-   python3 -c "
-   import json, glob, os
-   snapshot_ts = 'SNAPSHOT_TIMESTAMP_ISO'  # 스냅샷의 ISO timestamp
-   files = sorted(glob.glob(os.path.expanduser('~/.claude/projects/PROJECT_PATH/*.jsonl')), key=os.path.getmtime, reverse=True)
-   total_ms = 0
-   if files:
-       with open(files[0]) as f:
-           for line in f:
-               obj = json.loads(line.strip())
-               if obj.get('durationMs') and obj.get('timestamp', '') > snapshot_ts:
-                   total_ms += obj['durationMs']
-   print(f'{total_ms},{round(total_ms/60000)}')
-   "
+   python3 ~/.claude/scripts/duration.py <스냅샷_timestamp> <프로젝트_cwd>
+   # 출력: 초,분  (예: 584.9,10)
    ```
+   - 프로젝트_cwd는 현재 프로젝트의 루트 경로 (예: `/Users/ram/.claude/.claude`)
 5. 토큰/비용 delta 계산:
    - **토큰 delta** = 현재 totalTokens - 스냅샷 totalTokens
    - **비용 delta** = 현재 totalCost - 스냅샷 totalCost

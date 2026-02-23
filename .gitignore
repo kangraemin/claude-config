@@ -32,6 +32,10 @@
 !git-hooks/
 !git-hooks/**
 
+# scripts
+!scripts/
+!scripts/**
+
 # memory (auto memory)
 !projects/
 !projects/-Users-ram/
