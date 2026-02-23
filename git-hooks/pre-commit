@@ -51,4 +51,12 @@ ENTRY
 
 git add "$LOG_FILE" 2>/dev/null
 
+# 스냅샷 timestamp 갱신 (토큰/비용은 유지, 다음 /worklog의 시간 delta 정확도 보장)
+SNAPSHOT_FILE="$LOG_DIR/.snapshot"
+NOW=$(date +%s)
+PYTHON=$(command -v python3 || command -v python || command -v py)
+if [ -n "$PYTHON" ] && [ -f "$SNAPSHOT_FILE" ]; then
+  $PYTHON -c "import json,sys;p=sys.argv[1];d=json.load(open(p));d['timestamp']=int(sys.argv[2]);json.dump(d,open(p,'w'))" "$SNAPSHOT_FILE" "$NOW" 2>/dev/null
+fi
+
 exit 0
