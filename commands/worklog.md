@@ -6,6 +6,10 @@ description: 워크로그 작성
 
 `~/.claude/rules/worklog-rules.md`의 규칙을 따른다.
 
+## 모드 체크
+
+- `WORKLOG_MODE=off`이면 "워크로그 비활성화 상태 (WORKLOG_MODE=off)" 출력 후 즉시 종료한다.
+
 ## 플로우
 
 1. `git diff --cached --stat`으로 staged 변경 확인 (없으면 `git diff --stat`으로 unstaged 확인)

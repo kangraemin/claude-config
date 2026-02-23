@@ -6,6 +6,9 @@
 #   - Claude /commit 플로우: Claude가 직접 작성 (요청사항, 작업요약, 토큰 등)
 #   - auto-commit 등: 이 훅이 fallback으로 기본 정보만 작성
 
+# WORKLOG_MODE=off이면 워크로그 fallback 스킵
+[ "$WORKLOG_MODE" = "off" ] && exit 0
+
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 DATE=$(date +"%Y-%m-%d")
 TIME=$(date +"%H:%M")

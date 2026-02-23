@@ -6,6 +6,9 @@
 #   2. 이 훅에서 커밋 메시지를 읽어 "작업 내용" 추가
 #   3. git add로 워크로그 재스테이징
 
+# WORKLOG_MODE=off이면 워크로그 enrichment 스킵
+[ "$WORKLOG_MODE" = "off" ] && exit 0
+
 REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
 DATE=$(date +"%Y-%m-%d")
 

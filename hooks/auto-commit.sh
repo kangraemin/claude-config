@@ -35,4 +35,9 @@ fi
 [ "$HAS_CHANGES" = "false" ] && exit 0
 
 # 변경 있으면 block → Claude가 커밋 처리
-echo '{"decision":"block","reason":"커밋되지 않은 변경사항이 있습니다. /commit 플로우를 실행하세요 (워크로그 작성 포함)."}'
+# WORKLOG_MODE에 따라 메시지 분기
+if [ "$WORKLOG_MODE" = "off" ]; then
+  echo '{"decision":"block","reason":"커밋되지 않은 변경사항이 있습니다. /commit 플로우를 실행하세요."}'
+else
+  echo '{"decision":"block","reason":"커밋되지 않은 변경사항이 있습니다. /commit 플로우를 실행하세요 (워크로그 작성 포함)."}'
+fi
