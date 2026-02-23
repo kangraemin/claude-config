@@ -33,6 +33,18 @@
     ]
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd $HOME/.claude && git pull --ff-only origin main 2>/dev/null || true",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      }
+    ],
     "PostToolUse": [
       {
         "hooks": [
