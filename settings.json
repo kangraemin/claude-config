@@ -1,7 +1,9 @@
 {
+  "model": "opusplan",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "WORKLOG_MODE": "all"
+    "WORKLOG_MODE": "all",
+    "ENABLE_TOOL_SEARCH": "true"
   },
   "permissions": {
     "allow": [
