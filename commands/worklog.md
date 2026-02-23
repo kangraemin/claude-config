@@ -37,18 +37,38 @@ description: 워크로그 작성
 1. `date +%s`로 현재 unix timestamp 가져오기
 2. `ccusage session --json`으로 현재 세션 토큰 수집 (없으면 `npx ccusage@latest session --json`)
 3. `cat .worklogs/.snapshot`으로 이전 스냅샷 읽기
-4. delta 계산:
+4. **소요 시간 계산** (실제 Claude 작업 시간):
+   - 현재 세션 JSONL 파일에서 `durationMs` 필드를 가진 엔트리 추출
+   - 스냅샷 timestamp 이후(`timestamp >`) 엔트리만 필터
+   - `durationMs` 합산 → 분 단위로 변환 (반올림)
+   - JSONL 경로: `~/.claude/projects/<프로젝트경로인코딩>/*.jsonl` (최신 파일)
+   ```bash
+   # 예시: 스냅샷 이후 durationMs 합산
+   python3 -c "
+   import json, glob, os
+   snapshot_ts = 'SNAPSHOT_TIMESTAMP_ISO'  # 스냅샷의 ISO timestamp
+   files = sorted(glob.glob(os.path.expanduser('~/.claude/projects/PROJECT_PATH/*.jsonl')), key=os.path.getmtime, reverse=True)
+   total_ms = 0
+   if files:
+       with open(files[0]) as f:
+           for line in f:
+               obj = json.loads(line.strip())
+               if obj.get('durationMs') and obj.get('timestamp', '') > snapshot_ts:
+                   total_ms += obj['durationMs']
+   print(f'{total_ms},{round(total_ms/60000)}')
+   "
+   ```
+5. 토큰/비용 delta 계산:
    - **토큰 delta** = 현재 totalTokens - 스냅샷 totalTokens
    - **비용 delta** = 현재 totalCost - 스냅샷 totalCost
-   - **소요 시간** = 현재 timestamp - 스냅샷 timestamp → 분 단위로 변환
-5. 워크로그에 delta 값 기록
-6. 스냅샷 갱신: `echo '{"timestamp":NOW,"totalTokens":NOW,"totalCost":NOW}' > .worklogs/.snapshot`
+6. 워크로그에 delta 값 기록
+7. 스냅샷 갱신: `echo '{"timestamp":NOW,"totalTokens":NOW,"totalCost":NOW}' > .worklogs/.snapshot`
 
 스냅샷이 없으면 (첫 실행) delta 대신 전체값 표시하고 스냅샷 생성.
 
 ### 중요
 
-- 소요 시간은 **반드시 스냅샷 timestamp에서 계산**한다. 추정하지 않는다.
+- 소요 시간은 **JSONL의 durationMs 합산**으로 계산한다. 벽시계 시간(wall clock) 아님.
 - 스냅샷 갱신은 **워크로그 작성 후** 반드시 실행한다.
 
 ## 엔트리 포맷

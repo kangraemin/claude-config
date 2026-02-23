@@ -42,11 +42,14 @@ auto-commit fallback: `## HH:MM (auto)` + 변경 파일 목록만.
 1. `date +%s` → 현재 timestamp
 2. `ccusage session --json` (없으면 `npx ccusage@latest session --json`)
 3. `.worklogs/.snapshot` 읽기
-4. delta = 현재값 - 스냅샷값 (토큰, 비용, 시간→분)
-5. 워크로그 작성 후 스냅샷 갱신
+4. 토큰/비용 delta = 현재값 - 스냅샷값
+5. **소요 시간** = 세션 JSONL의 `durationMs` 합산 (스냅샷 timestamp 이후만 필터)
+   - JSONL 경로: `~/.claude/projects/<프로젝트경로>/*.jsonl` (최신 파일)
+   - 실제 Claude 작업 시간 (벽시계 시간 아님)
+6. 워크로그 작성 후 스냅샷 갱신
 
 - 스냅샷 없으면 전체값 표시 후 생성
-- 소요 시간은 **스냅샷 timestamp 기준** (추정 금지)
+- JSONL 읽기 실패 시 "측정 불가"
 - ccusage 실패 시 "데이터 없음"
 
 ## 제한
