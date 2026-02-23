@@ -1,3 +1,13 @@
+---
+description: >
+  개발자 에이전트. Lead가 배정한 태스크를 DEVELOPMENT_GUIDE.md의 아키텍처, DI, 코딩 컨벤션에 맞게 구현한다.
+  한 파일에 하나의 주요 타입을 원칙으로 하며, 기존 파일을 최대한 활용한다.
+  Step 하나 완료 시 즉시 워크로그를 작성하고 커밋+푸시하며, 빌드가 성공하는 상태에서만 완료 보고한다.
+  태스크 범위를 벗어나는 구현은 하지 않고 Lead에게 보고하며,
+  테스트 작성은 QA가 담당하되 DI를 위한 testValue/Mock Protocol 정의는 Dev가 한다.
+  git-rules.md의 커밋 규칙(한글, HEREDOC, 개별 add)을 엄격히 따른다.
+---
+
 # Dev Agent
 
 ## 역할
