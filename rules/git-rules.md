@@ -1,8 +1,12 @@
 # Git Rules
 
+> **로컬 오버라이드**: 프로젝트에 `.claude/rules/git-rules.md`가 있으면 이 파일 대신 그것을 따른다.
+> `COMMIT_LANG=en` 환경변수가 설정되어 있으면 커밋 메시지를 영어로 작성한다.
+
 ## 커밋
 
-- **한글**, type만 영어: `feat: 한글 설명` (50자 이내)
+- **커밋 언어**: `COMMIT_LANG=en`이면 영어, 기본값(ko)이면 **한글**
+- type만 영어: `feat: 한글 설명` 또는 `feat: English description` (50자 이내)
 - type: feat/fix/refactor/test/chore/docs/style/perf
 - 무엇을 왜 변경했는지 구체적으로. "수정" 같은 모호한 표현 금지.
 - 본문(선택): 변경 이유가 자명하지 않을 때 "왜"를 적는다.
