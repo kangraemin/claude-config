@@ -20,7 +20,8 @@ Claude Code 설정(플래그)을 조회하거나 변경한다.
 | 키 | 가능한 값 | 설명 |
 |---|---|---|
 | `model` | opusplan / claude-sonnet-4-6 / claude-haiku-4-5-20251001 | 사용 모델 |
-| `WORKLOG_MODE` | all / off / manual | 워크로그 모드 |
+| `WORKLOG_TIMING` | each-commit / session-end / manual | 워크로그 작성 시점 |
+| `COMMIT_TIMING` | session-end / manual | 커밋 트리거 시점 |
 | `COMMIT_LANG` | ko / en | 커밋 메시지 언어 |
 | `ENABLE_TOOL_SEARCH` | true / false | 도구 검색 활성화 |
 

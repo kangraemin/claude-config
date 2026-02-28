@@ -1,43 +1,49 @@
 #!/bin/bash
-# Stop 훅: 커밋 안 된 변경사항이 있으면 Claude에게 커밋하도록 block
+# Stop 훅: COMMIT_TIMING / WORKLOG_TIMING에 따라 세션 종료 시 동작 결정
 
 INPUT=$(cat)
 CWD=$(echo "$INPUT" | jq -r '.cwd')
 STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
 
-# 재진입 방지 (이미 커밋 처리 중이면 통과)
+# 재진입 방지
 [ "$STOP_HOOK_ACTIVE" = "true" ] && exit 0
 
 cd "$CWD" 2>/dev/null || exit 0
-
-# git 레포가 아니면 통과
 git rev-parse --is-inside-work-tree &>/dev/null || exit 0
 
-# .worklogs/만 변경된 경우는 무시 (commit-msg 훅 보강분)
-CHANGED=$(git diff --name-only 2>/dev/null; git diff --cached --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null)
-NON_WORKLOG=$(echo "$CHANGED" | grep -v '.worklogs/' | grep -v '^$')
-[ -z "$NON_WORKLOG" ] && exit 0
+# 타이밍 설정 읽기 (기본값)
+COMMIT_TIMING="${COMMIT_TIMING:-session-end}"
+WORKLOG_TIMING="${WORKLOG_TIMING:-each-commit}"
 
-# 변경사항 확인
-HAS_CHANGES=false
+# --- 커밋 필요 여부 ---
+NEED_COMMIT=false
+if [ "$COMMIT_TIMING" = "session-end" ]; then
+  CHANGED=$(git diff --name-only 2>/dev/null; git diff --cached --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null)
+  NON_WORKLOG=$(echo "$CHANGED" | grep -v '\.worklogs/' | grep -v '^$')
 
-# staged/unstaged 변경
-git diff --quiet 2>/dev/null || HAS_CHANGES=true
-git diff --cached --quiet 2>/dev/null || HAS_CHANGES=true
-
-# untracked 파일
-if [ "$HAS_CHANGES" = "false" ]; then
-  UNTRACKED=$(git ls-files --others --exclude-standard 2>/dev/null)
-  [ -n "$UNTRACKED" ] && HAS_CHANGES=true
+  if [ -n "$NON_WORKLOG" ]; then
+    git diff --quiet 2>/dev/null || NEED_COMMIT=true
+    git diff --cached --quiet 2>/dev/null || NEED_COMMIT=true
+    [ -n "$(git ls-files --others --exclude-standard 2>/dev/null)" ] && NEED_COMMIT=true
+  fi
 fi
 
-# 변경 없으면 통과
-[ "$HAS_CHANGES" = "false" ] && exit 0
+# --- 워크로그 필요 여부 ---
+NEED_WORKLOG=false
+if [ "$WORKLOG_TIMING" = "session-end" ]; then
+  WORKLOG_FILE="$CWD/.worklogs/$(date +%Y-%m-%d).md"
+  [ ! -f "$WORKLOG_FILE" ] && NEED_WORKLOG=true
+fi
 
-# 변경 있으면 block → Claude가 커밋 처리
-# WORKLOG_MODE에 따라 메시지 분기
-if [ "$WORKLOG_MODE" = "off" ]; then
-  echo '{"decision":"block","reason":"커밋되지 않은 변경사항이 있습니다. /commit 플로우를 실행하세요."}'
+# --- block 메시지 결정 ---
+if [ "$NEED_COMMIT" = "true" ] && [ "$NEED_WORKLOG" = "true" ]; then
+  echo '{"decision":"block","reason":"세션 종료 전 /worklog를 실행한 후 /commit을 실행하세요."}'
+elif [ "$NEED_COMMIT" = "true" ]; then
+  MSG="커밋되지 않은 변경사항이 있습니다. /commit을 실행하세요"
+  [ "$WORKLOG_TIMING" = "each-commit" ] && MSG="$MSG (워크로그 포함)."
+  echo "{\"decision\":\"block\",\"reason\":\"$MSG\"}"
+elif [ "$NEED_WORKLOG" = "true" ]; then
+  echo '{"decision":"block","reason":"세션 종료 전 /worklog를 실행하세요."}'
 else
-  echo '{"decision":"block","reason":"커밋되지 않은 변경사항이 있습니다. /commit 플로우를 실행하세요 (워크로그 작성 포함)."}'
+  exit 0
 fi

@@ -1,11 +1,16 @@
 # Worklog Rules
 
-## 생성 주체
+## 생성 시점 (`WORKLOG_TIMING`)
 
-| 상황 | 작성자 | 내용 |
-|------|--------|------|
-| `/commit` 또는 Claude 커밋 | `/worklog` | 요청사항, 작업내용, 변경파일, 토큰(delta) |
-| auto-commit (SessionEnd) | pre-commit 훅 | 변경파일 목록 (fallback) |
+| 값 | 동작 |
+|---|---|
+| `each-commit` | `/commit` 실행 시마다 자동 작성 (기본) |
+| `session-end` | 세션 종료 전 오늘 워크로그 없으면 Stop 훅이 요청 |
+| `manual` | `/worklog` 직접 실행할 때만 작성 |
+
+## 모드 체크
+
+- `WORKLOG_TIMING=manual`이면 `/worklog` 스킬 시작 시 "워크로그 비활성화 상태" 출력 후 종료
 
 ## 저장 위치
 

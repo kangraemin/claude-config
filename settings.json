@@ -2,9 +2,9 @@
   "model": "opusplan",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "WORKLOG_MODE": "all",
     "ENABLE_TOOL_SEARCH": "true",
-    "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "WORKLOG_TIMING": "each-commit"
   },
   "permissions": {
     "allow": [

@@ -29,35 +29,45 @@ fi
 echo ""
 echo "╔══════════════════════════════════════╗"
 echo "║    Claude Code 설정 마법사           ║"
-echo "║    대상: $LABEL"
+printf "║    대상: %-29s║\n" "$LABEL"
 echo "╚══════════════════════════════════════╝"
 echo "엔터: 현재값 유지  |  번호 입력: 변경"
 echo ""
 
 # 현재값 읽기
 cur_model=$(jq -r '.model // ""' "$SETTINGS")
-cur_worklog=$(jq -r '.env.WORKLOG_MODE // ""' "$SETTINGS")
+cur_worklog_timing=$(jq -r '.env.WORKLOG_TIMING // ""' "$SETTINGS")
+cur_commit_timing=$(jq -r '.env.COMMIT_TIMING // ""' "$SETTINGS")
 cur_tool_search=$(jq -r '.env.ENABLE_TOOL_SEARCH // ""' "$SETTINGS")
 cur_commit_lang=$(jq -r '.env.COMMIT_LANG // ""' "$SETTINGS")
 
 # 글로벌 폴백 (로컬 모드일 때)
 if $LOCAL_MODE; then
-  [[ -z "$cur_model" ]] && cur_model=$(jq -r '.model // "opusplan"' "$HOME/.claude/settings.json") && cur_model="${cur_model} (글로벌)"
-  [[ -z "$cur_worklog" ]] && cur_worklog=$(jq -r '.env.WORKLOG_MODE // "all"' "$HOME/.claude/settings.json") && cur_worklog="${cur_worklog} (글로벌)"
-  [[ -z "$cur_commit_lang" ]] && cur_commit_lang=$(jq -r '.env.COMMIT_LANG // "ko"' "$HOME/.claude/settings.json") && cur_commit_lang="${cur_commit_lang} (글로벌)"
+  G="$HOME/.claude/settings.json"
+  [[ -z "$cur_model" ]] && cur_model="$(jq -r '.model // "opusplan"' "$G") (글로벌)"
+  [[ -z "$cur_worklog_timing" ]] && cur_worklog_timing="$(jq -r '.env.WORKLOG_TIMING // "each-commit"' "$G") (글로벌)"
+  [[ -z "$cur_commit_timing" ]] && cur_commit_timing="$(jq -r '.env.COMMIT_TIMING // "session-end"' "$G") (글로벌)"
+  [[ -z "$cur_commit_lang" ]] && cur_commit_lang="$(jq -r '.env.COMMIT_LANG // "ko"' "$G") (글로벌)"
 else
   [[ -z "$cur_model" ]] && cur_model="opusplan"
-  [[ -z "$cur_worklog" ]] && cur_worklog="all"
+  [[ -z "$cur_worklog_timing" ]] && cur_worklog_timing="each-commit"
+  [[ -z "$cur_commit_timing" ]] && cur_commit_timing="session-end"
   [[ -z "$cur_commit_lang" ]] && cur_commit_lang="ko"
 fi
 [[ -z "$cur_tool_search" ]] && cur_tool_search="true"
 
-# --- 1. 모델 (로컬 모드에서는 건너뜀) ---
+# 수집할 새 값들
 new_model=""
+new_worklog_timing=""
+new_commit_timing=""
+new_commit_lang=""
+new_tool_search=""
+
+# --- 1. 모델 (글로벌만) ---
 if ! $LOCAL_MODE; then
   echo "1) 모델 [현재: $cur_model]"
-  echo "   1) opusplan       — 리드 에이전트 + 팀 모드"
-  echo "   2) claude-sonnet-4-6 — 빠르고 저렴"
+  echo "   1) opusplan              — 리드 에이전트 + 팀 모드"
+  echo "   2) claude-sonnet-4-6     — 빠르고 저렴"
   echo "   3) claude-haiku-4-5-20251001 — 최경량"
   printf "   선택 (엔터=유지): "
   read -r choice
@@ -65,28 +75,38 @@ if ! $LOCAL_MODE; then
     1) new_model="opusplan" ;;
     2) new_model="claude-sonnet-4-6" ;;
     3) new_model="claude-haiku-4-5-20251001" ;;
-    *) new_model="" ;;
   esac
   echo ""
 fi
 
-# --- 2. 워크로그 모드 ---
-echo "2) 워크로그 모드 [현재: $cur_worklog]"
-echo "   1) all    — 모든 커밋에 자동 기록"
-echo "   2) off    — 워크로그 끄기"
-echo "   3) manual — /worklog 수동 실행만"
+# --- 2. 워크로그 타이밍 ---
+echo "2) 워크로그 작성 시점 [현재: $cur_worklog_timing]"
+echo "   1) each-commit  — 커밋할 때마다 자동 작성"
+echo "   2) session-end  — 세션 종료 시 한 번 (오늘 작성 안 했으면 요청)"
+echo "   3) manual       — /worklog 직접 실행할 때만"
 printf "   선택 (엔터=유지): "
 read -r choice
 case "$choice" in
-  1) new_worklog="all" ;;
-  2) new_worklog="off" ;;
-  3) new_worklog="manual" ;;
-  *) new_worklog="" ;;
+  1) new_worklog_timing="each-commit" ;;
+  2) new_worklog_timing="session-end" ;;
+  3) new_worklog_timing="manual" ;;
 esac
 echo ""
 
-# --- 3. 커밋 언어 ---
-echo "3) 커밋 메시지 언어 [현재: $cur_commit_lang]"
+# --- 3. 커밋 타이밍 ---
+echo "3) 커밋 시점 [현재: $cur_commit_timing]"
+echo "   1) session-end  — 세션 종료 시 미커밋 변경 있으면 자동 요청"
+echo "   2) manual       — /commit 직접 실행할 때만"
+printf "   선택 (엔터=유지): "
+read -r choice
+case "$choice" in
+  1) new_commit_timing="session-end" ;;
+  2) new_commit_timing="manual" ;;
+esac
+echo ""
+
+# --- 4. 커밋 언어 ---
+echo "4) 커밋 메시지 언어 [현재: $cur_commit_lang]"
 echo "   1) ko — 한글 (기본)"
 echo "   2) en — English"
 printf "   선택 (엔터=유지): "
@@ -94,14 +114,12 @@ read -r choice
 case "$choice" in
   1) new_commit_lang="ko" ;;
   2) new_commit_lang="en" ;;
-  *) new_commit_lang="" ;;
 esac
 echo ""
 
-# --- 4. 도구 검색 (글로벌만) ---
-new_tool_search=""
+# --- 5. 도구 검색 (글로벌만) ---
 if ! $LOCAL_MODE; then
-  echo "4) Tool Search [현재: $cur_tool_search]"
+  echo "5) Tool Search [현재: $cur_tool_search]"
   echo "   1) true  — 활성화"
   echo "   2) false — 비활성화"
   printf "   선택 (엔터=유지): "
@@ -109,7 +127,6 @@ if ! $LOCAL_MODE; then
   case "$choice" in
     1) new_tool_search="true" ;;
     2) new_tool_search="false" ;;
-    *) new_tool_search="" ;;
   esac
   echo ""
 fi
@@ -124,7 +141,8 @@ apply_jq() {
 }
 
 [[ -n "$new_model" ]] && apply_jq --arg v "$new_model" '.model = $v'
-[[ -n "$new_worklog" ]] && apply_jq --arg v "$new_worklog" '.env.WORKLOG_MODE = $v'
+[[ -n "$new_worklog_timing" ]] && apply_jq --arg v "$new_worklog_timing" '.env.WORKLOG_TIMING = $v'
+[[ -n "$new_commit_timing" ]] && apply_jq --arg v "$new_commit_timing" '.env.COMMIT_TIMING = $v'
 [[ -n "$new_commit_lang" ]] && apply_jq --arg v "$new_commit_lang" '.env.COMMIT_LANG = $v'
 [[ -n "$new_tool_search" ]] && apply_jq --arg v "$new_tool_search" '.env.ENABLE_TOOL_SEARCH = $v'
 
@@ -132,7 +150,8 @@ mv "$tmp" "$SETTINGS"
 
 echo "✅ 저장 완료: $SETTINGS"
 [[ -n "$new_model" ]] && echo "   모델: $new_model"
-[[ -n "$new_worklog" ]] && echo "   워크로그: $new_worklog"
+[[ -n "$new_worklog_timing" ]] && echo "   워크로그 시점: $new_worklog_timing"
+[[ -n "$new_commit_timing" ]] && echo "   커밋 시점: $new_commit_timing"
 [[ -n "$new_commit_lang" ]] && echo "   커밋 언어: $new_commit_lang"
 [[ -n "$new_tool_search" ]] && echo "   도구 검색: $new_tool_search"
 echo ""

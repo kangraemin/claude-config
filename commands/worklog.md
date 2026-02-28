@@ -8,7 +8,8 @@ description: 워크로그 작성
 
 ## 모드 체크
 
-- `WORKLOG_MODE=off`이면 "워크로그 비활성화 상태 (WORKLOG_MODE=off)" 출력 후 즉시 종료한다.
+- `/commit` 플로우에서 호출 시: `WORKLOG_TIMING=each-commit`인 경우에만 실행, 아니면 스킵
+- 사용자가 직접 `/worklog` 호출 시: `WORKLOG_TIMING` 값과 무관하게 항상 실행
 
 ## 플로우
 
