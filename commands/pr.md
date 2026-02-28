@@ -4,7 +4,7 @@ description: Pull Request 생성
 
 # /pr
 
-`~/.claude/rules/git-rules.md`의 PR 규칙을 따른다.
+로컬 `.claude/rules/git-rules.md`가 있으면 그걸, 없으면 `~/.claude/rules/git-rules.md`를 따른다.
 
 1. `git status`로 커밋 안 된 변경사항 확인
 2. base branch 자동 감지 (main 또는 develop)

@@ -4,7 +4,7 @@ description: 변경사항을 커밋하고 푸시
 
 # /commit
 
-`~/.claude/rules/git-rules.md`의 커밋 규칙을 따른다.
+로컬 `.claude/rules/git-rules.md`가 있으면 그걸, 없으면 `~/.claude/rules/git-rules.md`를 따른다.
 
 1. `git status`로 변경 파일 확인
 2. `git diff` + `git diff --cached`로 변경 내용 분석

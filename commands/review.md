@@ -16,7 +16,7 @@ description: 코드 리뷰 실행
 
 ### Step 2: 리뷰 실행
 
-1. `~/.claude/rules/review-rules.md` 읽기
+1. 로컬 `.claude/rules/review-rules.md`가 있으면 그걸, 없으면 `~/.claude/rules/review-rules.md` 읽기
 2. `DEVELOPMENT_GUIDE.md` 있으면 읽기 (프로젝트 컨벤션 파악)
 3. 변경 파일별 분석
 4. 심각도별 이슈 분류 (Critical / Important / Minor)

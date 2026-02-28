@@ -4,7 +4,7 @@ description: 워크로그 작성
 
 # /worklog
 
-`~/.claude/rules/worklog-rules.md`의 규칙을 따른다.
+로컬 `.claude/rules/worklog-rules.md`가 있으면 그걸, 없으면 `~/.claude/rules/worklog-rules.md`를 따른다.
 
 ## 모드 체크
 
