@@ -82,18 +82,20 @@ PYEOF
 # API 페이로드 생성
 PAYLOAD=$(python3 - "$NOTION_DB_ID" "$TITLE" "$DATE" "$PROJECT" "$COST" "$DURATION" "$MODEL" "$TOKENS" "$CHILDREN_JSON" <<'PYEOF'
 import json, sys
-tokens = int(sys.argv[8]) if sys.argv[8] != '0' else None
+cost     = round(float(sys.argv[5]), 3); cost = cost if cost else None
+duration = int(sys.argv[6]);             duration = duration if duration else None
+tokens   = int(sys.argv[8]);             tokens   = tokens   if tokens   else None
 data = {
     'parent': {'database_id': sys.argv[1]},
     'icon': {'type': 'emoji', 'emoji': '📖'},
     'properties': {
-        'Title': {'title': [{'text': {'content': sys.argv[2]}}]},
-        'Date':  {'date': {'start': sys.argv[3]}},
-        'Project': {'select': {'name': sys.argv[4]}},
-        'Cost':    {'number': round(float(sys.argv[5]), 3)},
-        'Duration': {'number': int(sys.argv[6])},
-        'Model':   {'select': {'name': sys.argv[7]}},
-        'Tokens':  {'number': tokens},
+        'Title':    {'title': [{'text': {'content': sys.argv[2]}}]},
+        'Date':     {'date': {'start': sys.argv[3]}},
+        'Project':  {'select': {'name': sys.argv[4]}},
+        'Cost':     {'number': cost},
+        'Duration': {'number': duration},
+        'Model':    {'select': {'name': sys.argv[7]}},
+        'Tokens':   {'number': tokens},
     },
     'children': json.loads(sys.argv[9])
 }
