@@ -1,6 +1,6 @@
 #!/bin/bash
 # Notion API로 워크로그 엔트리를 DB에 생성 (작업별 1행)
-# Usage: notion-worklog.sh <title> <date> <project> <cost> <duration_min> <model> <tokens> <content>
+# Usage: notion-worklog.sh <title> <date> <project> <cost> <duration_min> <model> <tokens> <datetime> <content>
 
 set -euo pipefail
 
@@ -19,7 +19,8 @@ COST="${4:-0}"
 DURATION="${5:-0}"
 MODEL="${6:-claude-opus-4-6}"
 TOKENS="${7:-0}"
-CONTENT="${8:-}"
+DATETIME="${8:-}"
+CONTENT="${9:-}"
 
 if [ -z "${NOTION_TOKEN:-}" ]; then
   echo "ERROR: NOTION_TOKEN required (set in ~/.claude/.env or env)" >&2
@@ -80,11 +81,12 @@ PYEOF
 )
 
 # API 페이로드 생성
-PAYLOAD=$(python3 - "$NOTION_DB_ID" "$TITLE" "$DATE" "$PROJECT" "$COST" "$DURATION" "$MODEL" "$TOKENS" "$CHILDREN_JSON" <<'PYEOF'
+PAYLOAD=$(python3 - "$NOTION_DB_ID" "$TITLE" "$DATE" "$PROJECT" "$COST" "$DURATION" "$MODEL" "$TOKENS" "$DATETIME" "$CHILDREN_JSON" <<'PYEOF'
 import json, sys
-cost     = round(float(sys.argv[5]), 3); cost = cost if cost else None
+cost     = round(float(sys.argv[5]), 3); cost     = cost     if cost     else None
 duration = int(sys.argv[6]);             duration = duration if duration else None
 tokens   = int(sys.argv[8]);             tokens   = tokens   if tokens   else None
+datetime = sys.argv[9] if sys.argv[9] else None
 data = {
     'parent': {'database_id': sys.argv[1]},
     'icon': {'type': 'emoji', 'emoji': '📖'},
@@ -96,8 +98,9 @@ data = {
         'Duration': {'number': duration},
         'Model':    {'select': {'name': sys.argv[7]}},
         'Tokens':   {'number': tokens},
+        'DateTime': {'date': {'start': datetime}} if datetime else {'date': None},
     },
-    'children': json.loads(sys.argv[9])
+    'children': json.loads(sys.argv[10])
 }
 print(json.dumps(data))
 PYEOF

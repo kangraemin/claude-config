@@ -254,13 +254,14 @@ for filename in md_files:
             success += 1
             continue
 
+        datetime_str = f"{e['date']}T{e['time']}:00"
         result = subprocess.run(
             [
                 "bash", os.path.join(script_dir, "notion-worklog.sh"),
                 e['title'], e['date'], e['project'],
                 str(round(e['cost'], 3)), str(e['duration']),
                 e['model'], str(e['tokens']),
-                e['content'],
+                datetime_str, e['content'],
             ],
             capture_output=True, text=True, env=env
         )
