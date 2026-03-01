@@ -1,10 +1,12 @@
 #!/bin/bash
 # 기존 .worklogs/*.md 파일을 Notion DB로 마이그레이션
-# Usage: notion-migrate-worklogs.sh [--dry-run] [--date YYYY-MM-DD] [--delete-after] <worklogs_dir>
+# Usage: notion-migrate-worklogs.sh [--dry-run] [--date YYYY-MM-DD] [--delete-after] [--set-mode <mode>] <worklogs_dir>
 #
-# --dry-run      : 실제 전송 없이 파싱 결과만 출력
-# --date         : 특정 날짜 파일만 처리 (예: 2026-02-23)
-# --delete-after : 마이그레이션 성공한 파일의 MD 삭제
+# --dry-run        : 실제 전송 없이 파싱 결과만 출력
+# --date           : 특정 날짜 파일만 처리 (예: 2026-02-23)
+# --delete-after   : 마이그레이션 성공한 파일의 MD 삭제
+# --set-mode <mode>: 마이그레이션 후 워크로그 저장 방식 변경
+#                    notion-only | git | git-ignore | both
 
 set -euo pipefail
 
@@ -16,6 +18,7 @@ fi
 DRY_RUN=false
 TARGET_DATE=""
 DELETE_AFTER=false
+SET_MODE=""
 WORKLOGS_DIR=""
 
 while [[ $# -gt 0 ]]; do
@@ -23,13 +26,25 @@ while [[ $# -gt 0 ]]; do
     --dry-run)      DRY_RUN=true; shift ;;
     --date)         TARGET_DATE="$2"; shift 2 ;;
     --delete-after) DELETE_AFTER=true; shift ;;
+    --set-mode)     SET_MODE="$2"; shift 2 ;;
     *) WORKLOGS_DIR="$1"; shift ;;
   esac
 done
 
 if [ -z "$WORKLOGS_DIR" ]; then
-  echo "Usage: $0 [--dry-run] [--date YYYY-MM-DD] [--delete-after] <worklogs_dir>" >&2
+  echo "Usage: $0 [--dry-run] [--date YYYY-MM-DD] [--delete-after] [--set-mode <mode>] <worklogs_dir>" >&2
   exit 1
+fi
+
+# --set-mode 유효성 검사
+if [ -n "$SET_MODE" ]; then
+  case "$SET_MODE" in
+    notion-only|git|git-ignore|both) ;;
+    *)
+      echo "ERROR: --set-mode 값은 notion-only | git | git-ignore | both 중 하나" >&2
+      exit 1
+      ;;
+  esac
 fi
 
 if [ ! -d "$WORKLOGS_DIR" ]; then
@@ -259,3 +274,46 @@ elif delete_after and not dry_run and not deleted_files:
 if failed:
     sys.exit(1)
 PYEOF
+
+# ── --set-mode 처리 ────────────────────────────────────────────────────────
+if [ -n "$SET_MODE" ]; then
+  SETTINGS_FILE="$HOME/.claude/settings.json"
+  python3 - "$SETTINGS_FILE" "$SET_MODE" <<'SETEOF'
+import sys, json
+
+settings_file = sys.argv[1]
+mode          = sys.argv[2]
+
+with open(settings_file, encoding='utf-8') as f:
+    cfg = json.load(f)
+
+env = cfg.setdefault('env', {})
+
+if mode == 'notion-only':
+    env['WORKLOG_DEST']      = 'notion-only'
+    env['WORKLOG_GIT_TRACK'] = 'false'
+elif mode == 'git':
+    env['WORKLOG_DEST']      = 'git'
+    env['WORKLOG_GIT_TRACK'] = 'true'
+elif mode == 'git-ignore':
+    env['WORKLOG_DEST']      = 'git'
+    env['WORKLOG_GIT_TRACK'] = 'false'
+elif mode == 'both':
+    env['WORKLOG_DEST']      = 'notion'
+    env['WORKLOG_GIT_TRACK'] = 'true'
+
+with open(settings_file, 'w', encoding='utf-8') as f:
+    json.dump(cfg, f, indent=2, ensure_ascii=False)
+    f.write('\n')
+
+labels = {
+    'notion-only': 'Notion에만 기록',
+    'git':         '파일로만 기록 (git 추적)',
+    'git-ignore':  '파일로만 기록 (git 미추적)',
+    'both':        '파일 + Notion 모두 기록',
+}
+print(f"\n⚙  워크로그 모드 변경: {labels[mode]}")
+print(f"   WORKLOG_DEST={env['WORKLOG_DEST']}  WORKLOG_GIT_TRACK={env['WORKLOG_GIT_TRACK']}")
+print(f"   ({settings_file} 업데이트 완료)")
+SETEOF
+fi

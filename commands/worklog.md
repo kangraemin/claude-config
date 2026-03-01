@@ -13,7 +13,7 @@ description: 워크로그 작성
 
 ## 환경변수 유효성 검사
 
-- `WORKLOG_DEST`가 `notion`이면:
+- `WORKLOG_DEST`가 `notion` 또는 `notion-only`이면:
   - `NOTION_TOKEN` 없으면: "⚠ NOTION_TOKEN 환경변수가 필요합니다. git 모드로 fallback합니다." 출력, `git` 모드로 진행
   - `NOTION_DB_ID` 없으면: "⚠ NOTION_DB_ID 환경변수가 필요합니다. git 모드로 fallback합니다." 출력, `git` 모드로 진행
 
@@ -23,8 +23,9 @@ description: 워크로그 작성
 2. 대화 컨텍스트에서 **사용자 요청사항** 정리
 3. 변경 내용 분석하여 **작업 내용** 요약
 4. **토큰/시간 계산** (아래 참조)
-5. `.worklogs/YYYY-MM-DD.md`에 엔트리 append
-6. **Notion 전송** (`WORKLOG_DEST=notion`일 때만):
+5. **로컬 파일 저장** (`WORKLOG_DEST=notion-only`이면 스킵, 그 외는 항상 실행):
+   - `.worklogs/YYYY-MM-DD.md`에 엔트리 append
+6. **Notion 전송** (`WORKLOG_DEST=notion` 또는 `notion-only`일 때만):
    - 프로젝트명 = `basename $(git rev-parse --show-toplevel)`
    - **Title**: 작업 내용 한 줄 요약 (시간 포함하지 않음)
    - **Content**: 워크로그 상세 내용 (요청사항, 작업 내용, 변경 파일, 토큰 사용량) — git 워크로그와 동일 수준
