@@ -6,7 +6,8 @@
     "WORKLOG_TIMING": "each-commit",
     "WORKLOG_DEST": "notion",
     "WORKLOG_GIT_TRACK": "true",
-    "NOTION_DB_ID": "316d4919-b6eb-8170-8adb-f1a8f43c3ece"
+    "NOTION_DB_ID": "316d4919-b6eb-8170-8adb-f1a8f43c3ece",
+    "AI_WORKLOG_DIR": "/Users/ram/.claude"
   },
   "permissions": {
     "allow": [
@@ -63,9 +64,40 @@
         ]
       }
     ],
-    "PostToolUse": [],
-    "Stop": [],
-    "SessionEnd": []
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/worklog.sh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/stop.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/session-end.sh",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
   },
   "statusLine": {
     "type": "command",
