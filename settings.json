@@ -1,10 +1,11 @@
 {
-  "model": "opusplan",
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "ENABLE_TOOL_SEARCH": "true",
     "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-    "WORKLOG_TIMING": "each-commit"
+    "WORKLOG_TIMING": "each-commit",
+    "WORKLOG_DEST": "git",
+    "WORKLOG_GIT_TRACK": "true"
   },
   "permissions": {
     "allow": [
@@ -36,6 +37,7 @@
       "Read(**/*.key)"
     ]
   },
+  "model": "opusplan",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -99,9 +101,9 @@
     "type": "command",
     "command": "~/.claude/statusline.sh"
   },
-  "skipDangerousModePermissionPrompt": true,
   "enabledPlugins": {
     "swift-lsp@claude-plugins-official": true
   },
+  "skipDangerousModePermissionPrompt": true,
   "teammateMode": "tmux"
 }

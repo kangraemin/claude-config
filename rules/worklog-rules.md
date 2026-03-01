@@ -8,6 +8,32 @@
 | `session-end` | 세션 종료 전 오늘 워크로그 없으면 Stop 훅이 요청 |
 | `manual` | `/worklog` 직접 실행할 때만 작성 |
 
+## 저장 대상 (`WORKLOG_DEST`)
+
+| 값 | 동작 |
+|---|---|
+| `git` | `.worklogs/YYYY-MM-DD.md`에 저장 (기본) |
+| `notion` | 로컬 저장 + Notion DB에 엔트리 생성 |
+
+- `notion`일 때 `NOTION_TOKEN`과 `NOTION_DB_ID` 환경변수 필요 (쉘 환경변수로 설정, settings.json에 넣지 말 것)
+- Notion 전송 실패 시 로컬 저장은 유지, 에러 메시지 출력
+
+## Git 추적 (`WORKLOG_GIT_TRACK`)
+
+| 값 | 동작 |
+|---|---|
+| `true` | `.worklogs/`를 git add (기본) |
+| `false` | `.worklogs/`를 git add하지 않음 |
+
+## 조합 매트릭스
+
+| DEST | GIT_TRACK | 동작 |
+|------|-----------|------|
+| `git` | `true` | 기본값: 로컬 저장 + git add |
+| `git` | `false` | 로컬 저장, git add 스킵 |
+| `notion` | `true` | 로컬 + Notion + git add |
+| `notion` | `false` | 로컬 + Notion, git add 스킵 |
+
 ## 모드 체크
 
 - `WORKLOG_TIMING=manual`이면 `/worklog` 스킬 시작 시 "워크로그 비활성화 상태" 출력 후 종료

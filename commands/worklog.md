@@ -11,6 +11,12 @@ description: 워크로그 작성
 - `/commit` 플로우에서 호출 시: `WORKLOG_TIMING=each-commit`인 경우에만 실행, 아니면 스킵
 - 사용자가 직접 `/worklog` 호출 시: `WORKLOG_TIMING` 값과 무관하게 항상 실행
 
+## 환경변수 유효성 검사
+
+- `WORKLOG_DEST`가 `notion`이면:
+  - `NOTION_TOKEN` 없으면: "⚠ NOTION_TOKEN 환경변수가 필요합니다. git 모드로 fallback합니다." 출력, `git` 모드로 진행
+  - `NOTION_DB_ID` 없으면: "⚠ NOTION_DB_ID 환경변수가 필요합니다. git 모드로 fallback합니다." 출력, `git` 모드로 진행
+
 ## 플로우
 
 1. `git diff --cached --stat`으로 staged 변경 확인 (없으면 `git diff --stat`으로 unstaged 확인)
@@ -18,8 +24,23 @@ description: 워크로그 작성
 3. 변경 내용 분석하여 **작업 내용** 요약
 4. **토큰/시간 계산** (아래 참조)
 5. `.worklogs/YYYY-MM-DD.md`에 엔트리 append
-6. **스냅샷 갱신** (`.worklogs/.snapshot`)
-7. `git add .worklogs/`
+6. **Notion 전송** (`WORKLOG_DEST=notion`일 때만):
+   - 프로젝트명 = `basename $(git rev-parse --show-toplevel)`
+   - 실행:
+     ```bash
+     bash ~/.claude/scripts/notion-worklog.sh \
+       "Worklog YYYY-MM-DD HH:MM" \
+       "YYYY-MM-DD" \
+       "<프로젝트명>" \
+       <토큰_delta> \
+       <비용_delta> \
+       <소요시간_분> \
+       "<워크로그 본문>"
+     ```
+   - 성공 시 "Notion 전송 완료" 출력
+   - 실패 시 "Notion 전송 실패: (에러)" 출력, 로컬 저장은 유지
+7. **스냅샷 갱신** (`.worklogs/.snapshot`)
+8. `WORKLOG_GIT_TRACK`이 `true`(기본)이면 `git add .worklogs/`, `false`이면 스킵
 
 ## 토큰/시간 계산
 
