@@ -210,6 +210,133 @@ class TestSetModeScript(unittest.TestCase):
         self.assertEqual(cfg['env']['WORKLOG_GIT_TRACK'], 'false')
 
 
+# ── 날짜별 1페이지 로직 테스트 ───────────────────────────────────────────────
+
+def parse_existing_page(notion_response: dict) -> str:
+    """notion-worklog.sh의 EXISTING 파싱 로직 재현 (빈 문자열 = 없음)"""
+    results = notion_response.get("results", [])
+    if not results:
+        return ""
+    p = results[0]
+    pid          = p["id"]
+    cur_cost     = p["properties"].get("Cost",     {}).get("number", 0) or 0
+    cur_duration = p["properties"].get("Duration", {}).get("number", 0) or 0
+    return f"{pid}|{cur_cost}|{cur_duration}"
+
+
+def make_append_json(children_json: list) -> list:
+    """append 시 divider + blocks 구성 로직 재현"""
+    divider = {"object": "block", "type": "divider", "divider": {}}
+    return [divider] + children_json
+
+
+def make_new_page_payload(db_id: str, date: str, project: str, cost: float,
+                           duration: int, model: str, children: list) -> dict:
+    """새 페이지 생성 payload 재현 (title = date)"""
+    return {
+        'parent': {'database_id': db_id},
+        'icon': {'type': 'emoji', 'emoji': '📖'},
+        'properties': {
+            'Title': {'title': [{'text': {'content': date}}]},
+            'Date':  {'date': {'start': date}},
+            'Project': {'select': {'name': project}},
+            'Cost':    {'number': round(cost, 3)},
+            'Duration': {'number': int(duration)},
+            'Model':   {'select': {'name': model}},
+        },
+        'children': children
+    }
+
+
+class TestNotionPagePerDate(unittest.TestCase):
+    """날짜별 1페이지: 기존 페이지 감지, append, 새 페이지 생성 로직"""
+
+    def test_no_results_returns_empty_string(self):
+        result = parse_existing_page({"results": []})
+        self.assertEqual(result, "")
+
+    def test_existing_page_returns_pipe_separated(self):
+        response = {
+            "results": [{
+                "id": "abc-123",
+                "properties": {
+                    "Cost":     {"number": 1.5},
+                    "Duration": {"number": 10}
+                }
+            }]
+        }
+        result = parse_existing_page(response)
+        self.assertEqual(result, "abc-123|1.5|10")
+
+    def test_null_cost_treated_as_zero(self):
+        response = {
+            "results": [{
+                "id": "xyz",
+                "properties": {
+                    "Cost":     {"number": None},
+                    "Duration": {"number": 5}
+                }
+            }]
+        }
+        result = parse_existing_page(response)
+        self.assertEqual(result, "xyz|0|5")
+
+    def test_missing_properties_treated_as_zero(self):
+        response = {
+            "results": [{"id": "xyz", "properties": {}}]
+        }
+        result = parse_existing_page(response)
+        self.assertEqual(result, "xyz|0|0")
+
+    def test_append_json_starts_with_divider(self):
+        blocks = [{"object": "block", "type": "paragraph",
+                   "paragraph": {"rich_text": [{"text": {"content": "test"}}]}}]
+        result = make_append_json(blocks)
+        self.assertEqual(result[0]["type"], "divider")
+
+    def test_append_json_preserves_original_blocks(self):
+        blocks = [{"type": "paragraph"}, {"type": "heading_3"}]
+        result = make_append_json(blocks)
+        self.assertEqual(result[1:], blocks)
+
+    def test_append_json_length(self):
+        blocks = [{"type": "paragraph"}] * 3
+        result = make_append_json(blocks)
+        self.assertEqual(len(result), 4)  # 1 divider + 3 blocks
+
+    def test_new_page_title_equals_date(self):
+        """새 페이지 Title은 date (작업 요약 아님)"""
+        payload = make_new_page_payload(
+            "db-id", "2026-03-01", "proj", 1.5, 10, "claude-sonnet-4-6", []
+        )
+        title = payload['properties']['Title']['title'][0]['text']['content']
+        self.assertEqual(title, "2026-03-01")
+
+    def test_new_page_date_property_equals_date(self):
+        payload = make_new_page_payload(
+            "db-id", "2026-03-01", "proj", 1.5, 10, "claude-sonnet-4-6", []
+        )
+        self.assertEqual(payload['properties']['Date']['date']['start'], "2026-03-01")
+
+    def test_new_page_cost_rounded(self):
+        payload = make_new_page_payload(
+            "db-id", "2026-03-01", "proj", 1.4161023, 10, "claude-sonnet-4-6", []
+        )
+        self.assertEqual(payload['properties']['Cost']['number'], 1.416)
+
+    def test_cost_accumulation(self):
+        """append 시 cost = 기존 + 신규, 소수점 3자리"""
+        cur_cost  = 1.5
+        new_cost  = 0.4161023
+        total = round(cur_cost + new_cost, 3)
+        self.assertEqual(total, 1.916)
+
+    def test_duration_accumulation(self):
+        cur = 10
+        new = 7
+        self.assertEqual(int(cur + new), 17)
+
+
 if __name__ == '__main__':
     result = unittest.main(verbosity=2, exit=False)
     sys.exit(0 if result.result.wasSuccessful() else 1)
