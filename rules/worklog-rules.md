@@ -15,7 +15,9 @@
 | `git` | `.worklogs/YYYY-MM-DD.md`에 저장 (기본) |
 | `notion` | 로컬 저장 + Notion DB에 엔트리 생성 |
 
-- `notion`일 때 `NOTION_TOKEN`과 `NOTION_DB_ID` 환경변수 필요 (쉘 환경변수로 설정, settings.json에 넣지 말 것)
+- `NOTION_TOKEN`: 글로벌 `~/.claude/.env`에 설정 (워크스페이스 공통)
+- `NOTION_DB_ID`: 프로젝트별 `.claude/settings.json` env에 설정 (프로젝트마다 다른 DB 가능)
+- `notion-worklog.sh`가 `~/.claude/.env`를 자동 source하므로 별도 export 불필요
 - Notion 전송 실패 시 로컬 저장은 유지, 에러 메시지 출력
 
 ## Git 추적 (`WORKLOG_GIT_TRACK`)

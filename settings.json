@@ -5,7 +5,8 @@
     "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
     "WORKLOG_TIMING": "each-commit",
     "WORKLOG_DEST": "git",
-    "WORKLOG_GIT_TRACK": "true"
+    "WORKLOG_GIT_TRACK": "true",
+    "NOTION_DB_ID": "316d4919-b6eb-81b5-a2b8-c84ccb8f705e"
   },
   "permissions": {
     "allow": [

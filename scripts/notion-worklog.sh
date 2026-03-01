@@ -4,6 +4,14 @@
 
 set -euo pipefail
 
+# 글로벌 .env에서 NOTION_TOKEN 로딩 (없으면 환경변수 사용)
+ENV_FILE="$HOME/.claude/.env"
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  source "$ENV_FILE"
+  set +a
+fi
+
 TITLE="${1:?title required}"
 DATE="${2:?date required}"
 PROJECT="${3:?project required}"
@@ -12,8 +20,12 @@ COST="${5:-0}"
 DURATION="${6:-0}"
 CONTENT="${7:-}"
 
-if [ -z "${NOTION_TOKEN:-}" ] || [ -z "${NOTION_DB_ID:-}" ]; then
-  echo "ERROR: NOTION_TOKEN and NOTION_DB_ID required" >&2
+if [ -z "${NOTION_TOKEN:-}" ]; then
+  echo "ERROR: NOTION_TOKEN required (set in ~/.claude/.env or env)" >&2
+  exit 1
+fi
+if [ -z "${NOTION_DB_ID:-}" ]; then
+  echo "ERROR: NOTION_DB_ID required (set in project settings.json env)" >&2
   exit 1
 fi
 
