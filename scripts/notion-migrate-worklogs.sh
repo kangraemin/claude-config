@@ -1,9 +1,10 @@
 #!/bin/bash
 # 기존 .worklogs/*.md 파일을 Notion DB로 마이그레이션
-# Usage: notion-migrate-worklogs.sh [--dry-run] [--date YYYY-MM-DD] <worklogs_dir>
+# Usage: notion-migrate-worklogs.sh [--dry-run] [--date YYYY-MM-DD] [--delete-after] <worklogs_dir>
 #
-# --dry-run : 실제 전송 없이 파싱 결과만 출력
-# --date    : 특정 날짜 파일만 처리 (예: 2026-02-23)
+# --dry-run      : 실제 전송 없이 파싱 결과만 출력
+# --date         : 특정 날짜 파일만 처리 (예: 2026-02-23)
+# --delete-after : 마이그레이션 성공한 파일의 MD 삭제
 
 set -euo pipefail
 
@@ -14,18 +15,20 @@ fi
 
 DRY_RUN=false
 TARGET_DATE=""
+DELETE_AFTER=false
 WORKLOGS_DIR=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --dry-run) DRY_RUN=true; shift ;;
-    --date) TARGET_DATE="$2"; shift 2 ;;
+    --dry-run)      DRY_RUN=true; shift ;;
+    --date)         TARGET_DATE="$2"; shift 2 ;;
+    --delete-after) DELETE_AFTER=true; shift ;;
     *) WORKLOGS_DIR="$1"; shift ;;
   esac
 done
 
 if [ -z "$WORKLOGS_DIR" ]; then
-  echo "Usage: $0 [--dry-run] [--date YYYY-MM-DD] <worklogs_dir>" >&2
+  echo "Usage: $0 [--dry-run] [--date YYYY-MM-DD] [--delete-after] <worklogs_dir>" >&2
   exit 1
 fi
 
@@ -47,16 +50,17 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-python3 - "$WORKLOGS_DIR" "$TARGET_DATE" "$DRY_RUN" "$SCRIPT_DIR" \
+python3 - "$WORKLOGS_DIR" "$TARGET_DATE" "$DRY_RUN" "$DELETE_AFTER" "$SCRIPT_DIR" \
   "${NOTION_TOKEN:-}" "${NOTION_DB_ID:-}" <<'PYEOF'
 import sys, os, re, subprocess
 
 worklogs_dir = sys.argv[1]
 target_date  = sys.argv[2]
 dry_run      = sys.argv[3] == "true"
-script_dir   = sys.argv[4]
-notion_token = sys.argv[5]
-notion_db_id = sys.argv[6]
+delete_after = sys.argv[4] == "true"
+script_dir   = sys.argv[5]
+notion_token = sys.argv[6]
+notion_db_id = sys.argv[7]
 
 # ── 파서 ────────────────────────────────────────────────────────────────────
 
@@ -197,12 +201,14 @@ if target_date:
         sys.exit(1)
 
 total, success, failed = 0, 0, 0
+deleted_files = []
 
 env = {**os.environ, 'NOTION_TOKEN': notion_token, 'NOTION_DB_ID': notion_db_id}
 
 for filename in md_files:
-    filepath = os.path.join(worklogs_dir, filename)
-    entries  = parse_file(filepath)
+    filepath     = os.path.join(worklogs_dir, filename)
+    entries      = parse_file(filepath)
+    file_failed  = 0
     print(f"\n📄 {filename}  ({len(entries)} entries)")
 
     for e in entries:
@@ -233,10 +239,22 @@ for filename in md_files:
             print(f"  ❌ {label}")
             print(f"     {result.stderr.strip()}")
             failed += 1
+            file_failed += 1
+
+    # 파일 전체 성공 시에만 삭제
+    if delete_after and not dry_run and file_failed == 0 and entries:
+        os.remove(filepath)
+        deleted_files.append(filename)
+        print(f"  🗑  {filename} 삭제됨")
 
 tag = "[DRY RUN] " if dry_run else ""
 fail_str = f", {failed} 실패" if failed else ""
 print(f"\n{tag}완료: {success}/{total} 처리됨{fail_str}")
+
+if delete_after and deleted_files:
+    print(f"삭제된 파일 ({len(deleted_files)}개): {', '.join(deleted_files)}")
+elif delete_after and not dry_run and not deleted_files:
+    print("삭제된 파일 없음 (실패한 항목이 있는 파일은 보존됨)")
 
 if failed:
     sys.exit(1)
