@@ -86,7 +86,7 @@ PAYLOAD=$(python3 - "$NOTION_DB_ID" "$TITLE" "$DATE" "$PROJECT" "$TOKENS" "$COST
 import json, sys
 data = {
     'parent': {'database_id': sys.argv[1]},
-    'icon': {'type': 'emoji', 'emoji': '📚'},
+    'icon': {'type': 'emoji', 'emoji': '📖'},
     'properties': {
         'Title': {'title': [{'text': {'content': sys.argv[2]}}]},
         'Date': {'date': {'start': sys.argv[3]}},
