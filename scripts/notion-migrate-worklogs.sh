@@ -190,6 +190,12 @@ def parse_entry(date, project, entry_text):
         **token_info,
     }
 
+def prev_date(date_str):
+    """YYYY-MM-DD → 하루 전 날짜 문자열"""
+    from datetime import date, timedelta
+    d = date.fromisoformat(date_str)
+    return str(d - timedelta(days=1))
+
 def parse_file(filepath):
     """md 파일 전체 → [entry, ...]"""
     with open(filepath, encoding='utf-8') as f:
@@ -219,6 +225,28 @@ def parse_file(filepath):
         e = parse_entry(date, project, block)
         if e:
             entries.append(e)
+
+    # ── 자정 넘김 보정 ──────────────────────────────────────────────────────
+    # 패턴: 파일 내 시간이 20:xx~23:xx 에서 00:xx~05:xx 로 떨어지는 구간이 있으면
+    # 그 이전의 20:xx~23:xx 엔트리들은 실제로 전날 작업 → date - 1일 적용
+    def to_min(t):
+        h, m = int(t[:2]), int(t[3:])
+        return h * 60 + m
+
+    crossover_idx = None
+    for i in range(1, len(entries)):
+        prev_m = to_min(entries[i-1]['time'])
+        cur_m  = to_min(entries[i]['time'])
+        if prev_m >= 20 * 60 and cur_m < 6 * 60:
+            crossover_idx = i
+            break
+
+    if crossover_idx is not None:
+        yesterday = prev_date(date)
+        for e in entries[:crossover_idx]:
+            if to_min(e['time']) >= 20 * 60:
+                e['date'] = yesterday
+
     return entries
 
 # ── 마이그레이션 ─────────────────────────────────────────────────────────────
