@@ -106,6 +106,10 @@ def parse_token_section(text):
             if m:
                 result['tokens'] = parse_number(m.group(1))
                 result['cost']   = float(m.group(2))
+            else:
+                m2 = re.search(r'\$([\d.]+)', line)
+                if m2:
+                    result['cost'] = float(m2.group(1))
         elif line.startswith('소요 시간:'):
             m = re.search(r'(\d+)', line)
             if m:

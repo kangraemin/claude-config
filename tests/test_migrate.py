@@ -29,6 +29,10 @@ def parse_token_section(text):
             if m:
                 result['tokens'] = parse_number(m.group(1))
                 result['cost']   = float(m.group(2))
+            else:
+                m2 = re.search(r'\$([\d.]+)', line)
+                if m2:
+                    result['cost'] = float(m2.group(1))
         elif line.startswith('소요 시간:'):
             m = re.search(r'(\d+)', line)
             if m:
@@ -197,6 +201,20 @@ class TestParseTokenSection(unittest.TestCase):
         self.assertEqual(r['tokens'], 3_181_115)
         self.assertAlmostEqual(r['cost'], 1.3199667, places=6)
         self.assertEqual(r['daily_tokens'], 1_255_312_387)
+
+    def test_cost_only_format(self):
+        """토큰 없이 비용만 있는 신형 형식: 이번 작업: $1.416"""
+        text = "- 모델: claude-sonnet-4-6\n- 이번 작업: $1.416"
+        r = parse_token_section(text)
+        self.assertEqual(r['tokens'], 0)
+        self.assertAlmostEqual(r['cost'], 1.416, places=3)
+        self.assertEqual(r['model'], 'claude-sonnet-4-6')
+
+    def test_cost_only_format_many_decimals(self):
+        text = "- 이번 작업: $0.8207073000"
+        r = parse_token_section(text)
+        self.assertAlmostEqual(r['cost'], 0.8207073, places=6)
+        self.assertEqual(r['tokens'], 0)
 
 
 class TestParseEntry(unittest.TestCase):
