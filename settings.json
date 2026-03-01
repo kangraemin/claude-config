@@ -6,7 +6,7 @@
     "WORKLOG_TIMING": "each-commit",
     "WORKLOG_DEST": "notion",
     "WORKLOG_GIT_TRACK": "true",
-    "NOTION_DB_ID": "316d4919-b6eb-81b1-a49a-c7c31e4e2952"
+    "NOTION_DB_ID": "316d4919-b6eb-811f-b8b8-d4cf78d1eda0"
   },
   "permissions": {
     "allow": [
