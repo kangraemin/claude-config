@@ -30,6 +30,12 @@ def apply_mode(cfg: dict, mode: str) -> dict:
 VALID_MODES = ['notion-only', 'git', 'git-ignore', 'both']
 
 
+# ── cost 반올림 로직 (notion-worklog.sh / notion-migrate-worklogs.sh 와 동일) ──
+
+def round_cost(cost: float) -> float:
+    return round(cost, 3)
+
+
 # ── 유닛 테스트: apply_mode ───────────────────────────────────────────────────
 
 class TestApplyMode(unittest.TestCase):
@@ -79,6 +85,31 @@ class TestApplyMode(unittest.TestCase):
         for mode in VALID_MODES:
             cfg = apply_mode({}, mode)
             self.assertIn(cfg['env']['WORKLOG_GIT_TRACK'], {'true', 'false'}, f"mode={mode}")
+
+
+# ── 유닛 테스트: cost 반올림 ────────────────────────────────────────────────
+
+class TestCostRounding(unittest.TestCase):
+
+    def test_rounds_to_3_decimal_places(self):
+        self.assertEqual(round_cost(1.3199667), 1.320)
+
+    def test_exact_3_decimal_unchanged(self):
+        self.assertEqual(round_cost(37.470), 37.470)
+
+    def test_long_decimal(self):
+        self.assertAlmostEqual(round_cost(720.3599667), 720.360, places=3)
+
+    def test_zero(self):
+        self.assertEqual(round_cost(0.0), 0.0)
+
+    def test_small_cost(self):
+        self.assertEqual(round_cost(0.8207073), 0.821)
+
+    def test_migrate_cost_rounding(self):
+        """migrate 스크립트가 cost를 3자리로 반올림해 notion-worklog.sh에 전달"""
+        cost = 1.3199667
+        self.assertEqual(round(cost, 3), 1.320)
 
 
 # ── 통합 테스트: 실제 쉘 스크립트 호출 ──────────────────────────────────────

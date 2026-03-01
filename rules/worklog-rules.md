@@ -32,13 +32,12 @@
 - **`notion-only` 모드**: 로컬 파일 write 스킵. 스냅샷(`.worklogs/.snapshot`)은 유지.
 - Content 본문은 마크다운 → Notion 블록 자동 변환 (`###` → heading_3, `- ` → bulleted_list_item)
 - Notion 페이지 아이콘: 📚 (notion-worklog.sh에서 자동 설정)
-- **Notion DB 컬럼**: Title, Date, Project, Tokens, Cost, Duration, Model, Daily Tokens, Daily Cost
+- **Notion DB 컬럼**: Title, Date, Project, Tokens, Cost, Duration, Model
 - **Notion 엔트리 포맷**:
   - Title: 작업 내용 한 줄 요약 (시간 포함 X)
   - Content (페이지 본문): 워크로그 상세 (요청사항, 작업내용, 변경파일, 토큰) — git 워크로그와 동일 수준
-  - Cost / Daily Cost: 소숫점 그대로 전달 (반올림 금지)
+  - Cost: 소수점 3자리 반올림 (예: $1.320)
   - Model: 사용 모델 (예: claude-opus-4-6)
-  - Daily Tokens / Daily Cost: 일일 누적 토큰/비용
 
 ## Git 추적 (`WORKLOG_GIT_TRACK`)
 
@@ -72,9 +71,8 @@
 
 ### 토큰 사용량
 - 모델: claude-opus-4-6
-- 이번 작업: N 토큰 / $N
+- 이번 작업: N 토큰 / $N.NNN
 - 소요 시간: N분
-- 일일 누적: N 토큰 / $N
 ```
 
 auto-commit fallback: `## HH:MM (auto)` + 변경 파일 목록만.

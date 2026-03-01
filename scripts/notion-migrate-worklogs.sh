@@ -240,9 +240,8 @@ for filename in md_files:
             [
                 "bash", os.path.join(script_dir, "notion-worklog.sh"),
                 e['title'], e['date'], e['project'],
-                str(e['tokens']), str(e['cost']), str(e['duration']),
+                str(e['tokens']), str(round(e['cost'], 3)), str(e['duration']),
                 e['model'],
-                str(e['daily_tokens']), str(e['daily_cost']),
                 e['content'],
             ],
             capture_output=True, text=True, env=env
