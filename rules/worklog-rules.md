@@ -22,6 +22,10 @@
 - DB 네이밍 예: `claude config`, `my-app) worklog` 등
 - `notion-worklog.sh`가 `~/.claude/.env`를 자동 source하므로 별도 export 불필요
 - Notion 전송 실패 시 로컬 저장은 유지, 에러 메시지 출력
+- **Notion 엔트리 포맷**:
+  - Title: 작업 내용 한 줄 요약 (시간 포함 X)
+  - Content (페이지 본문): 워크로그 상세 (요청사항, 작업내용, 변경파일, 토큰)
+  - Cost: 소숫점 그대로 전달 (반올림 금지)
 
 ## Git 추적 (`WORKLOG_GIT_TRACK`)
 

@@ -32,16 +32,19 @@ description: 워크로그 작성
 5. `.worklogs/YYYY-MM-DD.md`에 엔트리 append
 6. **Notion 전송** (`WORKLOG_DEST=notion`일 때만):
    - 프로젝트명 = `basename $(git rev-parse --show-toplevel)`
+   - **Title**: 작업 내용 한 줄 요약 (시간 포함하지 않음)
+   - **Content**: 워크로그 상세 내용 (요청사항, 작업 내용, 변경 파일, 토큰 사용량)
+   - **비용은 소숫점 그대로 전달** (반올림 금지)
    - 실행:
      ```bash
      bash ~/.claude/scripts/notion-worklog.sh \
-       "Worklog YYYY-MM-DD HH:MM" \
+       "<작업 내용 한 줄 요약>" \
        "YYYY-MM-DD" \
        "<프로젝트명>" \
        <토큰_delta> \
-       <비용_delta> \
+       <비용_delta (소숫점 유지)> \
        <소요시간_분> \
-       "<워크로그 본문>"
+       "<워크로그 전체 본문 (요청사항 + 작업내용 + 변경파일 + 토큰)>"
      ```
    - 성공 시 "Notion 전송 완료" 출력
    - 실패 시 "Notion 전송 실패: (에러)" 출력, 로컬 저장은 유지
