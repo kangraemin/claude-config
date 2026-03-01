@@ -33,17 +33,19 @@ description: 워크로그 작성
 6. **Notion 전송** (`WORKLOG_DEST=notion`일 때만):
    - 프로젝트명 = `basename $(git rev-parse --show-toplevel)`
    - **Title**: 작업 내용 한 줄 요약 (시간 포함하지 않음)
-   - **Content**: 워크로그 상세 내용 (요청사항, 작업 내용, 변경 파일, 토큰 사용량)
+   - **Content**: 워크로그 상세 내용 (요청사항, 작업 내용, 변경 파일, 토큰 사용량) — git 워크로그와 동일 수준
    - **비용은 소숫점 그대로 전달** (반올림 금지)
    - 실행:
      ```bash
      bash ~/.claude/scripts/notion-worklog.sh \
        "<작업 내용 한 줄 요약>" \
        "YYYY-MM-DD" \
-       "<프로젝트명>" \
        <토큰_delta> \
        <비용_delta (소숫점 유지)> \
        <소요시간_분> \
+       "<모델명 (예: claude-opus-4-6)>" \
+       <일일누적_토큰> \
+       <일일누적_비용 (소숫점 유지)> \
        "<워크로그 전체 본문 (요청사항 + 작업내용 + 변경파일 + 토큰)>"
      ```
    - 성공 시 "Notion 전송 완료" 출력

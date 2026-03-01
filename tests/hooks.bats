@@ -121,21 +121,21 @@ teardown() {
 @test "notion-worklog: missing NOTION_TOKEN (no .env) - fails with error" {
   # Temporarily rename .env to prevent auto-sourcing
   [ -f "$HOME/.claude/.env" ] && mv "$HOME/.claude/.env" "$HOME/.claude/.env.bak"
-  run bash -c "NOTION_TOKEN='' NOTION_DB_ID='' bash $HOME/.claude/scripts/notion-worklog.sh 'title' '2026-03-01' 'proj' 100 0.5 1 'content'"
+  run bash -c "NOTION_TOKEN='' NOTION_DB_ID='' bash $HOME/.claude/scripts/notion-worklog.sh 'title' '2026-03-01' 100 0.5 1 'claude-opus-4-6' 500 2.0 'content'"
   [ -f "$HOME/.claude/.env.bak" ] && mv "$HOME/.claude/.env.bak" "$HOME/.claude/.env"
   [ "$status" -ne 0 ]
   [[ "$output" == *"NOTION_TOKEN"* ]]
 }
 
 @test "notion-worklog: missing NOTION_DB_ID - fails with specific error" {
-  run bash -c "NOTION_TOKEN='fake_token' NOTION_DB_ID='' bash $HOME/.claude/scripts/notion-worklog.sh 'title' '2026-03-01' 'proj' 100 0.5 1 'content'"
+  run bash -c "NOTION_TOKEN='fake_token' NOTION_DB_ID='' bash $HOME/.claude/scripts/notion-worklog.sh 'title' '2026-03-01' 100 0.5 1 'claude-opus-4-6' 500 2.0 'content'"
   [ "$status" -ne 0 ]
   [[ "$output" == *"NOTION_DB_ID"* ]]
 }
 
 @test "notion-worklog: auto-sources .env for NOTION_TOKEN" {
   # Script should load token from .env even without explicit env var
-  run bash -c "NOTION_DB_ID='' bash $HOME/.claude/scripts/notion-worklog.sh 'title' '2026-03-01' 'proj' 100 0.5 1 'content'"
+  run bash -c "NOTION_DB_ID='' bash $HOME/.claude/scripts/notion-worklog.sh 'title' '2026-03-01' 100 0.5 1 'claude-opus-4-6' 500 2.0 'content'"
   [ "$status" -ne 0 ]
   # Should fail on DB_ID (not TOKEN), proving .env was loaded
   [[ "$output" == *"NOTION_DB_ID"* ]]

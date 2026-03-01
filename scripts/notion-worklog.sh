@@ -1,6 +1,6 @@
 #!/bin/bash
 # Notion API로 워크로그 엔트리를 DB에 생성
-# Usage: notion-worklog.sh <title> <date> <project> <tokens> <cost> <duration_min> <content>
+# Usage: notion-worklog.sh <title> <date> <tokens> <cost> <duration_min> <model> <daily_tokens> <daily_cost> <content>
 
 set -euo pipefail
 
@@ -14,11 +14,13 @@ fi
 
 TITLE="${1:?title required}"
 DATE="${2:?date required}"
-PROJECT="${3:?project required}"
-TOKENS="${4:-0}"
-COST="${5:-0}"
-DURATION="${6:-0}"
-CONTENT="${7:-}"
+TOKENS="${3:-0}"
+COST="${4:-0}"
+DURATION="${5:-0}"
+MODEL="${6:-claude-opus-4-6}"
+DAILY_TOKENS="${7:-0}"
+DAILY_COST="${8:-0}"
+CONTENT="${9:-}"
 
 if [ -z "${NOTION_TOKEN:-}" ]; then
   echo "ERROR: NOTION_TOKEN required (set in ~/.claude/.env or env)" >&2
@@ -52,15 +54,17 @@ data = {
     'properties': {
         'Title': {'title': [{'text': {'content': sys.argv[2]}}]},
         'Date': {'date': {'start': sys.argv[3]}},
-        'Project': {'select': {'name': sys.argv[4]}},
-        'Tokens': {'number': int(sys.argv[5])},
-        'Cost': {'number': float(sys.argv[6])},
-        'Duration': {'number': int(sys.argv[7])}
+        'Tokens': {'number': int(sys.argv[4])},
+        'Cost': {'number': float(sys.argv[5])},
+        'Duration': {'number': int(sys.argv[6])},
+        'Model': {'select': {'name': sys.argv[7]}},
+        'Daily Tokens': {'number': int(sys.argv[8])},
+        'Daily Cost': {'number': float(sys.argv[9])}
     },
-    'children': json.loads(sys.argv[8])
+    'children': json.loads(sys.argv[10])
 }
 print(json.dumps(data))
-" "$NOTION_DB_ID" "$TITLE" "$DATE" "$PROJECT" "$TOKENS" "$COST" "$DURATION" "$CHILDREN_JSON")
+" "$NOTION_DB_ID" "$TITLE" "$DATE" "$TOKENS" "$COST" "$DURATION" "$MODEL" "$DAILY_TOKENS" "$DAILY_COST" "$CHILDREN_JSON")
 
 # Notion API 호출
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.notion.com/v1/pages" \
