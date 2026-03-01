@@ -107,5 +107,9 @@
     "swift-lsp@claude-plugins-official": true
   },
   "skipDangerousModePermissionPrompt": true,
-  "teammateMode": "tmux"
+  "teammateMode": "tmux",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  }
 }
