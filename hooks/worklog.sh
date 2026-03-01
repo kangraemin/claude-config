@@ -2,6 +2,10 @@
 # PostToolUse: 세션별 임시 파일에 도구 사용 기록 수집
 
 INPUT=$(cat)
+
+# WORKLOG_TIMING=manual이면 수집 불필요
+[ "${WORKLOG_TIMING:-each-commit}" = "manual" ] && exit 0
+
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name')
 TOOL_INPUT=$(echo "$INPUT" | jq -c '.tool_input // {}')

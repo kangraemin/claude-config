@@ -14,6 +14,7 @@ git rev-parse --is-inside-work-tree &>/dev/null || exit 0
 # 타이밍 설정 읽기 (기본값)
 COMMIT_TIMING="${COMMIT_TIMING:-session-end}"
 WORKLOG_TIMING="${WORKLOG_TIMING:-each-commit}"
+WORKLOG_GIT_TRACK="${WORKLOG_GIT_TRACK:-true}"
 
 # --- 커밋 필요 여부 ---
 NEED_COMMIT=false
@@ -40,7 +41,7 @@ if [ "$NEED_COMMIT" = "true" ] && [ "$NEED_WORKLOG" = "true" ]; then
   echo '{"decision":"block","reason":"세션 종료 전 /worklog를 실행한 후 /commit을 실행하세요."}'
 elif [ "$NEED_COMMIT" = "true" ]; then
   MSG="커밋되지 않은 변경사항이 있습니다. /commit을 실행하세요"
-  [ "$WORKLOG_TIMING" = "each-commit" ] && MSG="$MSG (워크로그 포함)."
+  [ "$WORKLOG_TIMING" = "each-commit" ] && [ "$WORKLOG_GIT_TRACK" = "true" ] && MSG="$MSG (워크로그 포함)."
   echo "{\"decision\":\"block\",\"reason\":\"$MSG\"}"
 elif [ "$NEED_WORKLOG" = "true" ]; then
   echo '{"decision":"block","reason":"세션 종료 전 /worklog를 실행하세요."}'
