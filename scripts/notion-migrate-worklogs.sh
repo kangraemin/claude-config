@@ -156,11 +156,20 @@ def parse_entry(date, project, entry_text):
     # 토큰 파싱
     token_info = parse_token_section(sections.get('토큰 사용량', ''))
 
-    # 전달할 content 구성
+    # 전달할 content 구성 (일일 누적 / 소요 시간 라인 제거)
+    def clean_token_section(text):
+        lines = [l for l in text.split('\n')
+                 if not re.search(r'일일 누적|소요 시간', l)]
+        return '\n'.join(lines).strip()
+
     parts = []
     for sec in ['요청사항', '작업 내용', '변경 파일', '토큰 사용량']:
-        if sections.get(sec, '').strip():
-            parts.append(f"### {sec}\n{sections[sec]}")
+        raw = sections.get(sec, '').strip()
+        if not raw:
+            continue
+        cleaned = clean_token_section(raw) if sec == '토큰 사용량' else raw
+        if cleaned:
+            parts.append(f"### {sec}\n{cleaned}")
     content = '\n\n'.join(parts)
 
     return {
@@ -227,12 +236,17 @@ for filename in md_files:
     print(f"\n📄 {filename}  ({len(entries)} entries)")
 
     for e in entries:
+        # 내용 없는 항목 스킵 (title이 "YYYY-MM-DD HH:MM" 패턴 = 내용 없음)
+        if re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$', e['title']):
+            print(f"  ⏭  [{e['time']}] (내용 없음, 스킵)")
+            continue
+
         total += 1
         label = f"  [{e['time']}] {e['title'][:55]}"
 
         if dry_run:
             print(f"  ▷ [{e['time']}] {e['title'][:55]}")
-            print(f"        model={e['model']}  tokens={e['tokens']:,}  cost=${e['cost']}  duration={e['duration']}m")
+            print(f"        model={e['model']}  cost=${e['cost']}  duration={e['duration']}m")
             success += 1
             continue
 

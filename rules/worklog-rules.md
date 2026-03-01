@@ -74,7 +74,6 @@
 ### 토큰 사용량
 - 모델: claude-opus-4-6
 - 이번 작업: $N.NNN
-- 소요 시간: N분
 ```
 
 auto-commit fallback: `## HH:MM (auto)` + 변경 파일 목록만.
