@@ -9,3 +9,11 @@ COLLECT_FILE="$HOME/.claude/worklogs/.collecting/$SESSION_ID.jsonl"
 [ -f "$COLLECT_FILE" ] && rm -f "$COLLECT_FILE"
 
 exit 0
+
+# --- ai-worklog start ---
+SESSION_ID=$(echo "$INPUT" | jq -r '.session_id')
+COLLECT_FILE="$HOME/.claude/worklogs/.collecting/$SESSION_ID.jsonl"
+
+# stop.sh에서 이미 정리했으면 스킵
+[ -f "$COLLECT_FILE" ] && rm -f "$COLLECT_FILE"
+# --- ai-worklog end ---
