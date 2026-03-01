@@ -33,12 +33,11 @@
 - Content 본문은 마크다운 → Notion 블록 자동 변환 (`###` → heading_3, `- ` → bulleted_list_item)
 - Notion 페이지 아이콘: 📖 (notion-worklog.sh에서 자동 설정)
 - **Notion DB 컬럼**: Title, Date, Project, Cost, Duration, Model
-- **Notion 구조: 날짜별 1페이지**
-  - Title = YYYY-MM-DD (날짜 = 페이지 제목, DB에서 날짜별 행으로 정렬됨)
-  - 같은 날 추가 워크로그는 기존 페이지에 구분선 + 블록 append, Cost/Duration 누적
+- **Notion 구조: 작업별 개별 행**
+  - Title: 작업 내용 한 줄 요약
   - Content (페이지 본문): 워크로그 상세 (요청사항, 작업내용, 변경파일, 토큰)
-  - Cost: 소수점 3자리 반올림, 당일 누적값
-  - Duration: 당일 총 작업 시간(분)
+  - Cost: 소수점 3자리 반올림, 이번 작업 비용
+  - Duration: 이번 작업 소요 시간(분)
   - Model: 해당 세션 모델
 
 ## Git 추적 (`WORKLOG_GIT_TRACK`)
