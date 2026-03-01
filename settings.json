@@ -4,8 +4,8 @@
     "ENABLE_TOOL_SEARCH": "true",
     "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
     "WORKLOG_TIMING": "each-commit",
-    "WORKLOG_DEST": "notion",
-    "WORKLOG_GIT_TRACK": "true",
+    "WORKLOG_DEST": "notion-only",
+    "WORKLOG_GIT_TRACK": "false",
     "NOTION_DB_ID": "316d4919-b6eb-8170-8adb-f1a8f43c3ece",
     "AI_WORKLOG_DIR": "/Users/ram/.claude"
   },
