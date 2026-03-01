@@ -16,13 +16,11 @@
 | `notion` | 로컬 저장 + Notion DB에 엔트리 생성 |
 
 - `NOTION_TOKEN`: 글로벌 `~/.claude/.env`에 설정 (워크스페이스 공통)
-- `NOTION_DB_ID`: 프로젝트별 `.claude/settings.json` env에 설정 (프로젝트마다 다른 DB)
-- `NOTION_DB_ID` 없으면 `notion-create-db.sh`로 자동 생성 후 settings.json에 저장
-- `NOTION_DB_TITLE`: DB 제목 커스텀 (선택). 미설정 시 `{프로젝트명}) worklog`
-- DB 네이밍 예: `claude config`, `my-app) worklog` 등
+- `NOTION_DB_ID`: 글로벌 `~/.claude/settings.json` env에 설정 (전체 프로젝트 공용 DB 하나)
 - `notion-worklog.sh`가 `~/.claude/.env`를 자동 source하므로 별도 export 불필요
 - Notion 전송 실패 시 로컬 저장은 유지, 에러 메시지 출력
-- **Notion DB 컬럼**: Title, Date, Tokens, Cost, Duration, Model, Daily Tokens, Daily Cost
+- Content 본문은 마크다운 → Notion 블록 자동 변환 (`###` → heading_3, `- ` → bulleted_list_item)
+- **Notion DB 컬럼**: Title, Date, Project, Tokens, Cost, Duration, Model, Daily Tokens, Daily Cost
 - **Notion 엔트리 포맷**:
   - Title: 작업 내용 한 줄 요약 (시간 포함 X)
   - Content (페이지 본문): 워크로그 상세 (요청사항, 작업내용, 변경파일, 토큰) — git 워크로그와 동일 수준

@@ -52,6 +52,7 @@ data = {
     'properties': {
         'Title': {'title': {}},
         'Date': {'date': {}},
+        'Project': {'select': {'options': []}},
         'Tokens': {'number': {'format': 'number_with_commas'}},
         'Cost': {'number': {'format': 'dollar'}},
         'Duration': {'number': {'format': 'number'}},
