@@ -16,7 +16,9 @@
 | `notion` | 로컬 저장 + Notion DB에 엔트리 생성 |
 
 - `NOTION_TOKEN`: 글로벌 `~/.claude/.env`에 설정 (워크스페이스 공통)
-- `NOTION_DB_ID`: 프로젝트별 `.claude/settings.json` env에 설정 (프로젝트마다 다른 DB 가능)
+- `NOTION_DB_ID`: 프로젝트별 `.claude/settings.json` env에 설정 (프로젝트마다 다른 DB)
+- `NOTION_DB_ID` 없으면 `notion-create-db.sh`로 자동 생성 후 settings.json에 저장
+- DB 네이밍: `{프로젝트명}) worklog` (예: `.claude) worklog`, `my-app) worklog`)
 - `notion-worklog.sh`가 `~/.claude/.env`를 자동 source하므로 별도 export 불필요
 - Notion 전송 실패 시 로컬 저장은 유지, 에러 메시지 출력
 

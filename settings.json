@@ -4,9 +4,9 @@
     "ENABLE_TOOL_SEARCH": "true",
     "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
     "WORKLOG_TIMING": "each-commit",
-    "WORKLOG_DEST": "git",
+    "WORKLOG_DEST": "notion",
     "WORKLOG_GIT_TRACK": "true",
-    "NOTION_DB_ID": "316d4919-b6eb-81b5-a2b8-c84ccb8f705e"
+    "NOTION_DB_ID": "316d4919-b6eb-81b1-a49a-c7c31e4e2952"
   },
   "permissions": {
     "allow": [

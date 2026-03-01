@@ -140,3 +140,21 @@ teardown() {
   # Should fail on DB_ID (not TOKEN), proving .env was loaded
   [[ "$output" == *"NOTION_DB_ID"* ]]
 }
+
+# --- notion-create-db.sh ---
+
+@test "notion-create-db: missing NOTION_TOKEN (no .env) - fails" {
+  [ -f "$HOME/.claude/.env" ] && mv "$HOME/.claude/.env" "$HOME/.claude/.env.bak"
+  run bash -c "NOTION_TOKEN='' bash $HOME/.claude/scripts/notion-create-db.sh 'test-project'"
+  [ -f "$HOME/.claude/.env.bak" ] && mv "$HOME/.claude/.env.bak" "$HOME/.claude/.env"
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"NOTION_TOKEN"* ]]
+}
+
+@test "notion-create-db: auto-sources .env for NOTION_TOKEN" {
+  # Should get past token check (fail later on API or parent page)
+  run bash -c "NOTION_PARENT_PAGE_ID='fake-id' bash $HOME/.claude/scripts/notion-create-db.sh 'test-project'"
+  [ "$status" -ne 0 ]
+  # Should NOT fail on NOTION_TOKEN (proving .env was loaded)
+  [[ "$output" != *"NOTION_TOKEN required"* ]]
+}
