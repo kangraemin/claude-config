@@ -1,6 +1,6 @@
 #!/bin/bash
 # Notion API로 워크로그 엔트리를 DB에 생성 (작업별 1행)
-# Usage: notion-worklog.sh <title> <date> <project> <cost> <duration_min> <model> <content>
+# Usage: notion-worklog.sh <title> <date> <project> <cost> <duration_min> <model> <tokens> <content>
 
 set -euo pipefail
 
@@ -18,7 +18,8 @@ PROJECT="${3:?project required}"
 COST="${4:-0}"
 DURATION="${5:-0}"
 MODEL="${6:-claude-opus-4-6}"
-CONTENT="${7:-}"
+TOKENS="${7:-0}"
+CONTENT="${8:-}"
 
 if [ -z "${NOTION_TOKEN:-}" ]; then
   echo "ERROR: NOTION_TOKEN required (set in ~/.claude/.env or env)" >&2
@@ -79,8 +80,9 @@ PYEOF
 )
 
 # API 페이로드 생성
-PAYLOAD=$(python3 - "$NOTION_DB_ID" "$TITLE" "$DATE" "$PROJECT" "$COST" "$DURATION" "$MODEL" "$CHILDREN_JSON" <<'PYEOF'
+PAYLOAD=$(python3 - "$NOTION_DB_ID" "$TITLE" "$DATE" "$PROJECT" "$COST" "$DURATION" "$MODEL" "$TOKENS" "$CHILDREN_JSON" <<'PYEOF'
 import json, sys
+tokens = int(sys.argv[8]) if sys.argv[8] != '0' else None
 data = {
     'parent': {'database_id': sys.argv[1]},
     'icon': {'type': 'emoji', 'emoji': '📖'},
@@ -91,8 +93,9 @@ data = {
         'Cost':    {'number': round(float(sys.argv[5]), 3)},
         'Duration': {'number': int(sys.argv[6])},
         'Model':   {'select': {'name': sys.argv[7]}},
+        'Tokens':  {'number': tokens},
     },
-    'children': json.loads(sys.argv[8])
+    'children': json.loads(sys.argv[9])
 }
 print(json.dumps(data))
 PYEOF

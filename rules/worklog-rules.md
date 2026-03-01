@@ -32,7 +32,7 @@
 - **`notion-only` 모드**: 로컬 파일 write 스킵. 스냅샷(`.worklogs/.snapshot`)은 유지.
 - Content 본문은 마크다운 → Notion 블록 자동 변환 (`###` → heading_3, `- ` → bulleted_list_item)
 - Notion 페이지 아이콘: 📖 (notion-worklog.sh에서 자동 설정)
-- **Notion DB 컬럼**: Title, Date, Project, Cost, Duration, Model
+- **Notion DB 컬럼**: Title, Date, Project, Tokens, Cost, Duration, Model
 - **Notion 구조: 작업별 개별 행**
   - Title: 작업 내용 한 줄 요약
   - Content (페이지 본문): 워크로그 상세 (요청사항, 작업내용, 변경파일, 토큰)

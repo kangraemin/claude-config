@@ -250,7 +250,7 @@ for filename in md_files:
 
         if dry_run:
             print(f"  ▷ [{e['time']}] {e['title'][:55]}")
-            print(f"        model={e['model']}  cost=${e['cost']}  duration={e['duration']}m")
+            print(f"        model={e['model']}  cost=${e['cost']}  tokens={e['tokens']}  duration={e['duration']}m")
             success += 1
             continue
 
@@ -259,7 +259,7 @@ for filename in md_files:
                 "bash", os.path.join(script_dir, "notion-worklog.sh"),
                 e['title'], e['date'], e['project'],
                 str(round(e['cost'], 3)), str(e['duration']),
-                e['model'],
+                e['model'], str(e['tokens']),
                 e['content'],
             ],
             capture_output=True, text=True, env=env
