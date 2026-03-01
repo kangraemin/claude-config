@@ -254,7 +254,7 @@ for filename in md_files:
             success += 1
             continue
 
-        datetime_str = f"{e['date']}T{e['time']}:00"
+        datetime_str = f"{e['date']}T{e['time']}:00+09:00"
         result = subprocess.run(
             [
                 "bash", os.path.join(script_dir, "notion-worklog.sh"),
