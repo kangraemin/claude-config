@@ -17,8 +17,9 @@ description: 워크로그 작성
   - `NOTION_TOKEN` 없으면: "⚠ NOTION_TOKEN 환경변수가 필요합니다. git 모드로 fallback합니다." 출력, `git` 모드로 진행
   - `NOTION_DB_ID` 없으면: **자동 생성** 시도:
     ```bash
-    DB_ID=$(bash ~/.claude/scripts/notion-create-db.sh "<프로젝트명>")
+    DB_ID=$(bash ~/.claude/scripts/notion-create-db.sh "<프로젝트명>" "" "<NOTION_DB_TITLE 또는 기본값>")
     ```
+    - DB 제목: `NOTION_DB_TITLE` env가 있으면 사용, 없으면 `{프로젝트명}) worklog`
     - 성공 시: 프로젝트 `.claude/settings.json`의 env에 `NOTION_DB_ID` 추가하고 진행
     - 실패 시: "⚠ Notion DB 생성 실패. git 모드로 fallback합니다." 출력, `git` 모드로 진행
 

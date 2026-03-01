@@ -1,6 +1,6 @@
 #!/bin/bash
 # Notion에 워크로그 DB를 생성하고 ID를 출력
-# Usage: notion-create-db.sh <project_name> [parent_page_id]
+# Usage: notion-create-db.sh <project_name> [parent_page_id] [db_title]
 # Output: DB ID (stdout)
 
 set -euo pipefail
@@ -15,6 +15,7 @@ fi
 
 PROJECT="${1:?project name required}"
 PARENT_PAGE_ID="${2:-${NOTION_PARENT_PAGE_ID:-}}"
+CUSTOM_TITLE="${3:-${NOTION_DB_TITLE:-}}"
 
 if [ -z "${NOTION_TOKEN:-}" ]; then
   echo "ERROR: NOTION_TOKEN required" >&2
@@ -40,8 +41,8 @@ print(results[0]['id'] if results else '')
   fi
 fi
 
-# DB 이름: "{project}) worklog"
-DB_TITLE="${PROJECT}) worklog"
+# DB 이름: 커스텀 제목 > NOTION_DB_TITLE env > 기본값 "{project}) worklog"
+DB_TITLE="${CUSTOM_TITLE:-${PROJECT}) worklog}"
 
 PAYLOAD=$(python3 - "$PARENT_PAGE_ID" "$DB_TITLE" <<'PYEOF'
 import json, sys
