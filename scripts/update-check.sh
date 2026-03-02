@@ -68,6 +68,25 @@ if [ "$LATEST_SHA" = "$INSTALLED_SHA" ]; then
   exit 0
 fi
 
+# ── bootstrap: 자기 자신을 먼저 업데이트 후 재실행 ────────────────────────────
+# 옛날 버전의 FILES 배열이 불완전할 수 있으므로,
+# 새 버전의 update-check.sh로 교체 후 재실행해서 전체 파일을 받는다.
+SELF_SCRIPT="$AI_WORKLOG_DIR/scripts/update-check.sh"
+if [ "${_UPDATE_BOOTSTRAPPED:-}" != "1" ]; then
+  SELF_TMP=$(mktemp)
+  if curl -sf --max-time 10 "$RAW_BASE/scripts/update-check.sh" -o "$SELF_TMP" 2>/dev/null; then
+    if ! cmp -s "$SELF_TMP" "$SELF_SCRIPT"; then
+      mv "$SELF_TMP" "$SELF_SCRIPT"
+      chmod +x "$SELF_SCRIPT"
+      export _UPDATE_BOOTSTRAPPED=1
+      exec bash "$SELF_SCRIPT" --force
+    fi
+    rm -f "$SELF_TMP"
+  else
+    rm -f "$SELF_TMP"
+  fi
+fi
+
 # ── 파일 다운로드 + 교체 ─────────────────────────────────────────────────────
 FILES=(
   # scripts
