@@ -90,7 +90,6 @@ data = {
     'icon': {'type': 'emoji', 'emoji': '📖'},
     'properties': {
         'Title':    {'title': [{'text': {'content': sys.argv[2]}}]},
-        'Date':     {'date': {'start': sys.argv[3]}},
         'Project':  {'select': {'name': sys.argv[4]}},
         'Cost':     {'number': cost},
         'Duration': {'number': duration},
