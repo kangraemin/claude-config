@@ -73,8 +73,29 @@ if [ "$MODE" = "global" ]; then
     if [ -d "$TARGET/.git" ]; then
       echo "이미 설치됨. 업데이트합니다."
       cd "$TARGET" && git pull origin main
+
+      # 권한 재설정
+      chmod +x "$TARGET/hooks/"*.sh 2>/dev/null || true
+      chmod +x "$TARGET/git-hooks/"* 2>/dev/null || true
+      chmod +x "$TARGET/scripts/"*.sh 2>/dev/null || true
+      git config --global core.hooksPath "$TARGET/git-hooks"
+
+      # 현재 repo에 hook 재설치
+      CURRENT_REPO=$(git -C "${OLDPWD:-$HOME}" rev-parse --show-toplevel 2>/dev/null || echo "")
+      if [ -n "$CURRENT_REPO" ] && [ -f "$TARGET/git-hooks/post-commit" ]; then
+        HOOK_DST="$CURRENT_REPO/.git/hooks/post-commit"
+        mkdir -p "$CURRENT_REPO/.git/hooks"
+        if [ -f "$HOOK_DST" ] && ! grep -q "ai-worklog" "$HOOK_DST" 2>/dev/null; then
+          mv "$HOOK_DST" "$HOOK_DST.local"
+        fi
+        cp "$TARGET/git-hooks/post-commit" "$HOOK_DST"
+        chmod +x "$HOOK_DST"
+        echo "post-commit hook 재설치 완료"
+      fi
+
       echo ""
       echo "=== 업데이트 완료! ==="
+      echo "💡 Claude Code 세션에서는 /worklog 또는 /finish로 워크로그를 작성하세요."
       exit 0
     fi
 
