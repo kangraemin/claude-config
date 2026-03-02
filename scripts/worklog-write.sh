@@ -103,9 +103,13 @@ DURATION_MIN=0
 
 if [ "$NO_COST" = "false" ]; then
   if [ -f "$TOKEN_COST_SCRIPT" ]; then
-    TC_OUTPUT=$($PYTHON "$TOKEN_COST_SCRIPT" "$SNAPSHOT_TS" "$PROJECT_CWD" 2>/dev/null || echo "0,0.000")
+    TC_OUTPUT=$($PYTHON "$TOKEN_COST_SCRIPT" "$SNAPSHOT_TS" "$PROJECT_CWD" 2>/dev/null || echo "0,0.000,")
     TOKENS=$(echo "$TC_OUTPUT" | cut -d, -f1)
     COST=$(echo "$TC_OUTPUT" | cut -d, -f2)
+    TC_MODEL=$(echo "$TC_OUTPUT" | cut -d, -f3)
+    if [ -n "$TC_MODEL" ]; then
+      MODEL="$TC_MODEL"
+    fi
   fi
 
   if [ -f "$DURATION_SCRIPT" ]; then
@@ -201,5 +205,15 @@ fi
 # ── 스냅샷 갱신 ──────────────────────────────────────────────────────────────
 NOW_TS=$(date +%s)
 echo "{\"timestamp\":$NOW_TS}" > "$SNAPSHOT_FILE" 2>/dev/null || echo "worklog-for-claude: snapshot 갱신 실패 ($SNAPSHOT_FILE)" >&2
+
+# ── pending 마커 정리 ─────────────────────────────────────────────────────────
+PENDING_DIR="$HOME/.claude/worklogs/.pending"
+if [ -d "$PENDING_DIR" ]; then
+  for _pf in "$PENDING_DIR"/*.json; do
+    [ -f "$_pf" ] || continue
+    _pcwd=$($PYTHON -c "import json; print(json.load(open('$_pf')).get('project_cwd',''))" 2>/dev/null || echo "")
+    [ "$_pcwd" = "$PROJECT_CWD" ] && rm -f "$_pf"
+  done
+fi
 
 echo "워크로그 작성 완료: $DATE $TIMESTAMP"

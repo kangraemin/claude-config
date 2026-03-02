@@ -25,7 +25,28 @@ if [ -n "$DIRTY" ]; then
     decision: "block",
     reason: "/finish 스킬을 실행해서 커밋, 푸시, 워크로그를 작성해줘."
   }'
-else
   exit 0
 fi
+
+# pending worklog 마커 확인 (세션 내 커밋 후 /worklog 미실행)
+PENDING_DIR="$HOME/.claude/worklogs/.pending"
+PENDING_INFO=""
+if [ -d "$PENDING_DIR" ]; then
+  for f in "$PENDING_DIR"/*.json; do
+    [ -f "$f" ] || continue
+    pcwd=$(jq -r '.project_cwd // ""' "$f" 2>/dev/null)
+    if [ "$pcwd" = "$CWD" ]; then
+      cmsg=$(jq -r '.commit_msg // ""' "$f" 2>/dev/null | head -1)
+      PENDING_INFO="${PENDING_INFO}- ${cmsg}\n"
+    fi
+  done
+fi
+
+if [ -n "$PENDING_INFO" ]; then
+  REASON=$(printf "/worklog 스킬을 실행해서 워크로그를 작성해줘.\n\n미처리 커밋:\n%s" "$PENDING_INFO")
+  jq -n --arg reason "$REASON" '{decision: "block", reason: $reason}'
+  exit 0
+fi
+
+exit 0
 # --- worklog-for-claude end ---

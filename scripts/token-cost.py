@@ -8,8 +8,8 @@ Usage:
     project_cwd: 프로젝트 경로 (기본: 현재 디렉토리)
 
 Output:
-    <total_tokens>,<total_cost>
-    예: 52340,0.234
+    <total_tokens>,<total_cost>,<last_model>
+    예: 52340,0.234,claude-sonnet-4-6
 """
 
 import json
@@ -76,6 +76,7 @@ def calc_cost(model: str, usage: dict) -> float:
 def process_jsonl(jsonl_path, after_iso):
     total_tokens = 0
     total_cost = 0.0
+    last_model = ""
 
     with open(jsonl_path) as f:
         for line in f:
@@ -91,6 +92,9 @@ def process_jsonl(jsonl_path, after_iso):
                 model = msg.get("model", "")
                 usage = msg.get("usage", {})
 
+                if model:
+                    last_model = normalize_model(model)
+
                 tokens = (
                     usage.get("input_tokens", 0)
                     + usage.get("output_tokens", 0)
@@ -102,7 +106,7 @@ def process_jsonl(jsonl_path, after_iso):
             except (json.JSONDecodeError, KeyError):
                 continue
 
-    return total_tokens, total_cost
+    return total_tokens, total_cost, last_model
 
 
 def main():
@@ -134,13 +138,16 @@ def main():
 
     grand_tokens = 0
     grand_cost = 0.0
+    grand_model = ""
 
     for jsonl_path in jsonl_files:
-        tokens, cost = process_jsonl(jsonl_path, after_iso)
+        tokens, cost, model = process_jsonl(jsonl_path, after_iso)
         grand_tokens += tokens
         grand_cost += cost
+        if model:
+            grand_model = model
 
-    print(f"{grand_tokens},{grand_cost:.3f}")
+    print(f"{grand_tokens},{grand_cost:.3f},{grand_model}")
 
 
 if __name__ == "__main__":

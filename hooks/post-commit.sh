@@ -2,14 +2,36 @@
 # git post-commit hook — 커밋 후 자동 워크로그 작성
 # install.sh에서 git hooks 경로에 설치됨 (전역 또는 로컬)
 
-# ── Claude Code 세션 내에서는 스킵 ───────────────────────────────────────────
-# 세션 내에서는 /finish 또는 /commit 스킬이 워크로그를 처리한다.
-# post-commit hook은 터미널에서 직접 git commit 할 때만 동작.
-[ -n "${CLAUDECODE:-}" ] && exit 0
-
 # ── WORKLOG_TIMING 체크 ──────────────────────────────────────────────────────
 # manual이면 스킵 (each-commit이 기본)
 [ "${WORKLOG_TIMING:-each-commit}" = "manual" ] && exit 0
+
+# ── Claude Code 세션 내에서는 pending 마커 작성 후 종료 ──────────────────────
+# claude -p 중첩 실행이 불가하므로 마커를 남기고 Stop hook에서 /worklog 요청
+if [ -n "${CLAUDECODE:-}" ]; then
+  _PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
+  _CHANGED=$(git diff HEAD~1 HEAD --name-only 2>/dev/null || echo "")
+  _NON_WL=$(echo "$_CHANGED" | grep -v '^\.worklogs/' | grep -v '^$' || true)
+  if [ -n "$_NON_WL" ]; then
+    _PENDING_DIR="$HOME/.claude/worklogs/.pending"
+    mkdir -p "$_PENDING_DIR"
+    _PROJECT_CWD=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+    _COMMIT_MSG=$(git log -1 --pretty=%B 2>/dev/null || echo "")
+    _TS=$(date +%s)
+    _PENDING_FILE="$_PENDING_DIR/${_TS}.json"
+    $_PYTHON -c "
+import json, sys
+data = {
+  'commit_msg': sys.argv[1],
+  'changed_files': sys.argv[2],
+  'project_cwd': sys.argv[3],
+}
+with open(sys.argv[4], 'w') as f:
+    json.dump(data, f)
+" "$_COMMIT_MSG" "$_NON_WL" "$_PROJECT_CWD" "$_PENDING_FILE" 2>/dev/null || true
+  fi
+  exit 0
+fi
 
 # ── hook chaining: 기존 레포 hook 먼저 실행 ──────────────────────────────────
 # core.hooksPath로 전역 설치 시, 레포별 .git/hooks/post-commit이 무시되므로
