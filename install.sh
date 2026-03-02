@@ -8,6 +8,7 @@ set -e
 
 REPO="https://github.com/kangraemin/claude-config.git"
 WORKLOG_REPO="https://github.com/kangraemin/ai-worklog.git"
+BOUNCER_REPO="https://github.com/kangraemin/ai-bouncer.git"
 MODE="${1:-}"
 
 # --- 의존성 체크 ---
@@ -162,3 +163,13 @@ TMP_WL=$(mktemp -d)
 git clone --depth 1 "$WORKLOG_REPO" "$TMP_WL"
 bash "$TMP_WL/install.sh"
 rm -rf "$TMP_WL"
+
+# =============================================================
+# ai-bouncer 설치
+# =============================================================
+echo ""
+echo "=== ai-bouncer 설치 ==="
+TMP_AB=$(mktemp -d)
+git clone --depth 1 "$BOUNCER_REPO" "$TMP_AB"
+bash "$TMP_AB/install.sh"
+rm -rf "$TMP_AB"
