@@ -5,7 +5,7 @@
     "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
     "NOTION_DB_ID": "316d4919-b6eb-8170-8adb-f1a8f43c3ece",
     "WORKLOG_TIMING": "each-commit",
-    "WORKLOG_DEST": "notion",
+    "WORKLOG_DEST": "notion-only",
     "WORKLOG_GIT_TRACK": "false",
     "WORKLOG_LANG": "ko",
     "AI_WORKLOG_DIR": "/Users/ram/.claude"

@@ -10,13 +10,13 @@
 
 set -euo pipefail
 
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
+
 # .env 탐색: ~/.claude/.env 먼저, AI_WORKLOG_DIR/.env로 덮어쓰기 (cascade)
-if [ -f "$HOME/.claude/.env" ]; then
-  set -a; source "$HOME/.claude/.env"; set +a
-fi
-if [ -n "${AI_WORKLOG_DIR:-}" ] && [ "$AI_WORKLOG_DIR" != "$HOME/.claude" ] && [ -f "$AI_WORKLOG_DIR/.env" ]; then
-  set -a; source "$AI_WORKLOG_DIR/.env"; set +a
-fi
+# 같은 경로여도 중복 source는 무해 (idempotent)
+for _envfile in "$HOME/.claude/.env" ${AI_WORKLOG_DIR:+"$AI_WORKLOG_DIR/.env"}; do
+  [ -f "$_envfile" ] && { set -a; source "$_envfile"; set +a; }
+done
 
 DRY_RUN=false
 TARGET_DATE=""
@@ -68,7 +68,7 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-python3 - "$WORKLOGS_DIR" "$TARGET_DATE" "$DRY_RUN" "$DELETE_AFTER" "$SCRIPT_DIR" \
+$PYTHON - "$WORKLOGS_DIR" "$TARGET_DATE" "$DRY_RUN" "$DELETE_AFTER" "$SCRIPT_DIR" \
   "${NOTION_TOKEN:-}" "${NOTION_DB_ID:-}" <<'PYEOF'
 import sys, os, re, subprocess
 
@@ -333,7 +333,7 @@ if [ -n "$SET_MODE" ]; then
   else
     SETTINGS_FILE="$HOME/.claude/settings.json"
   fi
-  python3 - "$SETTINGS_FILE" "$SET_MODE" <<'SETEOF'
+  $PYTHON - "$SETTINGS_FILE" "$SET_MODE" <<'SETEOF'
 import sys, json
 
 settings_file = sys.argv[1]

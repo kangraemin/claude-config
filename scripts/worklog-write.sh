@@ -17,11 +17,13 @@
 
 set -euo pipefail
 
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
+
 # ── 파라미터 파싱 ─────────────────────────────────────────────────────────────
 SUMMARY_FILE=""
 PROJECT=""
 DATE=$(date +%Y-%m-%d)
-MODEL="claude-sonnet-4-6"
+MODEL="${WORKLOG_MODEL:-claude-sonnet-4-6}"
 NO_COST=false
 
 while [ $# -gt 0 ]; do
@@ -58,7 +60,7 @@ AI_WORKLOG_DIR="${AI_WORKLOG_DIR:-$HOME/.claude}"
 _load_settings_env() {
   local f="$1"
   [ -f "$f" ] || return 0
-  eval "$(python3 -c "
+  eval "$($PYTHON -c "
 import json
 try:
     cfg = json.load(open('$f'))
@@ -69,8 +71,8 @@ except: pass
 }
 # 글로벌 → 프로젝트 순서로 로드 (프로젝트가 덮어씀)
 _load_settings_env "$AI_WORKLOG_DIR/settings.json"
-PROJECT_CWD_EARLY=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-[ -f "$PROJECT_CWD_EARLY/.claude/settings.json" ] && _load_settings_env "$PROJECT_CWD_EARLY/.claude/settings.json"
+_PROJECT_CWD_EARLY=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+[ -f "$_PROJECT_CWD_EARLY/.claude/settings.json" ] && _load_settings_env "$_PROJECT_CWD_EARLY/.claude/settings.json"
 
 WORKLOG_DEST="${WORKLOG_DEST:-git}"
 WORKLOG_GIT_TRACK="${WORKLOG_GIT_TRACK:-true}"
@@ -86,7 +88,7 @@ SNAPSHOT_FILE="$SNAPSHOT_DIR/.snapshot"
 mkdir -p "$SNAPSHOT_DIR"
 
 if [ -f "$SNAPSHOT_FILE" ]; then
-  SNAPSHOT_TS=$(python3 -c "import json; print(json.load(open('$SNAPSHOT_FILE')).get('timestamp', 0))" 2>/dev/null || echo "0")
+  SNAPSHOT_TS=$($PYTHON -c "import json; print(json.load(open('$SNAPSHOT_FILE')).get('timestamp', 0))" 2>/dev/null || echo "0")
 else
   SNAPSHOT_TS=0
 fi
@@ -101,13 +103,13 @@ DURATION_MIN=0
 
 if [ "$NO_COST" = "false" ]; then
   if [ -f "$TOKEN_COST_SCRIPT" ]; then
-    TC_OUTPUT=$(python3 "$TOKEN_COST_SCRIPT" "$SNAPSHOT_TS" "$PROJECT_CWD" 2>/dev/null || echo "0,0.000")
+    TC_OUTPUT=$($PYTHON "$TOKEN_COST_SCRIPT" "$SNAPSHOT_TS" "$PROJECT_CWD" 2>/dev/null || echo "0,0.000")
     TOKENS=$(echo "$TC_OUTPUT" | cut -d, -f1)
     COST=$(echo "$TC_OUTPUT" | cut -d, -f2)
   fi
 
   if [ -f "$DURATION_SCRIPT" ]; then
-    DUR_OUTPUT=$(python3 "$DURATION_SCRIPT" "$SNAPSHOT_TS" "$PROJECT_CWD" 2>/dev/null || echo "0,0")
+    DUR_OUTPUT=$($PYTHON "$DURATION_SCRIPT" "$SNAPSHOT_TS" "$PROJECT_CWD" 2>/dev/null || echo "0,0")
     DURATION_MIN=$(echo "$DUR_OUTPUT" | cut -d, -f2)
   fi
 fi
@@ -123,14 +125,25 @@ if [ "$NO_COST" = "true" ]; then
 
 $SUMMARY"
 else
+  # 토큰 콤마 포맷팅 (1234567 → 1,234,567)
+  TOKENS_FMT=$(printf "%'d" "$TOKENS" 2>/dev/null || echo "$TOKENS")
+
   if [ "$WORKLOG_LANG" = "en" ]; then
     TOKEN_HEADER="### Token Usage"
     TOKEN_MODEL="- Model: $MODEL"
-    TOKEN_COST_LINE="- This session: \$$COST"
+    if [ "$TOKENS" -gt 0 ] 2>/dev/null; then
+      TOKEN_COST_LINE="- This session: ${TOKENS_FMT} tokens · \$$COST"
+    else
+      TOKEN_COST_LINE="- This session: \$$COST"
+    fi
   else
     TOKEN_HEADER="### 토큰 사용량"
     TOKEN_MODEL="- 모델: $MODEL"
-    TOKEN_COST_LINE="- 이번 작업: \$$COST"
+    if [ "$TOKENS" -gt 0 ] 2>/dev/null; then
+      TOKEN_COST_LINE="- 이번 작업: ${TOKENS_FMT} 토큰 · \$$COST"
+    else
+      TOKEN_COST_LINE="- 이번 작업: \$$COST"
+    fi
   fi
 
   ENTRY="---
@@ -187,6 +200,6 @@ fi
 
 # ── 스냅샷 갱신 ──────────────────────────────────────────────────────────────
 NOW_TS=$(date +%s)
-echo "{\"timestamp\":$NOW_TS}" > "$SNAPSHOT_FILE"
+echo "{\"timestamp\":$NOW_TS}" > "$SNAPSHOT_FILE" 2>/dev/null || echo "worklog-for-claude: snapshot 갱신 실패 ($SNAPSHOT_FILE)" >&2
 
 echo "워크로그 작성 완료: $DATE $TIMESTAMP"

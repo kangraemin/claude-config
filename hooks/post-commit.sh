@@ -17,12 +17,29 @@
 REPO_HOOK="$(git rev-parse --git-dir 2>/dev/null)/hooks/post-commit.local"
 [ -x "$REPO_HOOK" ] && "$REPO_HOOK"
 
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
+
 # ── AI_WORKLOG_DIR 탐색 ─────────────────────────────────────────────────────
+# 로컬 설치 우선: .claude/settings.json이 있으면 거기서 읽기
+if [ -z "${AI_WORKLOG_DIR:-}" ]; then
+  LOCAL_SETTINGS="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/settings.json"
+  if [ -f "$LOCAL_SETTINGS" ]; then
+    AI_WORKLOG_DIR=$($PYTHON -c "
+import json
+try:
+    cfg = json.load(open('$LOCAL_SETTINGS'))
+    print(cfg.get('env', {}).get('AI_WORKLOG_DIR', ''))
+except:
+    pass
+" 2>/dev/null || true)
+  fi
+fi
 AI_WORKLOG_DIR="${AI_WORKLOG_DIR:-$HOME/.claude}"
 WRITE_SCRIPT="$AI_WORKLOG_DIR/scripts/worklog-write.sh"
 
 if [ ! -f "$WRITE_SCRIPT" ]; then
-  # ai-worklog 미설치
+  echo "worklog-for-claude: worklog-write.sh not found at $WRITE_SCRIPT" >&2
+  echo "worklog-for-claude: AI_WORKLOG_DIR=$AI_WORKLOG_DIR — reinstall may be needed" >&2
   exit 0
 fi
 
@@ -30,7 +47,7 @@ fi
 # settings.json의 env를 읽어서 export
 SETTINGS_FILE="$AI_WORKLOG_DIR/settings.json"
 if [ -f "$SETTINGS_FILE" ]; then
-  eval "$(python3 -c "
+  eval "$($PYTHON -c "
 import json, sys
 try:
     cfg = json.load(open('$SETTINGS_FILE'))

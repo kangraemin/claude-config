@@ -4,6 +4,8 @@
 
 set -euo pipefail
 
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
+
 # .env 탐색: ~/.claude/.env 먼저, AI_WORKLOG_DIR/.env로 덮어쓰기 (cascade)
 # 같은 경로여도 중복 source는 무해 (idempotent)
 for _envfile in "$HOME/.claude/.env" ${AI_WORKLOG_DIR:+"$AI_WORKLOG_DIR/.env"}; do
@@ -30,7 +32,7 @@ if [ -z "${NOTION_DB_ID:-}" ]; then
 fi
 
 # 본문을 Notion blocks JSON으로 변환 (마크다운 → heading/bullet/paragraph)
-CHILDREN_JSON=$(python3 - "$CONTENT" <<'PYEOF'
+CHILDREN_JSON=$($PYTHON - "$CONTENT" <<'PYEOF'
 import sys, json
 
 content = sys.argv[1] if len(sys.argv) > 1 else ''
@@ -79,12 +81,13 @@ PYEOF
 )
 
 # API 페이로드 생성
-PAYLOAD=$(python3 - "$NOTION_DB_ID" "$TITLE" "$DATE" "$PROJECT" "$COST" "$DURATION" "$MODEL" "$TOKENS" "$DATETIME" "$CHILDREN_JSON" <<'PYEOF'
+PAYLOAD=$($PYTHON - "$NOTION_DB_ID" "$TITLE" "$DATE" "$PROJECT" "$COST" "$DURATION" "$MODEL" "$TOKENS" "$DATETIME" "$CHILDREN_JSON" <<'PYEOF'
 import json, sys
 cost     = round(float(sys.argv[5]), 3); cost     = cost     if cost     else None
 duration = int(sys.argv[6]);             duration = duration if duration else None
 tokens   = int(sys.argv[8]);             tokens   = tokens   if tokens   else None
 datetime = sys.argv[9] if sys.argv[9] else None
+date_val = sys.argv[3]
 data = {
     'parent': {'database_id': sys.argv[1]},
     'icon': {'type': 'emoji', 'emoji': '📖'},
@@ -95,7 +98,7 @@ data = {
         'Duration': {'number': duration},
         'Model':    {'select': {'name': sys.argv[7]}},
         'Tokens':   {'number': tokens},
-        'DateTime': {'date': {'start': datetime}} if datetime else {'date': None},
+        'DateTime': {'date': {'start': datetime if datetime else date_val}},
     },
     'children': json.loads(sys.argv[10])
 }
@@ -104,7 +107,7 @@ PYEOF
 )
 
 # Notion API 호출
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.notion.com/v1/pages" \
+RESPONSE=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" -X POST "https://api.notion.com/v1/pages" \
   -H "Authorization: Bearer $NOTION_TOKEN" \
   -H "Notion-Version: 2022-06-28" \
   -H "Content-Type: application/json" \

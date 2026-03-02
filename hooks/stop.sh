@@ -16,7 +16,7 @@ cd "$CWD" 2>/dev/null || exit 0
 # git repo가 아니면 통과
 git rev-parse --is-inside-work-tree &>/dev/null || exit 0
 
-# --- ai-worklog start ---
+# --- worklog-for-claude start ---
 # 미커밋 변경사항 확인 (untracked 파일 ??, .worklogs/ 제외)
 DIRTY=$(git status --porcelain 2>/dev/null | grep -v '^??' | grep -v ' \.worklogs/' || true)
 
@@ -28,4 +28,4 @@ if [ -n "$DIRTY" ]; then
 else
   exit 0
 fi
-# --- ai-worklog end ---
+# --- worklog-for-claude end ---
