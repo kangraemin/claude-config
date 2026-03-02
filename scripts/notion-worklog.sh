@@ -4,17 +4,11 @@
 
 set -euo pipefail
 
-# .env 탐색: AI_WORKLOG_DIR/.env → ~/.claude/.env fallback
-if [ -n "${AI_WORKLOG_DIR:-}" ] && [ -f "$AI_WORKLOG_DIR/.env" ]; then
-  ENV_FILE="$AI_WORKLOG_DIR/.env"
-else
-  ENV_FILE="$HOME/.claude/.env"
-fi
-if [ -f "$ENV_FILE" ]; then
-  set -a
-  source "$ENV_FILE"
-  set +a
-fi
+# .env 탐색: ~/.claude/.env 먼저, AI_WORKLOG_DIR/.env로 덮어쓰기 (cascade)
+# 같은 경로여도 중복 source는 무해 (idempotent)
+for _envfile in "$HOME/.claude/.env" ${AI_WORKLOG_DIR:+"$AI_WORKLOG_DIR/.env"}; do
+  [ -f "$_envfile" ] && { set -a; source "$_envfile"; set +a; }
+done
 
 TITLE="${1:?title required}"
 DATE="${2:?date required}"
