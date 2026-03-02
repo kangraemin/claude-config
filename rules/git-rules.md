@@ -55,3 +55,4 @@ EOF
 ## 금지
 - `reset --hard`, `clean -f`, `checkout .`, `restore .` — 사용자 요청 없이 금지
 - `--no-verify`, `--force`, `-i`(interactive), `--allow-empty` 금지
+- **`Co-Authored-By` 절대 금지** — 커밋 메시지에 추가하지 않는다

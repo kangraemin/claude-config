@@ -10,14 +10,12 @@
 
 set -euo pipefail
 
-# .env 탐색: AI_WORKLOG_DIR/.env → ~/.claude/.env fallback
-if [ -n "${AI_WORKLOG_DIR:-}" ] && [ -f "$AI_WORKLOG_DIR/.env" ]; then
-  ENV_FILE="$AI_WORKLOG_DIR/.env"
-else
-  ENV_FILE="$HOME/.claude/.env"
+# .env 탐색: ~/.claude/.env 먼저, AI_WORKLOG_DIR/.env로 덮어쓰기 (cascade)
+if [ -f "$HOME/.claude/.env" ]; then
+  set -a; source "$HOME/.claude/.env"; set +a
 fi
-if [ -f "$ENV_FILE" ]; then
-  set -a; source "$ENV_FILE"; set +a
+if [ -n "${AI_WORKLOG_DIR:-}" ] && [ "$AI_WORKLOG_DIR" != "$HOME/.claude" ] && [ -f "$AI_WORKLOG_DIR/.env" ]; then
+  set -a; source "$AI_WORKLOG_DIR/.env"; set +a
 fi
 
 DRY_RUN=false
@@ -190,12 +188,6 @@ def parse_entry(date, project, entry_text):
         **token_info,
     }
 
-def prev_date(date_str):
-    """YYYY-MM-DD → 하루 전 날짜 문자열"""
-    from datetime import date, timedelta
-    d = date.fromisoformat(date_str)
-    return str(d - timedelta(days=1))
-
 def parse_file(filepath):
     """md 파일 전체 → [entry, ...]"""
     with open(filepath, encoding='utf-8') as f:
@@ -225,28 +217,6 @@ def parse_file(filepath):
         e = parse_entry(date, project, block)
         if e:
             entries.append(e)
-
-    # ── 자정 넘김 보정 ──────────────────────────────────────────────────────
-    # 패턴: 파일 내 시간이 20:xx~23:xx 에서 00:xx~05:xx 로 떨어지는 구간이 있으면
-    # 그 이전의 20:xx~23:xx 엔트리들은 실제로 전날 작업 → date - 1일 적용
-    def to_min(t):
-        h, m = int(t[:2]), int(t[3:])
-        return h * 60 + m
-
-    crossover_idx = None
-    for i in range(1, len(entries)):
-        prev_m = to_min(entries[i-1]['time'])
-        cur_m  = to_min(entries[i]['time'])
-        if prev_m >= 20 * 60 and cur_m < 6 * 60:
-            crossover_idx = i
-            break
-
-    if crossover_idx is not None:
-        yesterday = prev_date(date)
-        for e in entries[:crossover_idx]:
-            if to_min(e['time']) >= 20 * 60:
-                e['date'] = yesterday
-
     return entries
 
 # ── 마이그레이션 ─────────────────────────────────────────────────────────────
@@ -261,7 +231,26 @@ if target_date:
         print(f"ERROR: {target_date}.md 파일 없음", file=sys.stderr)
         sys.exit(1)
 
-total, success, failed = 0, 0, 0
+# ── 중복 방지: .migrated 파일로 이미 전송한 항목 fingerprint 관리 ──
+migrated_file = os.path.join(worklogs_dir, '.migrated')
+
+def load_migrated():
+    if not os.path.exists(migrated_file):
+        return set()
+    with open(migrated_file, encoding='utf-8') as f:
+        return set(line.strip() for line in f if line.strip())
+
+def save_migrated(fp, migrated_set):
+    migrated_set.add(fp)
+    with open(migrated_file, 'a', encoding='utf-8') as f:
+        f.write(fp + '\n')
+
+def fingerprint(e):
+    return f"{e['date']}|{e['time']}|{e['title']}"
+
+migrated = load_migrated()
+
+total, success, failed, skipped = 0, 0, 0, 0
 deleted_files = []
 
 env = {**os.environ, 'NOTION_TOKEN': notion_token, 'NOTION_DB_ID': notion_db_id}
@@ -276,6 +265,14 @@ for filename in md_files:
         # 내용 없는 항목 스킵 (title이 "YYYY-MM-DD HH:MM" 패턴 = 내용 없음)
         if re.match(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$', e['title']):
             print(f"  ⏭  [{e['time']}] (내용 없음, 스킵)")
+            continue
+
+        fp = fingerprint(e)
+
+        # 이미 마이그레이션된 항목 스킵
+        if fp in migrated:
+            print(f"  ↩  [{e['time']}] (이미 전송됨, 스킵) {e['title'][:50]}")
+            skipped += 1
             continue
 
         total += 1
@@ -300,6 +297,7 @@ for filename in md_files:
         )
         if result.returncode == 0:
             print(f"  ✅ {label}")
+            save_migrated(fp, migrated)
             success += 1
         else:
             print(f"  ❌ {label}")
@@ -315,7 +313,8 @@ for filename in md_files:
 
 tag = "[DRY RUN] " if dry_run else ""
 fail_str = f", {failed} 실패" if failed else ""
-print(f"\n{tag}완료: {success}/{total} 처리됨{fail_str}")
+skip_str = f", {skipped} 스킵(중복)" if skipped else ""
+print(f"\n{tag}완료: {success}/{total} 처리됨{fail_str}{skip_str}")
 
 if delete_after and deleted_files:
     print(f"삭제된 파일 ({len(deleted_files)}개): {', '.join(deleted_files)}")

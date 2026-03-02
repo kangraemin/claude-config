@@ -16,10 +16,8 @@ bash <(curl -sL https://raw.githubusercontent.com/kangraemin/claude-config/main/
 | 도구 | 용도 |
 |------|------|
 | `git` | 버전 관리 |
-| `node` | ccusage 실행 |
 | `jq` | hooks 데이터 처리 |
 | `gh` | GitHub PR/이슈 |
-| `ccusage` | 토큰 사용량 추적 (install.sh에서 자동 설치) |
 
 ## 구조
 
@@ -162,9 +160,9 @@ Lead: Step 완료 확인 → 다음 Step 또는 Phase
 - 일일 누적: 29,760,365 토큰 / $17.87
 ```
 
-- **`/commit` 경유**: 요청사항 + 작업내용 + ccusage 토큰 delta 기록
+- **`/commit` 경유**: 요청사항 + 작업내용 + 프로젝트 JSONL 토큰 delta 기록
 - **auto-commit (fallback)**: pre-commit 훅이 변경파일 목록만 기록
-- **토큰 delta**: `.worklogs/.snapshot`에 이전 값 저장 → 차이 계산
+- **토큰 delta**: `~/.claude/worklogs/.snapshot`에 timestamp 저장 → 프로젝트 JSONL에서 차이 계산
 
 ## 업데이트
 

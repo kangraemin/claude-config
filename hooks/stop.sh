@@ -1,27 +1,31 @@
 #!/bin/bash
-# Stop 훅: 세션 종료 시 커밋/워크로그 필요 여부 확인
+# Stop hook: 미커밋 변경사항이 있으면 Claude에게 /finish 실행 지시
+
+# jq 필수 확인
+command -v jq &>/dev/null || exit 0
 
 INPUT=$(cat)
-CWD=$(echo "$INPUT" | jq -r '.cwd')
 STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
 
-# 재진입 방지
+# 재진입 방지: 이미 stop hook으로 계속 진행 중이면 통과
 [ "$STOP_HOOK_ACTIVE" = "true" ] && exit 0
 
+CWD=$(echo "$INPUT" | jq -r '.cwd')
 cd "$CWD" 2>/dev/null || exit 0
 
-# --- ai-worklog start ---
+# git repo가 아니면 통과
 git rev-parse --is-inside-work-tree &>/dev/null || exit 0
 
-# --- 커밋 필요 여부 ---
-NEED_COMMIT=false
-CHANGED=$(git diff --name-only 2>/dev/null; git diff --cached --name-only 2>/dev/null; git ls-files --others --exclude-standard 2>/dev/null | grep -v '^$')
-[ -n "$CHANGED" ] && NEED_COMMIT=true
+# --- ai-worklog start ---
+# 미커밋 변경사항 확인 (untracked 파일 ??, .worklogs/ 제외)
+DIRTY=$(git status --porcelain 2>/dev/null | grep -v '^??' | grep -v ' \.worklogs/' || true)
 
-# --- block 메시지 결정 ---
-if [ "$NEED_COMMIT" = "true" ]; then
-  echo '{"decision":"block","reason":"커밋되지 않은 변경사항이 있습니다. /commit을 실행하세요."}'
+if [ -n "$DIRTY" ]; then
+  jq -n '{
+    decision: "block",
+    reason: "/finish 스킬을 실행해서 커밋, 푸시, 워크로그를 작성해줘."
+  }'
+else
+  exit 0
 fi
 # --- ai-worklog end ---
-
-exit 0

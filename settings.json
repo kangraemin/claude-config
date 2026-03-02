@@ -3,11 +3,16 @@
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "ENABLE_TOOL_SEARCH": "true",
     "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-    "WORKLOG_TIMING": "each-commit",
-    "WORKLOG_DEST": "notion-only",
-    "WORKLOG_GIT_TRACK": "false",
     "NOTION_DB_ID": "316d4919-b6eb-8170-8adb-f1a8f43c3ece",
+    "WORKLOG_TIMING": "each-commit",
+    "WORKLOG_DEST": "notion",
+    "WORKLOG_GIT_TRACK": "false",
+    "WORKLOG_LANG": "ko",
     "AI_WORKLOG_DIR": "/Users/ram/.claude"
+  },
+  "attribution": {
+    "commit": "",
+    "pr": ""
   },
   "permissions": {
     "allow": [
@@ -39,7 +44,6 @@
       "Read(**/*.key)"
     ]
   },
-  "model": "opusplan",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -76,17 +80,6 @@
         ]
       }
     ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/stop.sh",
-            "timeout": 30
-          }
-        ]
-      }
-    ],
     "SessionEnd": [
       {
         "hooks": [
@@ -94,6 +87,17 @@
             "type": "command",
             "command": "/Users/ram/.claude/hooks/session-end.sh",
             "timeout": 15
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/stop.sh",
+            "timeout": 10
           }
         ]
       }
@@ -108,8 +112,5 @@
   },
   "skipDangerousModePermissionPrompt": true,
   "teammateMode": "tmux",
-  "attribution": {
-    "commit": "",
-    "pr": ""
-  }
+  "model": "opusPlan"
 }
