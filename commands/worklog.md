@@ -1,10 +1,10 @@
 ---
-description: 워크로그 작성
+description: "워크로그(작업 기록) 작성. '작업 기록해줘', '오늘 뭐 했는지 정리', '워크로그', 'worklog' 요청 시 트리거."
 ---
 
 # /worklog
 
-로컬 `.claude/rules/worklog-rules.md`가 있으면 그걸, 없으면 `$AI_WORKLOG_DIR/rules/worklog-rules.md`를 따른다.
+프로젝트 `.claude/rules/worklog-rules.md`가 있으면 그걸, 없으면 `$AI_WORKLOG_DIR/rules/worklog-rules.md`를 따른다.
 
 ## 모드 체크
 

@@ -57,7 +57,8 @@
 
 ## 모드 체크
 
-- `WORKLOG_TIMING=manual`이면 `/worklog` 스킬 시작 시 "워크로그 비활성화 상태" 출력 후 종료
+- `WORKLOG_TIMING=manual`이면 자동 워크로그(post-commit hook)가 비활성화된다.
+- 단, 사용자가 직접 `/worklog`를 호출하면 `WORKLOG_TIMING` 값과 무관하게 항상 실행한다.
 
 ## 저장 위치
 
@@ -84,31 +85,3 @@
 ```
 
 post-commit hook auto fallback: `## HH:MM (auto)` + 변경 파일 목록만 (`claude -p` 실패 시).
-
-## 토큰 delta 계산
-
-스냅샷: `{"timestamp":UNIX}`
-
-1. `~/.claude/worklogs/.snapshot` 읽기 (없으면 timestamp=0)
-2. 토큰/비용 = `python3 "${AI_WORKLOG_DIR}/scripts/token-cost.py" <스냅샷_timestamp> <프로젝트_cwd>`
-   - 출력: `토큰수,비용` (프로젝트 JSONL 직접 파싱, 다른 프로젝트 오염 없음)
-3. 소요 시간 = `python3 "${AI_WORKLOG_DIR}/scripts/duration.py" <스냅샷_timestamp> <프로젝트_cwd>`
-   - 출력: `초,분` → 분 값 사용. 실제 Claude 작업 시간 (벽시계 시간 아님)
-4. 워크로그 작성 후 스냅샷 갱신: `echo '{"timestamp":NOW}' > ~/.claude/worklogs/.snapshot`
-
-- 스냅샷 없으면 timestamp=0으로 전체값 계산 후 생성
-- JSONL 파싱 실패 시 "데이터 없음"
-
-## 아키텍처
-
-모든 워크로그 작성은 `scripts/worklog-write.sh`를 통해 수행:
-
-- **each-commit**: `git post-commit hook` → `claude -p`로 요약 생성 → `worklog-write.sh`
-- **manual**: `/worklog` 스킬 → 대화 컨텍스트에서 요약 생성 → `worklog-write.sh`
-
-`worklog-write.sh`가 토큰 계산, 파일 저장, Notion 전송, 스냅샷 갱신을 모두 담당.
-
-## 제한
-
-- post-commit hook은 항상 `exit 0` (워크로그 실패 → 커밋 차단 금지)
-- hook chaining: 레포별 기존 post-commit hook은 `.git/hooks/post-commit.local`로 보존/실행
