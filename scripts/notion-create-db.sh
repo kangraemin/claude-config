@@ -7,6 +7,8 @@
 
 set -euo pipefail
 
+PYTHON=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || echo python3)
+
 # .env 로드
 for _envfile in "$HOME/.claude/.env" ${AI_WORKLOG_DIR:+"$AI_WORKLOG_DIR/.env"}; do
   [ -f "$_envfile" ] && { set -a; source "$_envfile"; set +a; }
@@ -22,7 +24,7 @@ fi
 # parent_page_id에서 하이픈 제거 (URL에서 복사한 ID 대응)
 PARENT_PAGE_ID=$(echo "$PARENT_PAGE_ID" | tr -d '-')
 
-PAYLOAD=$(python3 -c "
+PAYLOAD=$($PYTHON -c "
 import json
 data = {
     'parent': {'type': 'page_id', 'page_id': '$PARENT_PAGE_ID'},
@@ -51,7 +53,7 @@ HTTP_CODE=$(echo "$RESPONSE" | tail -1)
 BODY=$(echo "$RESPONSE" | sed '$d')
 
 if [ "$HTTP_CODE" = "200" ]; then
-  DB_ID=$(echo "$BODY" | python3 -c "import json,sys; print(json.load(sys.stdin)['id'])")
+  DB_ID=$(echo "$BODY" | $PYTHON -c "import json,sys; print(json.load(sys.stdin)['id'])")
   echo "$DB_ID"
 else
   echo "FAIL: HTTP $HTTP_CODE" >&2

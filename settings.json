@@ -78,6 +78,24 @@
             "async": true
           }
         ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/doc-reminder.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/bash-audit.sh"
+          }
+        ],
+        "matcher": "Bash"
       }
     ],
     "SessionEnd": [
@@ -100,6 +118,34 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/completion-gate.sh"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/plan-gate.sh"
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/bash-gate.sh"
+          }
+        ],
+        "matcher": "Bash"
       }
     ]
   },
@@ -111,6 +157,5 @@
     "swift-lsp@claude-plugins-official": true
   },
   "skipDangerousModePermissionPrompt": true,
-  "teammateMode": "tmux",
-  "model": "opusPlan"
+  "teammateMode": "tmux"
 }
