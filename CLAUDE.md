@@ -108,7 +108,7 @@
 - **Evolve**: `/library-evolve`로 구조/규칙 자체 개선 (카테고리 밸런스, 템플릿 사용률, 규칙 효과성)
 - **CHANGELOG**: 모든 추가/수정/삭제를 `CHANGELOG.md`에 시간순 기록
 
-미결 상태는 기록하지 않는다.
+미결이라도 기록할 가치가 있으면 기록한다. 단, `[TODO]` 태그를 붙여 미결임을 명시.
 
 # --- ai-bouncer-rule start ---
 ## ai-bouncer
