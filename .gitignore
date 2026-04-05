@@ -20,6 +20,10 @@
 !guides/
 !guides/**
 
+# skills
+!skills/
+!skills/**
+
 # rules
 !rules/
 !rules/**
@@ -69,3 +73,4 @@ scripts/token-cost.py
 scripts/update-check.sh
 scripts/worklog-write.sh
 git-hooks/post-commit
+.claude-library/

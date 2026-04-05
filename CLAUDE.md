@@ -43,44 +43,62 @@
 
 참조: `~/.claude/.claude-library/GUIDE.md`
 
+### 목차
+> 설치 후 library에 지식이 쌓이면 여기에 카테고리별 주제 목록이 자동 추가됩니다.
+
 ### 읽기
-- 새 실험/전략 제안 전, 막히는 상황에서 `~/.claude/.claude-library/LIBRARY.md`를 읽는다
-- 관련 카테고리/주제 폴더의 `index.md`를 찾아 읽는다
-- 참조한 항목이 있으면 한 줄로 알린다: `📚 library 참조: [경로]`
+- 목차를 보고 관련 주제를 직접 판단한 뒤 `library_read(path)`로 읽는다
+- 키워드 매칭이 필요하면 `library_search(query)`도 보조로 사용
+- 새 실험/전략 제안 전, 막히는 상황에서 관련 키워드로 검색한다
+- 참조한 항목이 있으면 한 줄로 알린다: `📚 library 참조: [topic]`
 - 이미 기록된 방향은 재제안하지 않는다
 
 ### 쓰기
 아래 경우 library에 기록한다:
 - 실험/백테스트 결론이 났을 때
-- 아티클에서 유효한 인사이트를 얻었을 때
+- 아티클/논문에서 유효한 인사이트를 얻었을 때
 - 사용자가 접근법을 수정했을 때
 - 더 나은 방법을 발견했을 때
 - **개발 중 삽질로 알게 된 API/라이브러리 동작** — 에러로 발견한 것, 문서에 없는 것, 다음에 또 삽질할 것 같은 것. 발견 즉시 기록한다. 사용자가 요청하기 전에.
+- **틀린 내용을 교정받았을 때** — "그게 아니야"라고 교정받으면 그 자리에서 바로 저장. "저장할까요?" 묻지 않는다.
+- **세션에서 한 분석/비교/의사결정** (Query 파일백) — 전략 비교, 접근법 분석, 기술 선택 근거 등 결론이 나온 것은 해당 주제에 파일백. 채팅에서 증발시키지 않는다.
+
+### 분류 체계
+**`~/.claude/TAXONOMY.md`를 먼저 확인한다.**
+- 매칭되는 카테고리/서브카테고리가 있으면 그곳에 저장
+- 없으면 TAXONOMY.md에 먼저 추가 후 저장
+- ❌ 대회명, 프로젝트명, 도구명을 카테고리/서브카테고리로 사용 금지
+- ✅ 기법/주제/도메인 기준으로 분류
+
+### 파일명 원칙
+- **"뭘 배웠는지"**가 파일명에 드러나야 한다
+- ❌ `discovery.md`, `lessons.md`, `backtest.md` (뭔지 모름)
+- ✅ `ar1-lag-is-dominant-signal.md`, `synthetic-data-distribution-overfit.md`
+- 예외: finance/ 하위 전략별 `backtest.md`는 폴더가 전략명이므로 OK
 
 기록 방법:
-1. 카테고리 판단 (equity, crypto, ml, macro, claude 등)
-2. 주제 폴더 확인/생성: `~/.claude/.claude-library/library/[카테고리]/[주제]/`
-3. 지식 파일 생성 (내용 설명하는 이름, 날짜 없음)
-4. 주제 `index.md` 생성/업데이트
+1. **TAXONOMY.md 확인** — 매칭되는 분류 찾기, 없으면 추가
+2. 주제 폴더 확인/생성: `~/.claude/.claude-library/library/[카테고리]/[서브카테고리]/[주제]/`
+3. 지식 파일 생성: 교훈이 드러나는 이름 (날짜 없음)
+4. 주제 `index.md` 생성/업데이트 + `관련:` 태그 추가 (관련 주제가 있으면)
 5. `~/.claude/.claude-library/LIBRARY.md` 업데이트
-6. 즉시 commit/push:
+6. `~/.claude/.claude-library/CHANGELOG.md`에 한 줄 append
+7. CLAUDE.md 목차 업데이트
+8. 즉시 commit/push:
    ```
    git -C ~/.claude/.claude-library add -A
    git -C ~/.claude/.claude-library commit -m "feat: [주제] 추가"
    git -C ~/.claude/.claude-library push
    ```
-7. 한 줄로 알린다: `📚 library에 추가: [경로]`
+9. 한 줄로 알린다: `📚 library에 추가: [경로]`
+
+### 유지보수
+- **Lint**: `/library-lint`로 건강 체크 (관련 태그 양방향, index 미등록, 카운트 불일치, 크로스레퍼런스 제안)
+- **CHANGELOG**: 모든 추가/수정/삭제를 `CHANGELOG.md`에 시간순 기록
 
 미결 상태는 기록하지 않는다.
 
-## Project Doc 자동 제안
-
-아래 중 하나라도 해당하는 작업을 마쳤으면, PROJECT.md 갭을 체크하고 제안한다:
-- 새 기능/모듈 완성
-- 파일·폴더 구조 변경
-- 접근법을 바꿈 (pivot)
-- 삽질 끝에 중요한 것을 알게 됨
-
-PROJECT.md가 없으면: "PROJECT.md 없는데 만들까?" 한 줄만 제안.
-PROJECT.md가 있으면: 반영 안 된 내용이 있을 때만 "이번 작업 PROJECT.md에 반영할까?" 제안.
-없으면 아무 말도 하지 않는다.
+# --- ai-bouncer-rule start ---
+## ai-bouncer
+코드 수정 / 기능 구현 / 파일 변경 / 버그 수정 등 개발 작업 시 반드시 `/dev-bounce` 스킬을 먼저 호출할 것.
+# --- ai-bouncer-rule end ---
