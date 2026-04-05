@@ -63,6 +63,17 @@
 - **틀린 내용을 교정받았을 때** — "그게 아니야"라고 교정받으면 그 자리에서 바로 저장. "저장할까요?" 묻지 않는다.
 - **세션에서 한 분석/비교/의사결정** (Query 파일백) — 전략 비교, 접근법 분석, 기술 선택 근거 등 결론이 나온 것은 해당 주제에 파일백. 채팅에서 증발시키지 않는다.
 
+### Prediction Error 필터
+기록 전 자문: "문서에 있나?" → 저장 안 함. "예상과 달랐나?" / "또 삽질할 것 같나?" → 저장. **놀라움이 저장의 기준.**
+
+### 지식 파일 메타데이터
+- `durability: permanent | temporal` — permanent은 lint에서 staleness 스킵
+- `type: gotcha | strategy | pattern | decision` — 유형별 템플릿 사용 (GUIDE.md 참조)
+- 본문 내 `[verified]`, `[inferred]`, `[TODO]` 인라인 태그로 신뢰도 표시
+
+### Synthesis (종합 문서)
+3개+ 주제를 가로지르는 상위 결론은 `library/synthesis/`에 저장. 개별 지식이 "나무", synthesis가 "숲".
+
 ### 분류 체계
 **`~/.claude/TAXONOMY.md`를 먼저 확인한다.**
 - 매칭되는 카테고리/서브카테고리가 있으면 그곳에 저장
@@ -93,7 +104,8 @@
 9. 한 줄로 알린다: `📚 library에 추가: [경로]`
 
 ### 유지보수
-- **Lint**: `/library-lint`로 건강 체크 (관련 태그 양방향, index 미등록, 카운트 불일치, 크로스레퍼런스 제안)
+- **Lint**: `/library-lint`로 건강 체크 (관련 태그 양방향, index 미등록, 카운트 불일치, 크로스레퍼런스 제안). temporal 항목만 staleness 체크.
+- **Evolve**: `/library-evolve`로 구조/규칙 자체 개선 (카테고리 밸런스, 템플릿 사용률, 규칙 효과성)
 - **CHANGELOG**: 모든 추가/수정/삭제를 `CHANGELOG.md`에 시간순 기록
 
 미결 상태는 기록하지 않는다.
