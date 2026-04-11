@@ -3,11 +3,13 @@
     "ENABLE_TOOL_SEARCH": "true",
     "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
     "NOTION_DB_ID": "316d4919-b6eb-8170-8adb-f1a8f43c3ece",
-    "WORKLOG_TIMING": "each-commit",
+    "WORKLOG_TIMING": "stop",
     "WORKLOG_DEST": "notion-only",
     "WORKLOG_GIT_TRACK": "false",
     "WORKLOG_LANG": "ko",
-    "AI_WORKLOG_DIR": "/Users/ram/.claude"
+    "AI_WORKLOG_DIR": "/Users/ram/.claude",
+    "LIBRARY_NOTION_DB_ID": "334d4919-b6eb-81bf-aee8-cffeb264f70d",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "attribution": {
     "commit": "",
@@ -20,7 +22,10 @@
       "Bash(*)",
       "Write",
       "Edit",
-      "Read"
+      "Read",
+      "Glob",
+      "Grep",
+      "mcp__stitch__*"
     ],
     "deny": [
       "Bash(rm -rf:*)",
@@ -43,6 +48,7 @@
       "Read(**/*.key)"
     ]
   },
+  "model": "sonnet[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -65,6 +71,34 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/scripts/bouncer-update-check.sh",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/scripts/worklog-update-check.sh",
+            "timeout": 15
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/learnings-update-check.sh",
+            "timeout": 15,
+            "async": true
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -75,6 +109,43 @@
             "command": "/Users/ram/.claude/hooks/worklog.sh",
             "timeout": 5,
             "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/doc-reminder.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/bash-audit.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/on-commit.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/commit-doc-check.sh",
+            "timeout": 5
           }
         ]
       }
@@ -99,6 +170,72 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/completion-gate.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/stop-active-cleanup.sh"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-save-check.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/bash-gate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/plan-gate.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/subagent-track.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/subagent-cleanup.sh"
+          }
+        ]
       }
     ]
   },
@@ -107,8 +244,21 @@
     "command": "~/.claude/statusline.sh"
   },
   "enabledPlugins": {
-    "swift-lsp@claude-plugins-official": true
+    "swift-lsp@claude-plugins-official": true,
+    "telegram@claude-plugins-official": true,
+    "ralph-x@ralph-x": true
   },
   "skipDangerousModePermissionPrompt": true,
+  "mcpServers": {
+    "telegram": {
+      "command": "/opt/homebrew/bin/bun",
+      "args": [
+        "/Users/ram/.claude/plugins/cache/claude-plugins-official/telegram/0.0.1/server.ts"
+      ],
+      "env": {
+        "TELEGRAM_STATE_DIR": "/Users/ram/.claude/channels/telegram"
+      }
+    }
+  },
   "teammateMode": "tmux"
 }
