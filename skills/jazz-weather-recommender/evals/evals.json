@@ -1,0 +1,77 @@
+{
+  "skill_name": "jazz-weather-recommender",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "오늘 서울 날씨에 맞는 재즈 추천해줘",
+      "expected_output": "현재 서울 날씨 정보를 검색하고, 날씨 분위기에 맞는 재즈곡 3~5곡을 YouTube 링크와 함께 추천. 각 곡마다 날씨와의 연관성 설명 포함.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "has_weather_info",
+          "description": "서울 현재 날씨 정보(기온 또는 날씨 상태)가 출력에 포함되어 있음"
+        },
+        {
+          "id": "recommends_3_or_more_songs",
+          "description": "최소 3곡 이상의 재즈곡을 추천함"
+        },
+        {
+          "id": "has_youtube_links",
+          "description": "적어도 1개 이상의 YouTube 링크(youtube.com 포함)가 있음"
+        },
+        {
+          "id": "explains_weather_connection",
+          "description": "날씨와 곡 선정의 연관성을 설명하는 텍스트가 있음 (단순 목록 나열이 아님)"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "지금 밖에 비가 오는데 듣기 좋은 재즈 없을까? 서울 기준으로",
+      "expected_output": "비 오는 날씨에 어울리는 재즈곡 추천. 현재 서울 실제 날씨도 확인하고, 비의 강도/분위기에 맞는 곡 선정. YouTube 링크 포함.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "rainy_mood_match",
+          "description": "비/우천 분위기에 특화된 추천임 (단순 재즈 베스트 목록이 아님)"
+        },
+        {
+          "id": "recommends_3_or_more_songs",
+          "description": "최소 3곡 이상의 곡을 추천함"
+        },
+        {
+          "id": "has_youtube_links",
+          "description": "적어도 1개 이상의 YouTube 링크(youtube.com 포함)가 있음"
+        },
+        {
+          "id": "explains_rainy_connection",
+          "description": "비의 정서(감성적, 잔잔함, 리드미컬함 등)와 곡의 연결을 설명하는 텍스트가 있음"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "날씨 보고 음악 골라줘. 재즈 말고 다른 것도 괜찮아",
+      "expected_output": "재즈 기반으로 추천하되, 사용자가 '재즈 말고도 괜찮다'고 했으므로 재즈 인접 장르(보사노바, 소울, 퓨전 등)도 포함 가능. 서울 날씨 기반 추천.",
+      "files": [],
+      "assertions": [
+        {
+          "id": "has_weather_info",
+          "description": "서울 현재 날씨 정보(기온 또는 날씨 상태)가 출력에 포함되어 있음"
+        },
+        {
+          "id": "recommends_3_or_more_songs",
+          "description": "최소 3곡 이상의 곡을 추천함"
+        },
+        {
+          "id": "has_youtube_links",
+          "description": "적어도 1개 이상의 YouTube 링크(youtube.com 포함)가 있음"
+        },
+        {
+          "id": "includes_non_pure_jazz",
+          "description": "순수 재즈 외에 보사노바, 소울, 퓨전, 월드뮤직 등 인접 장르가 1곡 이상 포함되어 있음"
+        }
+      ]
+    }
+  ]
+}
