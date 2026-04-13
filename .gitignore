@@ -53,6 +53,18 @@
 # worklogs (git 추적 안 함)
 .worklogs/
 
+# 임시 상태 파일 (hook runtime)
+hooks/.library-check-counter*
+hooks/.learnings-version
+hooks/.learnings-version-checked
+
+# workspace 디렉토리 (스킬 개발용 임시)
+skills/*-workspace/
+
+# 백업/임시 파일
+scripts/*.bak
+agents/*.pre-update
+
 # ai-worklog 프로젝트 소속 파일 (install.sh로 설치됨, 여기서 추적 안 함)
 install.sh
 commands/finish.md
