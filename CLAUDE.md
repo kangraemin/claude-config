@@ -46,6 +46,16 @@
 ### 목차
 > 설치 후 library에 지식이 쌓이면 여기에 카테고리별 주제 목록이 자동 추가됩니다.
 
+- **ml/audio/perch-onnx**: LSE head + MPS 속도 이슈, LSE 추론 전용 적용 역효과, ONNX 출력 차이
+- **tooling/claude-code/worklog-notion-token-guard**: NOTION_TOKEN이 stop hook 호출 시점에 shell에 없으면 Notion 전송 무음 스킵
+- **infra/aws-lambda/secrets-manager-key-missing**: Lambda 500 — Secrets Manager에서 API Key 삭제 시 조용한 실패
+- **tooling/ai-agent/llm-tool-design**: LLM 채팅 툴 설계 — 소형 목적별 툴 > 대형 덩어리 툴, JSON 블록 > 프롬프트 포맷 강제
+- **tooling/ai-bouncer/dev-phases-format**: dev_phases.steps는 숫자가 아닌 객체여야 bash-gate 통과
+- **api/stitch**: generate_screen_from_text 타임아웃 시 스크린 보존 여부 + 성공 패턴
+- **shell/macos-sed**: macOS sed 다단계 경로 치환 실패 → Python re.sub 사용
+- **api/electron**: Vanilla→React 마이그레이션 시 body.darwin 클래스 수동 설정, #root height, 레이아웃 구조 1:1 대응 필수
+- **api/ga4-measurement-protocol**: Electron에서 국가 데이터 미수집 — ip_override 없으면 geo 안 됨
+
 ### 읽기
 - 목차를 보고 관련 주제를 직접 판단한 뒤 `library_read(path)`로 읽는다
 - 키워드 매칭이 필요하면 `library_search(query)`도 보조로 사용
@@ -61,18 +71,6 @@
 - 더 나은 방법을 발견했을 때
 - **개발 중 삽질로 알게 된 API/라이브러리 동작** — 에러로 발견한 것, 문서에 없는 것, 다음에 또 삽질할 것 같은 것. 발견 즉시 기록한다. 사용자가 요청하기 전에.
 - **틀린 내용을 교정받았을 때** — "그게 아니야"라고 교정받으면 그 자리에서 바로 저장. "저장할까요?" 묻지 않는다.
-- **세션에서 한 분석/비교/의사결정** (Query 파일백) — 전략 비교, 접근법 분석, 기술 선택 근거 등 결론이 나온 것은 해당 주제에 파일백. 채팅에서 증발시키지 않는다.
-
-### Prediction Error 필터
-기록 전 자문: "문서에 있나?" → 저장 안 함. "예상과 달랐나?" / "또 삽질할 것 같나?" → 저장. **놀라움이 저장의 기준.**
-
-### 지식 파일 메타데이터
-- `durability: permanent | temporal` — permanent은 lint에서 staleness 스킵
-- `type: gotcha | strategy | pattern | decision` — 유형별 템플릿 사용 (GUIDE.md 참조)
-- 본문 내 `[verified]`, `[inferred]`, `[TODO]` 인라인 태그로 신뢰도 표시
-
-### Synthesis (종합 문서)
-3개+ 주제를 가로지르는 상위 결론은 `library/synthesis/`에 저장. 개별 지식이 "나무", synthesis가 "숲".
 
 ### 분류 체계
 **`~/.claude/TAXONOMY.md`를 먼저 확인한다.**
@@ -87,30 +85,33 @@
 - ✅ `ar1-lag-is-dominant-signal.md`, `synthetic-data-distribution-overfit.md`
 - 예외: finance/ 하위 전략별 `backtest.md`는 폴더가 전략명이므로 OK
 
+### 지식 파일 메타데이터
+- `source_session`: 어느 세션에서 발견했는지 (워크로그 날짜/시간 또는 세션 컨텍스트). 나중에 "이거 왜 이렇게 기록했지?" 역추적용.
+
 기록 방법:
 1. **TAXONOMY.md 확인** — 매칭되는 분류 찾기, 없으면 추가
 2. 주제 폴더 확인/생성: `~/.claude/.claude-library/library/[카테고리]/[서브카테고리]/[주제]/`
-3. 지식 파일 생성: 교훈이 드러나는 이름 (날짜 없음)
+3. 지식 파일 생성: 교훈이 드러나는 이름 (날짜 없음), `source_session` 포함
 4. 주제 `index.md` 생성/업데이트 + `관련:` 태그 추가 (관련 주제가 있으면)
+4.5. **관련 주제 자동 탐색**: `library_search()`로 새 파일의 핵심 키워드 검색 → 관련 주제 발견 시 양방향 `관련:` 태그 추가 (새 index.md + 기존 index.md 모두)
 5. `~/.claude/.claude-library/LIBRARY.md` 업데이트
-6. `~/.claude/.claude-library/CHANGELOG.md`에 한 줄 append
-7. CLAUDE.md 목차 업데이트
-8. 즉시 commit/push:
+6. CLAUDE.md 목차 업데이트
+6.5. **Synthesis 체크**: 같은 서브카테고리에 파일 3개 이상이면 "종합 문서 필요한가?" 자문 → 공통 패턴이 보이면 `library/synthesis/`에 작성
+7. 즉시 commit/push:
    ```
    git -C ~/.claude/.claude-library add -A
    git -C ~/.claude/.claude-library commit -m "feat: [주제] 추가"
    git -C ~/.claude/.claude-library push
    ```
-9. 한 줄로 알린다: `📚 library에 추가: [경로]`
+8. 한 줄로 알린다: `📚 library에 추가: [경로]`
 
-### 유지보수
-- **Lint**: `/library-lint`로 건강 체크 (관련 태그 양방향, index 미등록, 카운트 불일치, 크로스레퍼런스 제안). temporal 항목만 staleness 체크.
-- **Evolve**: `/library-evolve`로 구조/규칙 자체 개선 (카테고리 밸런스, 템플릿 사용률, 규칙 효과성)
-- **CHANGELOG**: 모든 추가/수정/삭제를 `CHANGELOG.md`에 시간순 기록
-
-미결이라도 기록할 가치가 있으면 기록한다. 단, `[TODO]` 태그를 붙여 미결임을 명시.
+미결 상태는 기록하지 않는다.
 
 # --- ai-bouncer-rule start ---
-## ai-bouncer
-코드 수정 / 기능 구현 / 파일 변경 / 버그 수정 등 개발 작업 시 반드시 `/dev-bounce` 스킬을 먼저 호출할 것.
+## ai-bouncer 필수 규칙
+
+**절대 금지**: `/dev-bounce` 스킬 호출 없이 Edit / Write / Bash로 소스 파일을 수정하는 것.
+
+- 코드 수정 / 기능 구현 / 버그 수정 / 파일 변경 등 **모든 개발 작업** 전에 반드시 `Skill("dev-bounce")`를 호출한다.
+- 사용자 메시지에 `/dev-bounce`가 포함되어 있으면 **가장 먼저** Skill 도구로 실행한다. 다른 어떤 행동보다 우선.
 # --- ai-bouncer-rule end ---

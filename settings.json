@@ -8,8 +8,7 @@
     "WORKLOG_GIT_TRACK": "false",
     "WORKLOG_LANG": "ko",
     "AI_WORKLOG_DIR": "/Users/ram/.claude",
-    "LIBRARY_NOTION_DB_ID": "334d4919-b6eb-81bf-aee8-cffeb264f70d",
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    "LIBRARY_NOTION_DB_ID": "334d4919-b6eb-81bf-aee8-cffeb264f70d"
   },
   "attribution": {
     "commit": "",
@@ -48,7 +47,7 @@
       "Read(**/*.key)"
     ]
   },
-  "model": "sonnet[1m]",
+  "model": "sonnet",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -89,16 +88,6 @@
             "timeout": 15
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/learnings-update-check.sh",
-            "timeout": 15,
-            "async": true
-          }
-        ]
       }
     ],
     "PostToolUse": [
@@ -109,24 +98,6 @@
             "command": "/Users/ram/.claude/hooks/worklog.sh",
             "timeout": 5,
             "async": true
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/doc-reminder.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/bash-audit.sh"
           }
         ]
       },
@@ -148,6 +119,24 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/doc-reminder.sh"
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/bash-audit.sh"
+          }
+        ],
+        "matcher": "Bash"
       }
     ],
     "SessionEnd": [
@@ -175,6 +164,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-save-check.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "/Users/ram/.claude/ai-bouncer/hooks/completion-gate.sh"
           }
         ]
@@ -186,36 +184,26 @@
             "command": "/Users/ram/.claude/ai-bouncer/hooks/stop-active-cleanup.sh"
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/library-save-check.sh",
-            "timeout": 10
-          }
-        ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/plan-gate.sh"
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
+      },
+      {
         "hooks": [
           {
             "type": "command",
             "command": "/Users/ram/.claude/ai-bouncer/hooks/bash-gate.sh"
           }
-        ]
-      },
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/plan-gate.sh",
-            "timeout": 5
-          }
-        ]
+        ],
+        "matcher": "Bash"
       }
     ],
     "SubagentStart": [
