@@ -1,0 +1,23 @@
+{
+  "skill_name": "create-spec",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "mukmap이라는 서비스를 만들려고 해. 유튜버 맛집을 자동으로 수집해서 지도에 보여주는 웹 서비스야. Next.js + Supabase + 카카오맵 쓸 거고, 자막 추출은 Railway 크론잡에서 해. PRD랑 기술문서 디자인문서 다 만들어줘",
+      "expected_output": "spec-docs/PRD.md, spec-docs/TECHNICAL.md, spec-docs/DESIGN.md 3개 파일 생성. PRD에 맛집 추출 예외케이스(자막 없는 영상, 가게명 불명확 등) 포함. TECHNICAL에 네이버 로컬 검색 API 실제 규격 반영. DESIGN에 stitch 스크린 생성.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "할일 관리 앱 만들려고 하는데 스펙 문서 좀 작성해줘. React Native로 만들 거고 Firebase 쓸 예정이야. 기본적인 CRUD에 카테고리별 분류, 마감일 알림 기능이 있으면 좋겠어",
+      "expected_output": "spec-docs/ 3개 파일 생성. PRD에 알림 권한 거부 시 예외처리, 오프라인 동기화 고려. TECHNICAL에 Firebase Firestore 스키마와 FCM 푸시 알림 실제 규격. DESIGN에 모바일 stitch 스크린.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "기획서 만들어줘. SaaS 대시보드 서비스인데, 유저가 여러 데이터 소스(Google Analytics, Stripe, Slack)를 연결하면 핵심 지표를 한 화면에 보여주는 거야. 웹앱이고 Next.js + PostgreSQL 쓸 거야",
+      "expected_output": "spec-docs/ 3개 파일. PRD에 OAuth 연동 실패, 데이터 소스 연결 해제, API rate limit 등 예외케이스. TECHNICAL에 OAuth2 플로우 상세, 각 외부 API 실제 엔드포인트/응답 형식. DESIGN에 데스크톱 대시보드 stitch 스크린.",
+      "files": []
+    }
+  ]
+}

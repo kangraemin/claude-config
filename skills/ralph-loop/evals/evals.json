@@ -1,0 +1,23 @@
+{
+  "skill_name": "ralph-loop",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "ralph loop 만들어줘. 게임 디자인 리뷰 자동화하고 싶어. localhost:8765에서 스크린샷 찍고 critical 이슈 없어질 때까지 반복해서 고쳐. 고치면 itch.io에 배포도 해줘.",
+      "expected_output": "conditions.md + pre/dev/post 프롬프트 + loop.sh 생성. 질문 3라운드 진행 후 파일 생성.",
+      "files": []
+    },
+    {
+      "id": 1,
+      "prompt": "pytest 테스트 자동 통과 루프 만들어줘. 테스트 실패하면 코드 고치고, 전부 통과하면 멈추게.",
+      "expected_output": "conditions.md + pre/dev/post 프롬프트 + loop.sh 생성. PASS 기준(테스트 전부 통과), 파일 범위 등 질문.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "그냥 계속 개선해줘",
+      "expected_output": "내용 불충분 → 구체화 질문 (무엇을 개선? PASS 기준?). 루프 파일은 질문 후 생성.",
+      "files": []
+    }
+  ]
+}
