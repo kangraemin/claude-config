@@ -54,6 +54,7 @@
 - **infra/kaggle-env**: embedded datasetId 스테일 시 마운트 실패, dataset_sources → /kaggle/input/{slug}/ 경로, model_sources 누락/XLA 호환 주의, Code Competition CLI 제출 불가(400)
 - **tooling/ai-agent/llm-tool-design**: LLM 채팅 툴 설계 — 소형 목적별 툴 > 대형 덩어리 툴, JSON 블록 > 프롬프트 포맷 강제
 - **tooling/ai-bouncer/dev-phases-format**: dev_phases.steps는 숫자가 아닌 객체여야 bash-gate 통과
+- **tooling/ai-bouncer/claude-p-self-blocks-on-dev-bounce-rule**: claude-p 에이전트가 CLAUDE.md dev-bounce 룰을 보고 출력 파일(eval.md 등) 쓰기도 자기 검열 → 프롬프트에 "출력 파일은 예외" 명시 필요
 - **api/stitch**: generate_screen_from_text 타임아웃 시 스크린 보존 여부 + 성공 패턴
 - **shell/macos-sed**: macOS sed 다단계 경로 치환 실패 → Python re.sub 사용
 - **shell/pipx**: pipx 설치 CLI는 pip3 upgrade 무효 — pipx upgrade 사용
@@ -73,8 +74,14 @@
 - **web-scraping/korean-gov/nowon-duplicate-download-links-in-table**: 테이블 제목+아이콘 동일 href → 셀렉터 2배 매칭, href 중복 제거 필수
 - **web-scraping/korean-gov/css-selector-over-regex-for-district-crawling**: post_re regex 12개 구 전멸, Playwright CSS selector `a[href*='keyword']`가 25개 전부 성공
 - **shell/python-unbuffered-stdout-for-realtime-logs**: `python script.py | tail`은 stdout block-buffered. 실시간 로그는 `python -u` 또는 `print(flush=True)`. CPU 0%여도 스턱 아님.
+- **finance/crypto-backtest-validation/strategy-search-loop-multiple-comparison-bias**: 20회+ 전략 탐색 루프 → WF만으론 부족, 3단계 추가 필수: Permutation(p<0.05) + Cross-Coin OOS(3종 중 ≥2 양수) + Year-Split Regime(Bear -30% 이내)
+- **finance/crypto-backtest-validation/4h-btc-breakout-slippage-is-negligible**: 4h 봉 BTC 돌파 후 ETH/XRP 진입 갭 실측 ~0% — 0.2% 가정은 과도, 실제는 수수료+스프레드 수준
+- **tooling/ralph-loop/checklist-completion-vs-full-run-intent**: Ralph-X 전략 탐색 루프는 PASS 발견 시 조기종료 말고 완주가 기본 — 설계 시 명시적으로 확인 필요
 - **finance/equity/overfitting-validation**: 전략 탐색 루프 4단계 검증 — WF+21d embargo / DSR 다중검정보정 / Monte Carlo p<0.05 / Out-of-Universe 자동화 (수동 불필요)
 - **api/gemma**: Gemma API (gemma-3-27b-it) 10개 동시 호출 시 429 rate limit → 3개 배치 + 1초 딜레이로 해결
+- **api/nextjs-app-router/get-handler-static-cache-by-default**: Next.js 14+ App Router GET handler는 기본 빌드타임 prerender. request 안 쓰면 옛 데이터 박힘. force-dynamic / revalidatePath 패턴
+- **infra/cicd/vercel-env-add-newline-trap**: `vercel env add`에 echo 파이프 시 trailing `\n` 저장 → 401. `printf "%s"` 필수
+- **infra/cicd/vercel-github-webhook-can-silently-disconnect**: Vercel/GitHub webhook 조용히 끊김 (14일 동안 자동 배포 안 됨). `vercel ls` Age 컬럼으로 진단
 
 ### 읽기
 - 목차를 보고 관련 주제를 직접 판단한 뒤 `library_read(path)`로 읽는다
