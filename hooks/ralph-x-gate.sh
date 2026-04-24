@@ -13,14 +13,16 @@ CWD=$(echo "$INPUT" | jq -r '.cwd')
 
 CURRENT_SESSION=$(echo "$INPUT" | jq -r '.session_id // ""')
 
-for state_file in "$CWD"/.claude/ralph-x-runs/*/session-state.json; do
+for state_file in "$CWD"/ralph-x-runs/*/session-state.json; do
   [ -f "$state_file" ] || continue
 
   ACTIVE=$(jq -r '.active // false' "$state_file")
   [ "$ACTIVE" != "true" ] && continue
 
   STORED_SESSION=$(jq -r '.session_id // ""' "$state_file")
-  [ -n "$STORED_SESSION" ] && [ "$STORED_SESSION" != "$CURRENT_SESSION" ] && continue
+  if [ -z "$STORED_SESSION" ] || [ "$STORED_SESSION" != "$CURRENT_SESSION" ]; then
+    continue
+  fi
 
   MAX_ITER=$(jq -r '.max_iterations // 0' "$state_file")
   CURRENT_ITER=$(jq -r '.current_iteration // 0' "$state_file")

@@ -5,13 +5,13 @@ PASS=0; FAIL=0
 _make_base() { mktemp -d; }
 _state() {
   local base="$1" name="$2" active="$3" sid="$4" cur="$5" max="$6"
-  local dir="$base/.claude/ralph-x-runs/$name"
+  local dir="$base/ralph-x-runs/$name"
   mkdir -p "$dir"
   cat > "$dir/session-state.json" <<EOF
-{"active":${active},"session_id":"${sid}","run_id":"${name}","run_dir":".claude/ralph-x-runs/${name}","checklist_file":".claude/ralph-x-runs/${name}/checklist.md","current_iteration":${cur},"max_iterations":${max}}
+{"active":${active},"session_id":"${sid}","run_id":"${name}","run_dir":"ralph-x-runs/${name}","checklist_file":"ralph-x-runs/${name}/checklist.md","current_iteration":${cur},"max_iterations":${max}}
 EOF
 }
-_checklist() { printf "%s" "$2" > "$1/.claude/ralph-x-runs/$3/checklist.md"; }
+_checklist() { printf "%s" "$2" > "$1/ralph-x-runs/$3/checklist.md"; }
 _hook() {
   local base="$1" sid="$2"
   echo "{\"cwd\":\"$base\",\"stop_hook_active\":false,\"session_id\":\"$sid\"}" \
@@ -35,7 +35,7 @@ _assert_pass() {
 }
 _assert_field() {
   local base="$1" run="$2" expected="$3" field="$4" label="$5"
-  local val; val=$(jq -r ".$field" "$base/.claude/ralph-x-runs/$run/session-state.json" 2>/dev/null)
+  local val; val=$(jq -r ".$field" "$base/ralph-x-runs/$run/session-state.json" 2>/dev/null)
   if [ "$val" = "$expected" ]; then
     echo "✅ $label"; PASS=$((PASS+1))
   else
@@ -45,7 +45,7 @@ _assert_field() {
 
 echo "=== TC-01: active 세션 없음 → 통과 ==="
 B=$(mktemp -d); trap "rm -rf $B" EXIT
-mkdir -p "$B/.claude/ralph-x-runs"
+mkdir -p "$B/ralph-x-runs"
 _assert_pass "$B" "any-sid" "TC-01 no active session → pass"
 rm -rf "$B"
 
@@ -100,7 +100,7 @@ rm -rf "$B"
 
 echo "=== TC-08: session-state.json 없는 디렉토리 → graceful ==="
 B=$(mktemp -d)
-mkdir -p "$B/.claude/ralph-x-runs/orphan-run"
+mkdir -p "$B/ralph-x-runs/orphan-run"
 _assert_pass "$B" "sid-A" "TC-08 missing state.json → pass"
 rm -rf "$B"
 
