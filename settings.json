@@ -21,6 +21,8 @@
       "Bash(*)",
       "Write",
       "Edit",
+      "Write(~/.claude/.claude-library/**)",
+      "Edit(~/.claude/.claude-library/**)",
       "Read",
       "Glob",
       "Grep",
@@ -88,6 +90,16 @@
             "timeout": 15
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/learnings-update-check.sh",
+            "timeout": 15,
+            "async": true
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -121,22 +133,22 @@
         ]
       },
       {
+        "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",
             "command": "/Users/ram/.claude/ai-bouncer/hooks/doc-reminder.sh"
           }
-        ],
-        "matcher": "Write|Edit|MultiEdit"
+        ]
       },
       {
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
             "command": "/Users/ram/.claude/ai-bouncer/hooks/bash-audit.sh"
           }
-        ],
-        "matcher": "Bash"
+        ]
       }
     ],
     "SessionEnd": [
@@ -184,26 +196,35 @@
             "command": "/Users/ram/.claude/ai-bouncer/hooks/stop-active-cleanup.sh"
           }
         ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/plan-gate.sh"
-          }
-        ],
-        "matcher": "Write|Edit|MultiEdit"
       },
       {
         "hooks": [
           {
             "type": "command",
+            "command": "/Users/ram/.claude/hooks/ralph-x-gate.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/ai-bouncer/hooks/plan-gate.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
             "command": "/Users/ram/.claude/ai-bouncer/hooks/bash-gate.sh"
           }
-        ],
-        "matcher": "Bash"
+        ]
       }
     ],
     "SubagentStart": [
@@ -237,6 +258,8 @@
     "ralph-x@ralph-x": true
   },
   "skipDangerousModePermissionPrompt": true,
+  "teammateMode": "tmux",
+  "remoteControlAtStartup": false,
   "mcpServers": {
     "telegram": {
       "command": "/opt/homebrew/bin/bun",
@@ -247,6 +270,5 @@
         "TELEGRAM_STATE_DIR": "/Users/ram/.claude/channels/telegram"
       }
     }
-  },
-  "teammateMode": "tmux"
+  }
 }
