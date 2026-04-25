@@ -35,60 +35,16 @@
 - 핵심만 간결하게 답한다. 장황한 설명 금지.
 - 선택지를 줄 때는 추천 순서로 정렬하고, 최선이 명확하면 바로 추천한다.
 
-## 글쓰기 스타일
-- LinkedIn 포스트, 블로그 등 글 작성 시 `~/.claude/rules/writing-style.md` 를 따른다.
-
+## 규칙 파일
+- git/커밋: `~/.claude/rules/git-rules.ref`
+- 자동커밋: `~/.claude/rules/auto-commit-rules.ref`
+- 워크로그: `~/.claude/rules/worklog-rules.ref`
+- 코드리뷰: `~/.claude/rules/review-rules.ref`
+- 글쓰기: `~/.claude/rules/writing-style.ref`
 
 ## Library 시스템
 
 참조: `~/.claude/.claude-library/GUIDE.md`
-
-### 목차
-> 설치 후 library에 지식이 쌓이면 여기에 카테고리별 주제 목록이 자동 추가됩니다.
-
-- **ml/audio/perch-onnx**: LSE head + MPS 속도 이슈, LSE 추론 전용 적용 역효과, ONNX 출력 차이
-- **ml/audio/dataloader-numworkers-14x-speedup**: MPS 오디오 학습 num_workers=0→4 + pseudo 서브샘플로 14x 속도 개선 (110분→7.7분/epoch)
-- **tooling/claude-code/worklog-notion-token-guard**: NOTION_TOKEN이 stop hook 호출 시점에 shell에 없으면 Notion 전송 무음 스킵
-- **tooling/ai-bouncer/plan-approved-two-step-update**: plan_approved=false 상태에서 workflow_phase=development로 한 번에 변경 불가 → 2단계 필수
-- **infra/aws-lambda/secrets-manager-key-missing**: Lambda 500 — Secrets Manager에서 API Key 삭제 시 조용한 실패
-- **infra/kaggle-env**: embedded datasetId 스테일 시 마운트 실패, dataset_sources → /kaggle/input/{slug}/ 경로, model_sources 누락/XLA 호환 주의, Code Competition CLI 제출 불가(400)
-- **tooling/ai-agent/llm-tool-design**: LLM 채팅 툴 설계 — 소형 목적별 툴 > 대형 덩어리 툴, JSON 블록 > 프롬프트 포맷 강제
-- **tooling/ai-bouncer/dev-phases-format**: dev_phases.steps는 숫자가 아닌 객체여야 bash-gate 통과
-- **tooling/ai-bouncer/claude-p-self-blocks-on-dev-bounce-rule**: claude-p 에이전트가 CLAUDE.md dev-bounce 룰을 보고 출력 파일(eval.md 등) 쓰기도 자기 검열 → 프롬프트에 "출력 파일은 예외" 명시 필요
-- **api/stitch**: generate_screen_from_text 타임아웃 시 스크린 보존 여부 + 성공 패턴
-- **shell/macos-sed**: macOS sed 다단계 경로 치환 실패 → Python re.sub 사용
-- **shell/pipx**: pipx 설치 CLI는 pip3 upgrade 무효 — pipx upgrade 사용
-- **api/electron**: Vanilla→React 마이그레이션 시 body.darwin 클래스 수동 설정, #root height, 레이아웃 구조 1:1 대응 필수
-- **api/ga4-measurement-protocol**: Electron에서 국가 데이터 미수집 — ip_override 없으면 geo 안 됨
-- **api/google-search-console**: 서비스 계정 연동 시 GCP API 활성화 + UI 사용자 추가 2단계 필수, sc-domain: prefix
-- **api/google-analytics-data**: GA4 Data API 서비스 계정 2단계(analyticsdata.googleapis.com 활성화 + Property access Viewer 추가), Property ID=9자리 숫자 (G-XXX 아님). `publisherAd*`/`totalAdRevenue` 접두사 주의, customEvent:<param>은 Admin Custom dimension 등록 후만 조회 가능.
-- **shell/caffeinate**: Bash 스크립트 상단에서 `exec caffeinate -i -s env CAFFEINATED=1 bash "$0"`로 self-wrap하면 긴 루프 중 Mac 안 잠듦.
-- **tooling/ralph-loop**: 자동 개선 루프는 성공 iter만 sleep. marker 파일(deploy-success)로 분기 — 실패 iter는 즉시 재시도 안 그러면 "평생 배포 못 함". claude-p 에이전트에게 "DB 건드리지 마" 프롬프트 지시는 신뢰 불가 — 사이드이펙트 작업은 스크립트로 분리, 에이전트는 실행만.
-- **infra/youtube-scraping/transcript-panel-dom-cdp-bypass**: 새 셀렉터 `transcript-segment-view-model`, headless 차단 → Chrome `--remote-debugging-port=9222` + Playwright `connect_over_cdp`
-- **web-scraping/korean-gov**: opengov.seoul.go.kr 첨부 URL 패턴(`/og/com/download.php`), 서울 25자치구 CMS 5-6계열(통합 API 없음), 지자체 href에 공백/개행 섞임 → `re.sub(r'\s+','',html)` 필수
-- **web-scraping/js-rendering**: Playwright `expect_download` + `accept_downloads=True`로 `HEAD 405` + 세션쿠키 필수 엔드포인트 뚫기. `context.request.get` fallback 2단계.
-- **tooling/ai-agent/gemini-hallucinates-public-dataset-ids**: Gemini가 공공데이터셋 번호(OA-XXXXX), API 서비스명, URL을 그럴듯하게 지어냄. WebFetch/curl로 무조건 검증.
-- **web-scraping/js-rendering/playwright-download-trigger-methods**: `page.goto(url)`은 navigation 에러로 다운로드 이벤트 놓침. `window.location.href` on about:blank는 세션쿠키 부재. **`<a>.click()` on 상세페이지**가 정답.
-- **web-scraping/korean-gov/file-format-magic-bytes-not-extension**: 지자체 다운로드 파일 확장자 거짓말 흔함. `.xlsx` 파일 75%가 실제 PDF, 5%는 HTML 에러. 매직 바이트 검증 필수.
-- **web-scraping/korean-gov/gangbuk-port-18000-only**: 강북구 구청 데이터 기본 포트 접속불가, `:18000` + 다른 경로/파라미터
-- **web-scraping/korean-gov/nowon-duplicate-download-links-in-table**: 테이블 제목+아이콘 동일 href → 셀렉터 2배 매칭, href 중복 제거 필수
-- **web-scraping/korean-gov/css-selector-over-regex-for-district-crawling**: post_re regex 12개 구 전멸, Playwright CSS selector `a[href*='keyword']`가 25개 전부 성공
-- **shell/python-unbuffered-stdout-for-realtime-logs**: `python script.py | tail`은 stdout block-buffered. 실시간 로그는 `python -u` 또는 `print(flush=True)`. CPU 0%여도 스턱 아님.
-- **finance/crypto-backtest-validation/strategy-search-loop-multiple-comparison-bias**: 20회+ 전략 탐색 루프 → WF만으론 부족, 3단계 추가 필수: Permutation(p<0.05) + Cross-Coin OOS(3종 중 ≥2 양수) + Year-Split Regime(Bear -30% 이내)
-- **finance/crypto-backtest-validation/4h-btc-breakout-slippage-is-negligible**: 4h 봉 BTC 돌파 후 ETH/XRP 진입 갭 실측 ~0% — 0.2% 가정은 과도, 실제는 수수료+스프레드 수준
-- **tooling/ralph-loop/checklist-completion-vs-full-run-intent**: Ralph-X 전략 탐색 루프는 PASS 발견 시 조기종료 말고 완주가 기본 — 설계 시 명시적으로 확인 필요
-- **finance/equity/overfitting-validation**: 전략 탐색 루프 4단계 검증 — WF+21d embargo / DSR 다중검정보정 / Monte Carlo p<0.05 / Out-of-Universe 자동화 (수동 불필요)
-- **api/gemma**: Gemma API (gemma-3-27b-it) 10개 동시 호출 시 429 rate limit → 3개 배치 + 1초 딜레이로 해결
-- **api/nextjs-app-router/get-handler-static-cache-by-default**: Next.js 14+ App Router GET handler는 기본 빌드타임 prerender. request 안 쓰면 옛 데이터 박힘. force-dynamic / revalidatePath 패턴
-- **infra/cicd/vercel-env-add-newline-trap**: `vercel env add`에 echo 파이프 시 trailing `\n` 저장 → 401. `printf "%s"` 필수
-- **infra/cicd/vercel-github-webhook-can-silently-disconnect**: Vercel/GitHub webhook 조용히 끊김 (14일 동안 자동 배포 안 됨). `vercel ls` Age 컬럼으로 진단
-
-### 읽기
-- 목차를 보고 관련 주제를 직접 판단한 뒤 `library_read(path)`로 읽는다
-- 키워드 매칭이 필요하면 `library_search(query)`도 보조로 사용
-- 새 실험/전략 제안 전, 막히는 상황에서 관련 키워드로 검색한다
-- 참조한 항목이 있으면 한 줄로 알린다: `📚 library 참조: [topic]`
-- 이미 기록된 방향은 재제안하지 않는다
 
 ### 쓰기
 아래 경우 library에 기록한다:
