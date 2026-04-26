@@ -49,7 +49,7 @@
       "Read(**/*.key)"
     ]
   },
-  "model": "sonnet",
+  "model": "sonnet[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -129,24 +129,6 @@
             "type": "command",
             "command": "/Users/ram/.claude/hooks/commit-doc-check.sh",
             "timeout": 5
-          }
-        ]
-      },
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/doc-reminder.sh"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/bash-audit.sh"
           }
         ]
       }
@@ -269,6 +251,15 @@
       "env": {
         "TELEGRAM_STATE_DIR": "/Users/ram/.claude/channels/telegram"
       }
+    },
+    "kaggle": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://www.kaggle.com/mcp",
+        "--header",
+        "Authorization: Bearer 84cbed3f8e2d2b21f99b1bbb780af09a"
+      ]
     }
   }
 }
