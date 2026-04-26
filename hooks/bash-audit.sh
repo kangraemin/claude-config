@@ -52,6 +52,7 @@ while IFS= read -r file; do
     .claude/plans/*|*/.claude/plans/*) continue ;;
     .claude/teams/*|*/.claude/teams/*) continue ;;
     .ai-bouncer-tasks/*/verifications/round-*.md) continue ;;
+    accounts.json) continue ;;
   esac
 
   UNAUTHORIZED_FILES="${UNAUTHORIZED_FILES}${file}"$'\n'
