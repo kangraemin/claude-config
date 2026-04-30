@@ -53,6 +53,13 @@ Library 경로: `~/.claude/.claude-library/library/`
 1. TAXONOMY.md 확인 — 매칭 분류 찾기, 없으면 추가
 2. `~/.claude/.claude-library/library/[카테고리]/[서브카테고리]/[주제]/[파일명].md` 생성 (`source_session` 포함)
 3. 주제 `index.md` 생성 또는 업데이트 + `관련:` 태그
+   - `지식 목록` 섹션에 항목 추가 시 **반드시** 아래 형식만 사용:
+     ```
+     - [파일명.md](파일명.md) — 한 줄 설명
+     ```
+   - 링크 텍스트(`[...]` 안)는 **파일명 그대로**. 설명은 `— ` 뒤에만.
+   - ❌ 절대 금지: `- [설명을 링크 텍스트로 쓰는 것](파일명.md) — ...`
+   - 이 포맷이 틀리면 `library_search`가 해당 파일을 찾지 못한다.
 3.5. **자동 크로스레퍼런스**: `library_search()`로 핵심 키워드 검색 → 관련 주제 발견 시 양방향 `관련:` 태그 추가
 4. `~/.claude/.claude-library/LIBRARY.md` 업데이트
 5. `~/.claude/CLAUDE.md` 목차에 새 주제 추가 (없으면)
