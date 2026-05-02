@@ -8,13 +8,6 @@
 - 작업 시작 전 available skills 목록을 확인하고, 매칭되는 스킬이 있으면 반드시 Skill 도구로 실행한다. 직접 수행 금지.
 - 세션을 이어받을 때도 동일하게 스킬/에이전트 매칭을 재점검한다.
 
-## Library 검색 필수
-- 기술 질문에 답하거나, 구현을 시작하거나, 접근법을 제안하기 전에 **반드시** `library_search()`를 호출한다.
-- claude-library MCP 도구 사용. 사용자 질문의 핵심 키워드로 검색.
-- 결과가 있으면 `📚 library 참조: [주제]`로 시작하고 저장된 내용을 따른다.
-- 결과가 없으면 별도 언급 없이 진행한다.
-
-
 ## 토큰 절약
 - 단순 셸 명령(ls, pwd, which 등)은 `!` prefix로 직접 실행. Claude 컨텍스트 소비 불필요.
 - 컨텍스트가 무거워지면 `/compact` 또는 세션 정리 후 `/clear`.
@@ -49,7 +42,43 @@
 - 글쓰기: `~/.claude/rules/writing-style.ref`
 
 ## Library 시스템
+
 참조: `~/.claude/.claude-library/GUIDE.md`
+
+### 목차
+> 설치 후 library에 지식이 쌓이면 여기에 카테고리별 주제 목록이 자동 추가됩니다.
+
+- **shell/git/branch-status-gotchas**: fetch 없이 브랜치 비교 → 캐시 오독 / force push 후 git log A..B 팬텀 커밋
+- **python/type-gotchas**: float config 상수 → f-string 소수점 표시 버그 / int() 래핑 필요
+- **testing/mock-patterns**: 하드코딩 문자열 cfg 변수화 시 테스트 assert 동반 수정 필요
+
+### 읽기
+- 기술 질문에 답하거나, 구현을 시작하거나, 접근법을 제안하기 전에 **반드시** `library_search(query)`를 호출한다
+- 결과가 있으면 `📚 library 참조: [topic]`로 시작하고 저장된 내용을 따른다
+- 결과가 없으면 별도 언급 없이 진행한다
+- 관련 주제가 발견되면 `library_read(path)`로 index.md를 읽어 상세 확인
+- 이미 기록된 방향은 재제안하지 않는다
+
+### 쓰기
+아래 경우 library에 기록한다:
+- 실험/백테스트 결론이 났을 때
+- 아티클/논문에서 유효한 인사이트를 얻었을 때
+- 사용자가 접근법을 수정했을 때
+- 더 나은 방법을 발견했을 때
+- **개발 중 삽질로 알게 된 API/라이브러리 동작** — 에러로 발견한 것, 문서에 없는 것, 다음에 또 삽질할 것 같은 것. 발견 즉시 기록한다. 사용자가 요청하기 전에.
+- **틀린 내용을 교정받았을 때** — "그게 아니야"라고 교정받으면 그 자리에서 바로 저장. "저장할까요?" 묻지 않는다.
+
+### 분류 체계
+**`~/.claude/TAXONOMY.md`를 먼저 확인한다.**
+- 매칭되는 카테고리/서브카테고리가 있으면 그곳에 저장
+- 없으면 TAXONOMY.md에 먼저 추가 후 저장
+- ❌ 대회명, 프로젝트명, 도구명을 카테고리/서브카테고리로 사용 금지
+- ✅ 기법/주제/도메인 기준으로 분류
+
+### 파일명 원칙
+- **"뭘 배웠는지"**가 파일명에 드러나야 한다
+- ❌ `discovery.md`, `lessons.md`, `backtest.md` (뭔지 모름)
+- ✅ `ar1-lag-is-dominant-signal.md`, `synthetic-data-distribution-overfit.md`
 
 # --- ai-bouncer-rule start ---
 ## ai-bouncer 필수 규칙
