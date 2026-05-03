@@ -3,6 +3,7 @@
 ## 세션 시작 시 필수
 - 작업 시작 전 반드시 `~/.claude/settings.json` 글로벌 설정을 확인하고 hooks, env 등 설정을 파악할 것
 - 프로젝트 로컬 설정만 보지 말고 글로벌 설정도 함께 확인
+- 기술 작업 시작 전: `ToolSearch("select:mcp__claude-library__library_search")` 로드 후 작업 키워드로 `library_search()` 호출
 
 ## 스킬 우선 사용
 - 작업 시작 전 available skills 목록을 확인하고, 매칭되는 스킬이 있으면 반드시 Skill 도구로 실행한다. 직접 수행 금지.
@@ -51,9 +52,14 @@
 - **shell/git/branch-status-gotchas**: fetch 없이 브랜치 비교 → 캐시 오독 / force push 후 git log A..B 팬텀 커밋
 - **python/type-gotchas**: float config 상수 → f-string 소수점 표시 버그 / int() 래핑 필요
 - **testing/mock-patterns**: 하드코딩 문자열 cfg 변수화 시 테스트 assert 동반 수정 필요
+- **api/anthropic**: Anthropic SDK MessageStream 토큰 카운팅 — `stream.finalMessage().usage` / 인라인 경로 분기
 
 ### 읽기
-- 기술 질문에 답하거나, 구현을 시작하거나, 접근법을 제안하기 전에 **반드시** `library_search(query)`를 호출한다
+- `library_search`는 **deferred tool** — 매 세션/작업 시작 시 반드시 먼저 `ToolSearch("select:mcp__claude-library__library_search")`로 로드한 뒤 사용한다
+- 아래 상황에서 **반드시** `library_search(query)`를 호출한다:
+  - 기술 질문에 답하거나 접근법을 제안할 때
+  - 구현을 시작할 때
+  - 에러/삽질이 발생했을 때 — 이미 기록된 해결책이 있을 수 있다
 - 결과가 있으면 `📚 library 참조: [topic]`로 시작하고 저장된 내용을 따른다
 - 결과가 없으면 별도 언급 없이 진행한다
 - 관련 주제가 발견되면 `library_read(path)`로 index.md를 읽어 상세 확인
