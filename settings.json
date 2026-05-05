@@ -8,7 +8,8 @@
     "WORKLOG_GIT_TRACK": "false",
     "WORKLOG_LANG": "ko",
     "AI_WORKLOG_DIR": "/Users/ram/.claude",
-    "LIBRARY_NOTION_DB_ID": "334d4919-b6eb-81bf-aee8-cffeb264f70d"
+    "LIBRARY_NOTION_DB_ID": "334d4919-b6eb-81bf-aee8-cffeb264f70d",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "attribution": {
     "commit": "",
@@ -23,15 +24,15 @@
       "Edit",
       "Write(~/.claude/.claude-library/**)",
       "Edit(~/.claude/.claude-library/**)",
+      "Write(/Users/ram/.claude/.claude-library/**)",
+      "Edit(/Users/ram/.claude/.claude-library/**)",
       "Read",
       "Glob",
       "Grep",
-      "mcp__stitch__*"
+      "mcp__stitch__*",
+      "mcp__kaggle__*"
     ],
-    "deny": [
-      "Bash(rm -rf:*)",
-      "Bash(rm -fr:*)"
-    ],
+    "deny": [],
     "ask": [
       "Bash(sudo:*)",
       "Bash(chmod 777:*)",
@@ -47,9 +48,11 @@
       "Read(**/*secret*)",
       "Read(**/*.pem)",
       "Read(**/*.key)"
+    ],
+    "additionalDirectories": [
+      "/Users/ram/.claude/.claude-library"
     ]
   },
-  "model": "sonnet[1m]",
   "hooks": {
     "UserPromptSubmit": [
       {
@@ -88,16 +91,6 @@
             "type": "command",
             "command": "/Users/ram/.claude/scripts/worklog-update-check.sh",
             "timeout": 15
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/learnings-update-check.sh",
-            "timeout": 15,
-            "async": true
           }
         ]
       }
@@ -167,6 +160,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "/Users/ram/.claude/hooks/ralph-x-gate.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "/Users/ram/.claude/ai-bouncer/hooks/completion-gate.sh"
           }
         ]
@@ -176,15 +178,6 @@
           {
             "type": "command",
             "command": "/Users/ram/.claude/ai-bouncer/hooks/stop-active-cleanup.sh"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/ralph-x-gate.sh",
-            "timeout": 5
           }
         ]
       }
@@ -242,6 +235,7 @@
   "skipDangerousModePermissionPrompt": true,
   "teammateMode": "tmux",
   "remoteControlAtStartup": false,
+  "agentPushNotifEnabled": true,
   "mcpServers": {
     "telegram": {
       "command": "/opt/homebrew/bin/bun",
@@ -261,5 +255,6 @@
         "Authorization: Bearer 84cbed3f8e2d2b21f99b1bbb780af09a"
       ]
     }
-  }
+  },
+  "model": "sonnet"
 }
