@@ -34,6 +34,13 @@
 ## 소통 스타일
 - 핵심만 간결하게 답한다. 장황한 설명 금지.
 - 선택지를 줄 때는 추천 순서로 정렬하고, 최선이 명확하면 바로 추천한다.
+- 이미 사용자가 선택한 옵션을 다시 옵션 목록으로 되묻지 않는다. 결정됐으면 실행한다.
+
+## 실행 원칙
+- "권장 조치", "추가할 만한", "추천합니다", "제안드립니다", "고려해볼 만" 식으로 할 일을 나열만 하고 응답 끝내는 거 금지.
+- 파일 변경 / library 저장 / 커밋 / 설정 갱신 등 **실행 가능한 항목은 그 응답 안에서 즉시 실행**한다. 사용자가 "그래서 해" 라고 다시 말하게 만들지 않는다.
+- 위험하거나 되돌리기 어려운 작업(force push, prod 배포·DB 변경, 외부 메시지 발송 등)만 사전 확인. 그 외엔 실행 후 결과 보고.
+- 분석/조사 결과를 번호 목록으로 정리했다고 해서 "리포트 모드"로 빠지지 않는다. 정리 + 실행을 같은 턴에 끝낸다.
 
 ## 규칙 파일
 - git/커밋: `~/.claude/rules/git-rules.ref`
@@ -44,15 +51,10 @@
 
 ## Library 시스템
 
-참조: `~/.claude/.claude-library/GUIDE.md`
+참조: `~/claude-library/GUIDE.md`
 
 ### 목차
 > 설치 후 library에 지식이 쌓이면 여기에 카테고리별 주제 목록이 자동 추가됩니다.
-
-- **shell/git/branch-status-gotchas**: fetch 없이 브랜치 비교 → 캐시 오독 / force push 후 git log A..B 팬텀 커밋
-- **python/type-gotchas**: float config 상수 → f-string 소수점 표시 버그 / int() 래핑 필요
-- **testing/mock-patterns**: 하드코딩 문자열 cfg 변수화 시 테스트 assert 동반 수정 필요
-- **api/anthropic**: Anthropic SDK MessageStream 토큰 카운팅 — `stream.finalMessage().usage` / 인라인 경로 분기
 
 ### 읽기
 - `library_search`는 **deferred tool** — 매 세션/작업 시작 시 반드시 먼저 `ToolSearch("select:mcp__claude-library__library_search")`로 로드한 뒤 사용한다
@@ -75,7 +77,7 @@
 - **틀린 내용을 교정받았을 때** — "그게 아니야"라고 교정받으면 그 자리에서 바로 저장. "저장할까요?" 묻지 않는다.
 
 ### 분류 체계
-**`~/.claude/TAXONOMY.md`를 먼저 확인한다.**
+**`~/claude-library/TAXONOMY.md`를 먼저 확인한다.**
 - 매칭되는 카테고리/서브카테고리가 있으면 그곳에 저장
 - 없으면 TAXONOMY.md에 먼저 추가 후 저장
 - ❌ 대회명, 프로젝트명, 도구명을 카테고리/서브카테고리로 사용 금지
@@ -85,6 +87,29 @@
 - **"뭘 배웠는지"**가 파일명에 드러나야 한다
 - ❌ `discovery.md`, `lessons.md`, `backtest.md` (뭔지 모름)
 - ✅ `ar1-lag-is-dominant-signal.md`, `synthetic-data-distribution-overfit.md`
+- 예외: finance/ 하위 전략별 `backtest.md`는 폴더가 전략명이므로 OK
+
+### 지식 파일 메타데이터
+- `source_session`: 어느 세션에서 발견했는지 (워크로그 날짜/시간 또는 세션 컨텍스트). 나중에 "이거 왜 이렇게 기록했지?" 역추적용.
+
+기록 방법:
+1. **TAXONOMY.md 확인** — 매칭되는 분류 찾기, 없으면 추가
+2. 주제 폴더 확인/생성: `~/claude-library/library/[카테고리]/[서브카테고리]/[주제]/`
+3. 지식 파일 생성: 교훈이 드러나는 이름 (날짜 없음), `source_session` 포함
+4. 주제 `index.md` 생성/업데이트 + `관련:` 태그 추가 (관련 주제가 있으면)
+4.5. **관련 주제 자동 탐색**: `library_search()`로 새 파일의 핵심 키워드 검색 → 관련 주제 발견 시 양방향 `관련:` 태그 추가 (새 index.md + 기존 index.md 모두)
+5. `~/claude-library/LIBRARY.md` 업데이트
+6. CLAUDE.md 목차 업데이트
+6.5. **Synthesis 체크**: 같은 서브카테고리에 파일 3개 이상이면 "종합 문서 필요한가?" 자문 → 공통 패턴이 보이면 `library/synthesis/`에 작성
+7. 즉시 commit/push:
+   ```
+   git -C ~/claude-library add -A
+   git -C ~/claude-library commit -m "feat: [주제] 추가"
+   git -C ~/claude-library push
+   ```
+8. 한 줄로 알린다: `📚 library에 추가: [경로]`
+
+미결 상태는 기록하지 않는다.
 
 # --- ai-bouncer-rule start ---
 ## ai-bouncer 필수 규칙
