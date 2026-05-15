@@ -1,25 +1,4 @@
 #!/bin/bash
-# --- ai-bouncer start ---
-# ai-bouncer NORMAL 모드 팀 작업 중이면 미커밋 체크 스킵
-# stdin을 먼저 읽고, 절대경로로 체크 후, 원본 스크립트에 stdin 재주입
-_bouncer_stdin=$(cat)
-_bouncer_cwd=$(echo "$_bouncer_stdin" | jq -r '.cwd' 2>/dev/null)
-if [ -n "$_bouncer_cwd" ] && { [ -f "$_bouncer_cwd/.claude/ai-bouncer/config.json" ] || [ -f "$HOME/.claude/ai-bouncer/config.json" ]; }; then
-  for _bouncer_active in "$_bouncer_cwd"/.ai-bouncer-tasks/*/*/.active "$_bouncer_cwd"/.ai-bouncer-tasks/*/.active; do
-    [ -f "$_bouncer_active" ] || continue
-    _bouncer_state="$(dirname "$_bouncer_active")/state.json"
-    [ -f "$_bouncer_state" ] || continue
-    _bouncer_mode=$(jq -r '.mode // "simple"' "$_bouncer_state" 2>/dev/null)
-    [ "$_bouncer_mode" != "normal" ] && continue
-    _bouncer_wf=$(jq -r '.workflow_phase // "done"' "$_bouncer_state" 2>/dev/null)
-    case "$_bouncer_wf" in
-      development|verification)
-        exit 0 ;;
-    esac
-  done
-fi
-exec <<< "$_bouncer_stdin"
-# --- ai-bouncer end ---
 
 # Stop hook: 방금 응답에서 library 저장 대상 있는지 체크
 
@@ -30,6 +9,17 @@ INPUT=$(cat)
 # 재진입 방지
 STOP_HOOK_ACTIVE=$(echo "$INPUT" | jq -r '.stop_hook_active // false')
 [ "$STOP_HOOK_ACTIVE" = "true" ] && exit 0
+
+# ralph-x in-session 루프 active이면 skip (루프 진행 우선)
+CWD=$(echo "$INPUT" | jq -r '.cwd // ""')
+if [ -n "$CWD" ]; then
+  for sf in "$CWD"/ralph-x-runs/*/session-state.json; do
+    [ -f "$sf" ] || continue
+    if [ "$(jq -r '.active // false' "$sf")" = "true" ]; then
+      exit 0
+    fi
+  done
+fi
 
 # 20번에 1번만 실행 (세션별 독립)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
