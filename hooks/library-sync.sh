@@ -1,8 +1,8 @@
 #!/bin/bash
 # SessionEnd / PostCompact: library 업데이트 체크 + commit/push + Notion sync
 
-LIBRARY="$HOME/.claude/.claude-library/LIBRARY.md"
-LIB_DIR="$HOME/.claude/.claude-library"
+LIBRARY="$HOME/claude-library/LIBRARY.md"
+LIB_DIR="$HOME/claude-library"
 
 [ -f "$LIBRARY" ] || exit 0
 

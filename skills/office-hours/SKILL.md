@@ -1,0 +1,1 @@
+/Users/ram/programming/vibecoding/gstack/office-hours/SKILL.md

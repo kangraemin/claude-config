@@ -61,6 +61,39 @@ _ensure_hook "$SETTINGS" "SessionStart" "$AI_WORKLOG_DIR/scripts/worklog-update-
 _ensure_hook "$SETTINGS" "SessionEnd"   "$AI_WORKLOG_DIR/hooks/session-end.sh"      15  false ""     || true
 _ensure_hook "$SETTINGS" "Stop"         "$AI_WORKLOG_DIR/hooks/stop.sh"             15  false ""     || true
 
+# ── critical 파일 무결성 검증 + 자동 복구 (24h throttle 무관) ────────────────
+# 외부 도구(git lfs install 등)가 hook을 덮어씌운 경우 자동 복구.
+# marker 문자열로 검증 — grep 매칭 안 되면 GitHub에서 해당 파일만 재다운로드.
+_C_Y='\033[1;33m' _C_N='\033[0m'
+_restore_critical() {
+  local file="$1"
+  local marker="$2"
+  local path="$AI_WORKLOG_DIR/$file"
+  if [ -f "$path" ] && grep -q "$marker" "$path" 2>/dev/null; then
+    return 0
+  fi
+  local tmp
+  tmp=$(mktemp) || return 0
+  if curl -sf --max-time 5 "$RAW_BASE/$file" -o "$tmp" 2>/dev/null && [ -s "$tmp" ]; then
+    if [[ "$file" == *.sh ]] && ! bash -n "$tmp" 2>/dev/null; then
+      rm -f "$tmp"
+      return 0
+    fi
+    mkdir -p "$(dirname "$path")"
+    mv "$tmp" "$path"
+    chmod +x "$path" 2>/dev/null || true
+    echo -e "${_C_Y}⚠${_C_N}  worklog-for-claude: 무결성 복구 — $file" >&2
+  else
+    rm -f "$tmp"
+  fi
+}
+
+_restore_critical "git-hooks/post-commit"    "worklog-for-claude"
+_restore_critical "hooks/post-commit.sh"     "커밋 후 자동 워크로그"
+_restore_critical "hooks/stop.sh"            "pending worklog 마커"
+_restore_critical "hooks/worklog.sh"         "worklog-for-claude"
+_restore_critical "scripts/worklog-write.sh" "worklog-write.sh — 워크로그 작성"
+
 # ── 24시간 throttle ───────────────────────────────────────────────────────────
 if [ "$FORCE" = false ] && [ "$CHECK_ONLY" = false ] && [ -f "$CHECKED_FILE" ]; then
   LAST=$(cat "$CHECKED_FILE" 2>/dev/null || echo 0)

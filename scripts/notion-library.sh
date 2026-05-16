@@ -6,7 +6,7 @@
 # 환경변수:
 #   NOTION_TOKEN          Notion API 토큰 (필수, .env에서 로드)
 #   LIBRARY_NOTION_DB_ID  Library Notion DB ID (필수, settings.json env)
-#   LIBRARY_ROOT          library 루트 경로 (기본: ~/.claude/.claude-library)
+#   LIBRARY_ROOT          library 루트 경로 (기본: ~/claude-library)
 
 set -euo pipefail
 
@@ -18,7 +18,7 @@ for _envfile in "$HOME/.claude/.env" ${AI_WORKLOG_DIR:+"$AI_WORKLOG_DIR/.env"}; 
 done
 
 FILE_PATH="${1:?file_path required (relative to library/)}"
-LIBRARY_ROOT="${LIBRARY_ROOT:-$HOME/.claude/.claude-library}"
+LIBRARY_ROOT="${LIBRARY_ROOT:-$HOME/claude-library}"
 FULL_PATH="$LIBRARY_ROOT/library/$FILE_PATH"
 
 if [ ! -f "$FULL_PATH" ]; then

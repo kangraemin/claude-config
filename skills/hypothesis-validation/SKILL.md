@@ -119,9 +119,73 @@ validate_backtest.py 출력을 **그대로** 붙여넣기 (편집 금지).
 
 ---
 
+## Step 5: 확장 검증 (Extended Validation)
+
+conclusion.md 작성 후 **반드시** 아래 3가지 추가 검증을 실행한다.
+`backtest/extended_validation.py`의 `run_extended_validation()`을 호출하거나,
+각 함수를 backtest.py 말미에 직접 삽입한다.
+
+### 5-1. WF Embargo 체크
+- IS 끝 ~ OOS 시작 간격이 **21일 미만**이면 `⚠️ WARN` 출력
+- WARN이어도 진행 가능하나 결과 신뢰도 낮음으로 표기
+
+### 5-2. Monte Carlo Permutation Test
+- OOS 거래의 **진입 날짜를 랜덤화**해서 1000회 반복 → Sharpe 분포 생성
+- `p_value < 0.05` → PASS (전략이 운이 아님)
+- `p_value >= 0.05` → FAIL (운으로 통과한 것)
+- ⚠️ 수익률 셔플 금지 — 진입 날짜 랜덤화만 유효
+
+### 5-3. Out-of-Universe Test
+- 훈련에 **사용하지 않은** 유사 종목에 동일 신호 로직 적용 → OOS Sharpe 계산
+- 기본 대체 종목: SPY→IVV, QQQ→VGT, IWM→VTWO, GLD→IAU, TLT→IEF
+- **평균 OOU Sharpe > 0** → PASS
+- **평균 OOU Sharpe ≤ 0** → FAIL (특정 종목 과적합)
+
+### 5-4. 라이브 적용 기준 (AND 조건)
+기존 8-check PASS **+** 아래 전부:
+- MC `p_value < 0.05`
+- OOU avg Sharpe `> 0`
+- (Embargo >= 21일 권장)
+
+**어느 하나라도 FAIL이면 라이브 적용 금지.**
+
+---
+
+## Step 6: 검증 결과 로그 저장 (필수)
+
+확장 검증 완료 후 **반드시** 아래 두 곳에 기록한다. 누락 금지.
+
+### 6-1. hypothesis validation_log.md
+`hypothesis/<가설이름>/validation_log.md` 저장:
+
+```
+# Validation Log — <가설이름>
+- 날짜: YYYY-MM-DD HH:MM
+- 전략: <전략명>
+- 8-Check: N/8 (PASS/FAIL)
+- MC p-value: 0.xxx (PASS/FAIL)
+- OOU Sharpe: 평균 X.XX (PASS/FAIL)
+  - IVV: X.XX, VGT: X.XX, VTWO: X.XX, IAU: X.XX, IEF: X.XX
+- Embargo: XX일 (OK/WARN)
+- **최종 판정: PASS ✅ / FAIL ❌**
+```
+
+`backtest/extended_validation.py`의 `save_validation_log()`를 사용하면 자동 생성된다.
+
+### 6-2. ralph-x log.md append (ralph 루프 실행 중일 때)
+`ralph-x-runs/*/log.md`가 존재하면 한 줄 append:
+```
+| <iter> | <전략명> | <PASS/FAIL> | Sharpe=X.XX | MC_p=X.XX | OOU=X.XX | <비고> |
+```
+`save_validation_log(ralph_log_path=..., iter_num=...)`에 경로를 넘기면 자동 처리된다.
+
+---
+
 ## 금지 행동
 
 - **"백테스트 해볼까요?"** 금지 — 가설 검증 요청 = 즉시 실행
 - **IS 결과만으로 "괜찮은데요"** 금지 — OOS + WF 없으면 결론 불가
 - **hypothesis.md 없이 backtest 실행** 금지 — 합격기준 먼저, 결과 나중
 - **results.csv 없이 conclusion.md 작성** 금지 — hypothesis-gate가 막음
+- **Step 5~6 스킵** 금지 — MC + OOU + 로그 저장은 결론 작성과 동급 필수 단계
+- **8-check PASS라도 MC/OOU 미통과시 "라이브 가능"** 표현 금지

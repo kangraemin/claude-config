@@ -1,0 +1,1 @@
+/Users/ram/programming/vibecoding/gstack/ship/SKILL.md

@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Stop hook gate: in-session ralph 루프가 미완이면 종료 차단
 
 command -v jq &>/dev/null || exit 0

@@ -1,0 +1,1 @@
+/Users/ram/programming/vibecoding/gstack/plan-design-review/SKILL.md

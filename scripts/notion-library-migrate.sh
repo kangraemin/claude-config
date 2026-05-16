@@ -4,7 +4,7 @@
 #
 # --dry-run         : 실제 전송 없이 대상 파일만 출력
 # --category <name> : 특정 카테고리만 처리 (예: ml, dev)
-# library_root      : library 루트 경로 (기본: ~/.claude/.claude-library)
+# library_root      : library 루트 경로 (기본: ~/claude-library)
 
 set -euo pipefail
 
@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-LIBRARY_ROOT="${LIBRARY_ROOT:-$HOME/.claude/.claude-library}"
+LIBRARY_ROOT="${LIBRARY_ROOT:-$HOME/claude-library}"
 LIBRARY_DIR="$LIBRARY_ROOT/library"
 
 if [ ! -d "$LIBRARY_DIR" ]; then

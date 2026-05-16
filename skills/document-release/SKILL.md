@@ -1,0 +1,1 @@
+/Users/ram/programming/vibecoding/gstack/document-release/SKILL.md

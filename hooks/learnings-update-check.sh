@@ -71,7 +71,7 @@ if [ "$FORCE" = false ] && [ "$CHECK_ONLY" = false ] && [ -f "$CHECKED_FILE" ]; 
 fi
 
 # 최신 SHA 조회
-LATEST_SHA=$(curl -sf --max-time 5 "$API_URL" 2>/dev/null | \
+LATEST_SHA=$(curl -sfL --max-time 5 "$API_URL" 2>/dev/null | \
   python3 -c "import json,sys; print(json.load(sys.stdin)['sha'][:7])" 2>/dev/null) || exit 0
 
 # 체크 타임스탬프 갱신
@@ -92,7 +92,7 @@ fi
 if [ "${_LEARNINGS_BOOTSTRAPPED:-}" != "1" ]; then
   SELF_TMP=$(mktemp)
   trap 'rm -f "$SELF_TMP"' EXIT
-  if curl -sf --max-time 10 "$RAW_BASE/scripts/update-check.sh" -o "$SELF_TMP" 2>/dev/null && \
+  if curl -sfL --max-time 10 "$RAW_BASE/scripts/update-check.sh" -o "$SELF_TMP" 2>/dev/null && \
      [ -s "$SELF_TMP" ] && bash -n "$SELF_TMP" 2>/dev/null; then
     if ! cmp -s "$SELF_TMP" "$SELF" 2>/dev/null; then
       mv "$SELF_TMP" "$SELF"

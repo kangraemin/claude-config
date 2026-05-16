@@ -1,0 +1,1 @@
+/Users/ram/programming/vibecoding/gstack/land-and-deploy/SKILL.md

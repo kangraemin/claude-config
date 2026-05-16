@@ -1,0 +1,1 @@
+/Users/ram/programming/vibecoding/gstack/setup-deploy/SKILL.md

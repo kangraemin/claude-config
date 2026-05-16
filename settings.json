@@ -1,4 +1,5 @@
 {
+  "disableAutoMode": "disable",
   "env": {
     "ENABLE_TOOL_SEARCH": "true",
     "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
@@ -8,8 +9,7 @@
     "WORKLOG_GIT_TRACK": "false",
     "WORKLOG_LANG": "ko",
     "AI_WORKLOG_DIR": "/Users/ram/.claude",
-    "LIBRARY_NOTION_DB_ID": "334d4919-b6eb-81bf-aee8-cffeb264f70d",
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+    "LIBRARY_NOTION_DB_ID": "334d4919-b6eb-81bf-aee8-cffeb264f70d"
   },
   "attribution": {
     "commit": "",
@@ -22,10 +22,10 @@
       "Bash(*)",
       "Write",
       "Edit",
-      "Write(~/.claude/.claude-library/**)",
-      "Edit(~/.claude/.claude-library/**)",
-      "Write(/Users/ram/.claude/.claude-library/**)",
-      "Edit(/Users/ram/.claude/.claude-library/**)",
+      "Write(~/claude-library/**)",
+      "Edit(~/claude-library/**)",
+      "Write(/Users/ram/claude-library/**)",
+      "Edit(/Users/ram/claude-library/**)",
       "Read",
       "Glob",
       "Grep",
@@ -50,7 +50,7 @@
       "Read(**/*.key)"
     ],
     "additionalDirectories": [
-      "/Users/ram/.claude/.claude-library"
+      "/Users/ram/claude-library"
     ]
   },
   "hooks": {
@@ -188,6 +188,16 @@
         "hooks": [
           {
             "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-allow.sh",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
             "command": "/Users/ram/.claude/ai-bouncer/hooks/plan-gate.sh"
           }
         ]
@@ -233,6 +243,7 @@
     "ralph-x@ralph-x": true
   },
   "skipDangerousModePermissionPrompt": true,
+  "preferredNotifChannel": "ghostty",
   "teammateMode": "tmux",
   "remoteControlAtStartup": false,
   "agentPushNotifEnabled": true,
@@ -254,7 +265,15 @@
         "--header",
         "Authorization: Bearer 84cbed3f8e2d2b21f99b1bbb780af09a"
       ]
+    },
+    "claude-library": {
+      "command": "uvx",
+      "args": [
+        "claude-library-mcp"
+      ],
+      "env": {
+        "LIBRARY_ROOT": "/Users/ram/claude-library"
+      }
     }
-  },
-  "model": "sonnet"
+  }
 }

@@ -1,0 +1,1 @@
+/Users/ram/programming/vibecoding/gstack/landing-report/SKILL.md
