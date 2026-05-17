@@ -65,6 +65,8 @@
 ### 목차
 > 설치 후 library에 지식이 쌓이면 여기에 카테고리별 주제 목록이 자동 추가됩니다.
 
+- `finance/crypto/eth-breakout-v3/` — ETH 1h 브레이크아웃 WF 전략 (V3=6.13, TP=3.8×ATR, ER 24/0.40 필터)
+
 ### 읽기
 - `library_search`는 **deferred tool** — 매 세션/작업 시작 시 반드시 먼저 `ToolSearch("select:mcp__claude-library__library_search")`로 로드한 뒤 사용한다
 - 아래 상황에서 **반드시** `library_search(query)`를 호출한다:

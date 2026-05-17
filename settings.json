@@ -194,22 +194,22 @@
         ]
       },
       {
-        "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {
             "type": "command",
             "command": "/Users/ram/.claude/ai-bouncer/hooks/plan-gate.sh"
           }
-        ]
+        ],
+        "matcher": "Write|Edit|MultiEdit"
       },
       {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
             "command": "/Users/ram/.claude/ai-bouncer/hooks/bash-gate.sh"
           }
-        ]
+        ],
+        "matcher": "Bash"
       }
     ],
     "SubagentStart": [
