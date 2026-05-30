@@ -66,6 +66,8 @@
 > 설치 후 library에 지식이 쌓이면 여기에 카테고리별 주제 목록이 자동 추가됩니다.
 
 - `finance/crypto/eth-breakout-v3/` — ETH 1h 브레이크아웃 WF 전략 (V3=6.13, TP=3.8×ATR, ER 24/0.40 필터)
+- `finance/equity/overfitting-validation/swing-50k-requant…` — ~50k 스윙 백테스트 16 family honest 재정량 survivor 0건, trade-list 인플레(~5x)+union-freq 환상+regime beta+MC entry-perm가 전부 죽임
+- `tooling/figma-mcp/` — Figma MCP 함정: component master는 `<symbol>` 태그, asset SVG export·7일 만료, 큰 응답 tool-results 파일 fallback, top-level frame≠모두 화면
 
 ### 읽기
 - `library_search`는 **deferred tool** — 매 세션/작업 시작 시 반드시 먼저 `ToolSearch("select:mcp__claude-library__library_search")`로 로드한 뒤 사용한다
