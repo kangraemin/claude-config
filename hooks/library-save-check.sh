@@ -42,15 +42,57 @@ fi
 
 # 20번에 1번만 실행 (세션별 독립)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
+TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // ""')
 COUNTER_FILE="$HOME/.claude/hooks/.library-check-counter-$SESSION_ID"
+MARKER_FILE="$HOME/.claude/hooks/.library-check-marker-$SESSION_ID"
 COUNT=0
 [ -f "$COUNTER_FILE" ] && COUNT=$(cat "$COUNTER_FILE")
 COUNT=$((COUNT + 1))
 echo "$COUNT" > "$COUNTER_FILE"
-# 20의 배수일 때만 block (첫 호출은 skip)
+# 20의 배수일 때만 동작 (첫 호출은 skip)
 [ $((COUNT % 20)) -ne 0 ] && exit 0
 
-jq -n '{
+# transcript 없거나 접근 불가 → skip
+{ [ -z "$TRANSCRIPT" ] || [ ! -f "$TRANSCRIPT" ]; } && exit 0
+
+# 지난 리뷰 이후 새 대화만 추출 (증분, user/assistant 텍스트만)
+MARKER=0
+[ -f "$MARKER_FILE" ] && MARKER=$(cat "$MARKER_FILE")
+TOTAL=$(wc -l < "$TRANSCRIPT" | tr -d ' ')
+EXCERPT_FILE="$HOME/.claude/hooks/.library-review-excerpt-$SESSION_ID-$TOTAL.txt"
+# 잔여 발췌 파일 제거 — 존재 여부가 이번 실행 결과만 반영하도록
+rm -f "$EXCERPT_FILE"
+
+python3 - "$TRANSCRIPT" "$MARKER" "$TOTAL" "$EXCERPT_FILE" <<'PYEOF'
+import json, sys
+path, marker, total, out = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+lines = open(path, encoding='utf-8', errors='replace').read().splitlines()
+parts = []
+for l in lines[marker:total]:
+    try: o = json.loads(l)
+    except: continue
+    if o.get('type') not in ('user', 'assistant'): continue
+    c = o.get('message', {}).get('content', '')
+    texts = []
+    if isinstance(c, list):
+        texts = [b['text'] for b in c if isinstance(b, dict) and b.get('type') == 'text']
+    elif isinstance(c, str):
+        texts = [c]
+    body = '\n'.join(x for x in texts if x.strip())
+    if body.strip():
+        parts.append(f"## {o['type'].upper()}\n{body}")
+joined = '\n\n'.join(parts)
+if joined.strip():
+    open(out, 'w', encoding='utf-8').write(joined)
+PYEOF
+
+# 마커는 항상 현재 위치로 업데이트 (중복 리뷰 방지)
+echo "$TOTAL" > "$MARKER_FILE"
+
+# 추출 내용 없으면 block 없이 종료
+[ ! -f "$EXCERPT_FILE" ] && exit 0
+
+jq -n --arg path "$EXCERPT_FILE" '{
   "decision": "block",
-  "reason": "아래 체크리스트를 하나씩 확인해라. 하나라도 yes면 /session-review 실행. 전부 no면 아무 말 없이 넘어가.\n\n1. 에러/삽질로 알게 된 API/라이브러리 동작이 있었나? (문서에 없던 것, 다음에 또 삽질할 것)\n2. 사용자가 내 접근법을 교정했나? (\"그게 아니야\", \"그렇게 하지 마\")\n3. 시도했다가 실패한 접근법이 있었나? (왜 실패했는지 다음에 알아야 하는 것)\n4. 설계 결정을 내렸고 그 이유가 자명하지 않은가?\n5. 포맷/구조 변경으로 다른 컴포넌트가 깨진 적 있었나?\n\n주의: \"아마 없을 것 같다\"로 넘기지 말고 실제로 대화를 돌아봐라."
+  "reason": ("다음만 수행하고 다른 행동은 하지 마라:\n\nrun_in_background=true로 Agent(general-purpose) 1개를 띄운다. subagent 프롬프트:\n---\n파일 \($path) 를 Read 해라. 최근 대화 발췌(user/assistant 텍스트)다. 이걸 '"'"'이번 세션 대화'"'"'로 간주하고 session-review 기준을 적용해라:\n1. 에러/삽질로 알게 된 API/라이브러리 동작\n2. 사용자가 접근법을 교정한 것\n3. 실패한 접근법과 이유\n4. 자명하지 않은 설계 결정\n저장 가치가 있으면 ~/claude-library 규칙대로 파일 작성 + commit/push. 없으면 아무것도 하지 마라. 끝나면 \($path) 를 rm 해라.\n---\nbackground Agent를 띄운 직후 추가 설명 없이 응답을 끝내라. 체크리스트를 인라인으로 직접 수행하지 마라.")
 }'
