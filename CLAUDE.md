@@ -67,7 +67,15 @@
 
 - `finance/crypto/eth-breakout-v3/` — ETH 1h 브레이크아웃 WF 전략 (V3=6.13, TP=3.8×ATR, ER 24/0.40 필터)
 - `finance/equity/overfitting-validation/swing-50k-requant…` — ~50k 스윙 백테스트 16 family honest 재정량 survivor 0건, trade-list 인플레(~5x)+union-freq 환상+regime beta+MC entry-perm가 전부 죽임
-- `tooling/figma-mcp/` — Figma MCP 함정: component master는 `<symbol>` 태그, asset SVG export·7일 만료, 큰 응답 tool-results 파일 fallback, top-level frame≠모두 화면
+- `finance/equity/overfitting-validation/permutation-test-annualization-mismatch…` — scorer.py perm 게이트 구조적 결함: 셔플이 mean/std 보존인데 셔플Sharpe=×√N봉 vs 전략Sharpe=×√252 불일치 → 양수익 전략 perm∩vsbh 상호배타로 PASS 영구불가(400전략 전부 p=1.0). 순서셔플은 Sharpe 유의검정 아님—entry-perm(random-buy)이 올바른 귀무
+- `finance/equity/overfitting-validation/entry-alpha-absent-only-exit-riskoverlay-and-diversification-work` — ★종합(~500전략): 진입타이밍 알파 0. 작동=trail 리스크오버레이(낙폭관리)+분산(60/40+gold)뿐. 가격/TA/옵션IV/PEAD/ML 다 dead. 여윳돈도 dip<any-day→보유. 신호사냥=음의기대값
+- `finance/equity/overfitting-validation/measured-bbo-spreads…` — 실측 bbo half-spread SPY 0.36bps/SOXL 3.4bps = 가정 0.5%/side의 1/14~1/140. 백테 비용은 종목별 실측으로. 단 overnight은 실측비용으로도 IS음수+B&H열위로 기각
+- `finance/equity/intraday-lead-lag/futures-etf-gap-catchup…` — ❌철회: 선물→ETF gap "생존자"는 중첩 트레이드 인공물(비중첩 실거래는 음수). 인트라데이 신호는 per-trade/entry-perm 금지, 비중첩·daily-eq로 검증. trade-list 인플레 함정 재현
+- `finance/equity/asset-allocation/lev-etf-hedge-cash-gold-reliable-bonds-fail-2022` — 레버 ETF 낙폭 헤지 프론티어: 현금·금만 모든 위기 작동, 채권(TLT/IEF) 2022 동반폭락 실패. 60/40+금 26.8%/-50.4% sweet spot, 연 리밸런스 필수
+- `tooling/figma-mcp/` — Figma MCP 함정: component master는 `<symbol>` 태그, asset SVG export·7일 만료, 큰 응답 tool-results 파일 fallback, top-level frame≠모두 화면; 색 토큰 값이 주석/SSOT에서 드리프트(design_context로 값 직접 대조), generic 컴포넌트는 색만 1px 보정·구조 재설계는 deferred; 카드 배경색은 figma 본문 픽셀 샘플로 확정(이름/요약 의심·캔버스색 혼동 금지)·검증 서브에이전트에 결론 전제 주입 금지(오탐 유발)
+- `tooling/ai-agent/` (visual-parity) — jest 707~814 통과 + subagent "critical 0/1px 정합" 자가보고는 시각 정합을 검증 못 함. 시뮬↔figma 내눈 스샷 대조에서 635건(critical 122) 불일치. 차트종류·색·폰트·데이터·섹션누락은 단위테스트/자가검증 맹점, ground truth는 렌더 픽셀뿐. + `tooling/ai-bouncer/` resolve-task.sh delegated-agent return 0이 phase 폴더 경로 깨 위임에이전트 커밋 차단→메인이 직접 커밋
+- `tooling/granite-rn/` — Granite RN: react-native-svg 내장(설치 금지), 제거 후 import는 `@granite-js/native/react-native-svg` 서브패스. tsc 통과≠Metro 번들, Metro watch 멈춤. `borderStyle:'dashed'/'dotted'` 미지원→svg Line/Rect strokeDasharray(onLayout 반응형, jest는 fireEvent layout+stroke ARGB payload). **커스텀 폰트는 mpack `.ait`에 번들 안 됨**(앞선 "가능" 결론 정정—.ait 3.5MB<폰트22MB·strings 0건 실측; 네이티브 ios/android dir 없어 react-native.config.js assets autolinking 무효·granite addFont API 없음→시스템 폴백, PostScript명 일치해도 안 됨; expo-font는 Metro DuplicateError로 비호환. "파일 있다≠적용된다"). **RN 그라데이션**=내장 svg Defs/LinearGradient/Stop/Rect(CSS gradient 미지원, onLayout 폭측정)
+- `tooling/ios-simulator/` — 시뮬 GUI 자동화 함정: DMG 터미널 권한 안 먹음·자식프로세스 권한 부모 귀속·다른 Space 윈도우 클릭 불가·intoss-sandbox:// scheme·screencapture -C 검증
 
 ### 읽기
 - `library_search`는 **deferred tool** — 매 세션/작업 시작 시 반드시 먼저 `ToolSearch("select:mcp__claude-library__library_search")`로 로드한 뒤 사용한다
