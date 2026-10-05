@@ -1,0 +1,25 @@
+IMPORTANT: Do NOT read or execute any files under ~/.claude/, ~/.agents/, .claude/skills/, or agents/. Ignore repo AGENTS.md workflow rules; do not ask questions.
+
+Task (authorized by the account owner): in the owner's already-logged-in Google Chrome, Apps in Toss developer console (https://apps-in-toss.toss.im/), workspace {WORKSPACE_ID} (the workspace the local deploy API key belongs to — it already contains {EXISTING_APPS}). Use your browser/computer-use tools to drive the real Chrome window.
+
+1. If not logged in or the site asks for login / phone verification / QR / password, STOP and output: LOGIN_REQUIRED: <what it asks>. Do not try to log in yourself.
+2. Create a new {APP_TYPE} mini-app (skip if an app with this appName already exists in this workspace; then just report it):
+   - display name: {DISPLAY_NAME} (rule: max 10 chars excluding spaces, no hyphen; fallbacks: {DISPLAY_FALLBACKS})
+   - appName (English ID): {APP_NAME} (unique across ALL workspaces; if taken use {APP_NAME_FALLBACKS} in order)
+   - category: {CATEGORY}
+   - short description: {DESCRIPTION}
+   - icon: upload {ICON_PATH_600x600} (must be exactly 600x600)
+   - customer-support email (고객문의 이메일, shown publicly): {SUPPORT_EMAIL}
+   Fill only what is required to create the app and get a test (QR) environment; save (임시저장 is fine).
+3. (optional) In-app ads (인앱 광고): {AD_TERMS_LINE}
+   Create REWARDED ad group(s): {AD_GROUPS — e.g. name 힌트, reward unit "힌트", amount 1}.
+   Report each adGroupId; it is the groupId query parameter in the console URL (format ait.v2.live.<16 hex>).
+4. (optional) In-app purchase: create {PRODUCTS — e.g. one-time product "확장팩", 2200원}. If IAP requires business registration, settlement/bank info or personal data, do NOT enter any; report NEEDS_OWNER with the exact screen text.
+5. Hard limits: no review submission (검토 요청), no release (출시), no changes to other apps, never enter business registration number, bank/settlement info, seal/signature, or personal identity data.
+
+Final output (plain text, concise):
+STATUS: CREATED | PARTIAL | LOGIN_REQUIRED | NEEDS_OWNER | PENDING_CONFIRMATION | FAILED
+APP <appName> <display name>
+AD_GROUP <name> <type> <adGroupId>
+PRODUCT <name> <productId/sku or NOT_CREATED: reason>
+Remaining required fields / blockers, if any.
