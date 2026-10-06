@@ -14,6 +14,8 @@ offset; mux with finish_video.py --audio --audio-offset. Playwright's video alon
 Lessons baked in:
 - record_video_size equals the CSS viewport. With device_scale_factor 2 and a larger record size, frames flip
   between full-size and quarter-size whenever page.screenshot() runs. Upscale afterwards with finish_video.py.
+- Headless Chrome screencasts the window, not the viewport: without --window-size equal to the viewport the video is a
+  shrunken, cropped page on a gray letterbox (screenshots look fine, so only the video shows it).
 - WebGL in headless Chrome needs swiftshader flags.
 """
 import argparse, functools, http.server, os, threading, time
@@ -45,7 +47,8 @@ logs = []
 with sync_playwright() as p:
     b = p.chromium.launch(channel="chrome", headless=True,
                           args=["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist",
-                                "--autoplay-policy=no-user-gesture-required"])
+                                "--autoplay-policy=no-user-gesture-required",
+                                "--window-size=%d,%d" % (a.width, a.height)])
     vp = {"width": a.width, "height": a.height}
     page = b.new_page(viewport=vp, device_scale_factor=2, record_video_dir=a.out, record_video_size=vp)
     page.add_init_script(path=os.path.join(os.path.dirname(os.path.abspath(__file__)), "webaudio_tap.js"))

@@ -50,13 +50,15 @@ each of the 5 criteria (ads, rewards, anything near violence) — a 1-minute cli
 concatenating many automated sessions with different content (days/levels/modes), not one run repeated.
 - If the repo has a play automation (smoke test, e2e), add a video option to it rather than writing a new player:
   Playwright `record_video_dir` + `record_video_size` **equal to the CSS viewport** (a larger size with dpr 2 makes
-  frames flip between full and quarter size whenever `page.screenshot` runs). Slow taps to 1.5–2 s so a human can
+  frames flip between full and quarter size whenever `page.screenshot` runs), and launch Chrome with
+  `--window-size=<viewport w>,<h>` (headless records the window: otherwise a shrunken page on a gray letterbox). Slow taps to 1.5–2 s so a human can
   follow, hold the final screen ~2.5 s, and print the elapsed time at the moment to cut.
 - **Sound is required** — the reviewer judges sound too, and Playwright's video is silent. Inject
   `scripts/webaudio_tap.js` with `page.add_init_script(path=...)` before `goto`, and at the end call
   `page.evaluate("window.__tapStop()")` → base64 webm + `startedAt` ms; mux with `finish_video.py --audio a.webm
   --audio-offset <startedAt/1000>`. Check the result has sound (`ffmpeg -af volumedetect`, mean above about -50 dB).
 - Otherwise `scripts/record_web.py <build> <out> --script play.py` with a small play script.
+- Over 100 MB: raise crf (26→28) rather than gitignore — GitHub warns above 50 MB but accepts up to 100 MB.
 - Native/no web build: ask the owner for a phone screen recording — the one acceptable question.
 - Finish with `scripts/finish_video.py raw.webm docs/store/rating/gameplay.mp4 --end <s>`; use `--sheet-only` on the
   raw file first to find where the loader/reload frames start, then Read the output sheet and confirm the first frame
