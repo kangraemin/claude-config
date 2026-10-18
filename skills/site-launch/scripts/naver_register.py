@@ -1,0 +1,81 @@
+"""네이버 서치어드바이저 등록 — 실제 Chrome 'Profile 1'(네이버 로그인됨)을 chromectl로 조작.
+  python3 naver_register.py add     https://site   → 확인 파일명(naverXXXX.html)과 meta 출력. 둘 다 사이트에 넣고 배포.
+  python3 naver_register.py verify  https://site   → [소유확인] → 보안문자 그림을 텔레그램으로 보내고 답장(최대 15분) 받아 입력
+  python3 naver_register.py sitemap https://site [sitemap.xml]
+네이버는 경로 붙은 주소를 안 받는다(사이트 단위). 로그아웃이면 chrome-direct/scenarios/naver_login.py --qr --notify.
+백그라운드 탭은 Vue 화면이 안 그려지므로 c.shot()으로 탭을 앞으로 띄운 뒤 읽는다."""
+import os, re, subprocess, sys, time, urllib.parse, urllib.request, json
+sys.path.insert(0, os.path.expanduser('~/.config/claude-accounts/personal/skills/chrome-direct'))
+import chromectl as c
+TMP = '/tmp/site-launch'; os.makedirs(TMP, exist_ok=True)
+cmd, site = sys.argv[1], sys.argv[2].rstrip('/')
+q = urllib.parse.quote(site, safe='')
+
+def front(t):
+    c.shot(t, f'{TMP}/front.png'); time.sleep(2)
+
+def text(t):
+    return c.js_json(t, "return document.body.innerText")
+
+def tg_env():
+    env = {}
+    for l in open(os.path.expanduser('~/.claude/.env')):
+        m = re.match(r'(?:export )?(CONTEST_TG_TOKEN|CONTEST_TG_CHAT_ID)=["\']?([^"\'\n]+)', l)
+        if m: env[m[1]] = m[2]
+    return env['CONTEST_TG_TOKEN'], env['CONTEST_TG_CHAT_ID']
+
+def captcha(t):
+    """보안문자 창이 있으면 텔레그램으로 묻고 입력. 없으면 False."""
+    src = c.js_json(t, "const e=document.querySelector('.v-dialog--active .v-image__image');return e?e.style.backgroundImage.slice(5,-2):''")
+    if not src: return False
+    gif = f'{TMP}/cap.gif'; urllib.request.urlretrieve(src, gif)
+    from PIL import Image
+    im = Image.open(gif).convert('RGB'); im.resize((im.width * 3, im.height * 3)).save(f'{TMP}/cap.png')
+    tok, chat = tg_env()
+    sent = json.loads(subprocess.check_output(['curl', '-s', '-F', f'chat_id={chat}', '-F', f'photo=@{TMP}/cap.png', '-F',
+        f'caption={site} 네이버 서치어드바이저 보안문자 — 보이는 글자를 답장해 주세요', f'https://api.telegram.org/bot{tok}/sendPhoto']))
+    t0 = sent['result']['date']
+    print('CAPTCHA sent to telegram, waiting reply', flush=True)
+    for _ in range(180):
+        ups = json.load(urllib.request.urlopen(f'https://api.telegram.org/bot{tok}/getUpdates?offset=-10'))['result']
+        rep = [u['message']['text'] for u in ups if u.get('message', {}).get('date', 0) > t0 and u['message'].get('text')]
+        if rep: break
+        time.sleep(5)
+    else:
+        print('RESULT: CAPTCHA_TIMEOUT'); sys.exit(2)
+    code = re.sub(r'[^0-9A-Za-z]', '', rep[-1].split()[0]).upper()
+    print('captcha answer', code)
+    c.js_json(t, f"const i=document.querySelector('.v-dialog--active input');const s=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;s.call(i,'{code}');i.dispatchEvent(new Event('input',{{bubbles:true}}));return 1")
+    # 확인 뒤 alert가 뜨면 AppleScript JS가 막히므로 setTimeout으로 누르고 빠진다
+    c.run_js(t, "setTimeout(()=>{[...document.querySelector('.v-dialog--active').querySelectorAll('button')].find(b=>b.innerText.trim()=='확인').click()},10);'ok'")
+    time.sleep(6); return True
+
+t = c.new_tab('https://searchadvisor.naver.com/console/board', profile='Profile 1'); time.sleep(6); front(t)
+try:
+    if cmd == 'add':
+        tx = text(t)
+        if site in tx: print('already listed')
+        else:
+            c.fill(t, 'input[type=text]', site); time.sleep(1)
+            c.js_json(t, "[...document.querySelectorAll('button')].find(e=>/exit_to_app/.test(e.textContent)).click();return 1"); time.sleep(6)
+        c.goto(t, f'https://searchadvisor.naver.com/console/verify?site={q}'); time.sleep(6); front(t)
+        tx = text(t)
+        f = re.search(r'naver[0-9a-f]{32}\.html', tx); m = re.search(r'<meta name="naver-site-verification"[^>]*>', tx)
+        print('FILE', f and f[0]); print('FILE_CONTENT', f and f'naver-site-verification: {f[0]}'); print('META', m and m[0])
+    elif cmd == 'verify':
+        c.goto(t, f'https://searchadvisor.naver.com/console/verify?site={q}'); time.sleep(6); front(t)
+        c.run_js(t, "setTimeout(()=>{[...document.querySelectorAll('button')].find(b=>b.innerText.trim()=='소유확인').click()},10);'ok'"); time.sleep(4)
+        captcha(t)
+        c.goto(t, 'https://searchadvisor.naver.com/console/board'); time.sleep(6); front(t)
+        tx = text(t); i = tx.find(site)
+        ok = i >= 0 and '소유확인 진행' not in tx[i:i + 120]
+        print('RESULT:', 'OK' if ok else 'FAIL', tx[i:i + 120] if i >= 0 else 'not listed')
+    elif cmd == 'sitemap':
+        sm = site + '/' + (sys.argv[3] if len(sys.argv) > 3 else 'sitemap.xml')
+        c.goto(t, f'https://searchadvisor.naver.com/console/site/request/sitemap?site={q}'); time.sleep(7); front(t)
+        c.fill(t, 'input[type=text]', sm); time.sleep(1)  # 전체 URL이어야 확인 버튼이 켜진다
+        c.run_js(t, "setTimeout(()=>{[...document.querySelectorAll('button')].find(b=>b.innerText.trim()=='확인').click()},10);'ok'"); time.sleep(5)
+        captcha(t)
+        tx = text(t); i = tx.find('제출된 사이트맵'); print('RESULT:', tx[i:i + 160].replace('\n', ' '))
+finally:
+    c.close_tab(t)
