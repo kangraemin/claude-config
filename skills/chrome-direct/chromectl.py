@@ -198,6 +198,28 @@ end tell''')
     return path
 
 
+def google_relogin(match, email="remin1994@gmail.com", tries=3):
+    """Google 계정이 '로그아웃됨'이면 다시 로그인한다(사용자 손 불필요). 이미 로그인 상태면 바로 True.
+    계정 선택 → 페이지 '계속' → macOS 패스키 시트 '계속'(지문 없이 통과). 시트는 DOM·AX 밖이라 cliclick 좌표로 누른다:
+    시트는 창 가운데에 뜨고 '계속'은 중심에서 (+197, +117)pt. 1분쯤 지나면 '요청 제한 시간 초과' 창이 따로 뜨는데 그 '닫기'는 창 좌상단 (+395, +262)pt."""
+    url = lambda: js_json(match, "return location.href")
+    for _ in range(tries):
+        if "accounts.google.com" not in url():
+            return True
+        js_json(match, f"const a=document.querySelector('[data-identifier=\"{email}\"]');if(a)a.click();return !!a"); time.sleep(5)
+        run_js(match, "setTimeout(()=>{const b=[...document.querySelectorAll('button')].find(b=>/^(계속|다시 시도)$/.test(b.innerText.trim()));b&&b.click()},10);'ok'"); time.sleep(3)
+        w, _t = find_tab(match)
+        osa(f'tell application "Google Chrome"\nset index of window {w} to 1\nactivate\nend tell'); time.sleep(0.5)
+        x1, y1, x2, y2 = [int(v) for v in osa('tell application "Google Chrome" to get bounds of window 1').split(", ")]
+        subprocess.run(["cliclick", f"c:{(x1 + x2) // 2 + 197},{(y1 + y2) // 2 + 117}"], check=True); time.sleep(8)
+        try:  # 시간 초과 창이 떠 있으면 닫는다
+            ex, ey = [int(v) for v in osa('tell application "System Events" to tell process "Google Chrome" to get position of window "문제가 발생했습니다"').split(", ")]
+            subprocess.run(["cliclick", f"c:{ex + 395},{ey + 262}"], check=True); time.sleep(2)
+        except RuntimeError:
+            pass
+    return "accounts.google.com" not in url()
+
+
 def rtype(env=None, value=None, enter=False):
     """Type into whatever has focus with real keystrokes (fields that reject JS values)."""
     v = secret(env) if env else value

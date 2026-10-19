@@ -25,6 +25,7 @@ acc = GA_ACCOUNT.split('/')[1]
 # 속성 ID 없는 #/a<acc>/admin/... 주소는 안 그려진다 → 아무 기존 속성 ID를 붙인다
 anyp = [p for a in s.get(B + '/accountSummaries').json()['accountSummaries'] if a['account'] == GA_ACCOUNT for p in a['propertySummaries']][0]['property'].split('/')[1]
 t = c.new_tab(f'https://analytics.google.com/analytics/web/?authuser=0#/a{acc}p{anyp}/admin/property/create', profile='Profile 1')
+c.google_relogin(t)  # 로그아웃돼 있으면 패스키 시트까지 눌러 다시 로그인
 c.shot(t, '/tmp/ga-front.png')  # 탭을 앞으로(백그라운드면 Angular가 안 그려짐)
 J = c.js_json
 def overlay_pick(word):

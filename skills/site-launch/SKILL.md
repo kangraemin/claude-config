@@ -1,6 +1,6 @@
 ---
 name: site-launch
-description: 새 웹사이트를 GA4·구글 서치콘솔·네이버 서치어드바이저·IndexNow에 사용자 손 안 대고 등록한다(서비스 계정 + 실제 Chrome 조작 + 보안문자만 텔레그램). "GA 붙여", "GA 속성 만들어", "서치콘솔 등록", "네이버 서치어드바이저", "검색 등록", "SEO 등록", "사이트맵 제출", "색인 요청" 등에 반드시 사용. 사용자에게 gcloud 로그인이나 직접 등록을 시키지 않는다.
+description: 새 웹사이트를 GA4·구글 서치콘솔·네이버 서치어드바이저·IndexNow·애드센스에 사용자 손 안 대고 등록한다(서비스 계정 + 실제 Chrome 조작 + 보안문자만 텔레그램). "GA 붙여", "GA 속성 만들어", "서치콘솔 등록", "네이버 서치어드바이저", "검색 등록", "SEO 등록", "사이트맵 제출", "색인 요청", "광고 붙여", "애드센스", "광고 달아", "ads.txt", "애드센스 심사" 등에 반드시 사용. 사용자에게 gcloud 로그인이나 직접 등록을 시키지 않는다.
 ---
 
 # site-launch
@@ -52,8 +52,12 @@ python3 indexnow.py <host> <key> <sitemap 경로|URL>
 
 ## 5. 애드센스 (계정 pub-4785237655148075, remin1994)
 - 코드: 모든 정적 페이지 head에 `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4785237655148075" crossorigin="anonymous"></script>`(자동 광고). 앱인토스 등 다른 빌드엔 넣지 않는다. `ads.txt`: `google.com, pub-4785237655148075, DIRECT, f08c47fec0942fa0`.
-- 등록은 Chrome `https://adsense.google.com/adsense/u/0/pub-4785237655148075/sites/list`: `새 사이트` → `input[aria-label="웹 사이트"]`에 도메인(IDN은 punycode) → `저장` → "코드를 삽입했습니다" 체크박스 click → `.verify-button`(확인) → "사이트가 확인되었습니다" `다음` → `검토 요청`. 상태가 "준비 중"이면 끝. 심사는 며칠~2주.
-- 로그아웃돼 있으면 패스키 시트 `계속`만 누르면 된다(chrome-direct Pitfalls). 사용자에게 지문을 시키지 않는다.
+- 코드·ads.txt를 배포한 뒤 실행(사이트 추가 → 소유권 확인 → 검토 요청, 이미 있으면 남은 단계만·상태 출력, IDN 자동 punycode):
+```
+python3 adsense_add.py https://site [--dry-run]    # 마지막 줄 RESULT: <host> / 준비 중 / … 이면 끝. 심사는 며칠~2주
+```
+- 내부 흐름: `새 사이트` → `input[aria-label="웹 사이트"]` → `저장` → "코드를 삽입했습니다" 체크 → `.verify-button` → `다음` → `검토 요청`.
+- 로그아웃돼 있어도 스크립트가 `chromectl.google_relogin`으로 다시 로그인한다(패스키 시트 `계속` 클릭, 지문 불필요). 사용자에게 시키지 않는다.
 - 공고 모음·짧은 글 사이트는 "가치가 별로 없는 콘텐츠"로 거절된 전례(티스토리 3개)가 있다.
 
 ## 한글 도메인(IDN)
@@ -63,6 +67,7 @@ python3 indexnow.py <host> <key> <sitemap 경로|URL>
 - 가비아 DNS(dns.gabia.com): Vercel이면 A @ 76.76.21.21, A www 76.76.21.21. 그 뒤 `vercel domains add`·`vercel certs issue`.
 
 ## Chrome 조작 함정
+- 구글 계정이 '로그아웃됨'이면 `c.google_relogin(tab)` 한 줄로 해결(ga_property·adsense_add에 들어 있음).
 - 백그라운드 탭은 Vue/Angular 화면이 안 그려진다 → `c.shot(tab, png)`로 앞으로 띄운 뒤 읽는다.
 - 누른 뒤 alert가 뜨는 버튼은 `run_js("setTimeout(()=>btn.click(),10)")`로 눌러 AppleScript가 막히지 않게.
 - GA 생성 화면 주소는 `#/a<계정>p<아무 속성>/admin/property/create` (속성 ID 없으면 안 그려짐). mat-checkbox는 내부 `input.mdc-checkbox__native-control`을 click.
