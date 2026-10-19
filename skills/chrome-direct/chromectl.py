@@ -34,7 +34,19 @@ def osa(script, timeout=20):
 
 
 def tabs(with_id=False):
-    out = osa('''set o to ""
+    # Retry when another session closes a tab mid-loop (-1719 invalid index)
+    for i in range(5):
+        try:
+            out = _tabs_raw(); break
+        except RuntimeError as e:
+            if "-1719" not in str(e) or i == 4: raise
+            time.sleep(0.5)
+    rows = [l.split("\t") for l in out.splitlines() if l.strip()]
+    return [r[:5] for r in rows] if with_id == True else rows if with_id == "full" else [r[:4] for r in rows]
+
+
+def _tabs_raw():
+    return osa('''set o to ""
 tell application "Google Chrome"
   repeat with w from 1 to count windows
     repeat with t from 1 to count tabs of window w
@@ -43,8 +55,6 @@ tell application "Google Chrome"
   end repeat
 end tell
 return o''')
-    rows = [l.split("\t") for l in out.splitlines() if l.strip()]
-    return [r[:5] for r in rows] if with_id == True else rows if with_id == "full" else [r[:4] for r in rows]
 
 
 def ref(match):
