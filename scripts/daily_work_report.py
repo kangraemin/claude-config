@@ -85,6 +85,12 @@ def build(arg):
         raw.append(f'{name} ({len(subs)})')
         raw += [f'- {re.sub(r"^[a-z]+(\([^)]*\))?!?: ?", "", s)}' for s in subs]
         raw.append('')
+    for name, asks in sessions(start, end).items():
+        if name in groups:
+            continue  # 커밋이 있으면 커밋으로 충분
+        raw.append(f'{name} (커밋 없음 — 사용자 요청 기준)')
+        raw += [f'- 요청: {a}' for a in asks[:25]]
+        raw.append('')
     raw = '\n'.join(raw).strip()
     body = (summarize(raw) if raw else None) or raw or '커밋한 작업 없음'
     OUT.mkdir(parents=True, exist_ok=True)
@@ -92,6 +98,57 @@ def build(arg):
     f = OUT / f'{d}.txt'
     f.write_text(head + '\n\n' + body.strip() + '\n')
     return f
+
+
+NOISE = re.compile(r'^(<|\[SYSTEM|\[Request interrupted|Stop hook|Caveat:|This session is being continued)')
+
+
+def project_of(cwd):
+    p = Path(cwd)
+    for q in [p, *p.parents]:
+        if (q / '.git').exists():
+            return name_of(q)
+    # git 없는 폴더: ~/programming/(vibecoding/)<프로젝트>/… 의 <프로젝트>로 묶는다. 그 밖(/tmp 등)은 뺀다.
+    for base in (HOME / 'programming/vibecoding', HOME / 'programming'):
+        try:
+            return p.relative_to(base).parts[0]
+        except (ValueError, IndexError):
+            pass
+    return None
+
+
+def sessions(start, end):
+    """커밋 안 하는 작업(이모티콘 그리기 등)도 잡으려고 Claude 세션 기록의 사용자 요청을 프로젝트별로 모은다."""
+    t0, t1 = start.astimezone(dt.timezone.utc), end.astimezone(dt.timezone.utc)
+    out = {}
+    roots = [HOME / '.claude/projects', *HOME.glob('.config/claude-accounts/*/projects')]
+    for root in roots:
+        for f in root.glob('*/*.jsonl'):
+            if dt.datetime.fromtimestamp(f.stat().st_mtime, dt.timezone.utc) < t0:
+                continue
+            try:
+                for line in f.open(encoding='utf-8', errors='replace'):
+                    if '"type":"user"' not in line:
+                        continue
+                    d = json.loads(line)
+                    if d.get('isMeta') or not d.get('cwd'):
+                        continue
+                    ts = dt.datetime.fromisoformat(d.get('timestamp', '').replace('Z', '+00:00'))
+                    c = d.get('message', {}).get('content')
+                    if not (t0 <= ts < t1) or not isinstance(c, str):
+                        continue
+                    c = ' '.join(c.split())
+                    if len(c) < 6 or NOISE.match(c):
+                        continue
+                    name = project_of(d['cwd'])
+                    if not name or name == 'vibecoding':
+                        continue
+                    asks = out.setdefault(name, [])
+                    if c[:100] not in asks:
+                        asks.append(c[:100])
+            except Exception:
+                continue
+    return out
 
 
 PROMPT = '''아래는 하루 동안 레포(프로젝트)별 git 커밋 제목이다. 사용자가 아침에 텔레그램으로 읽을 하루 작업 정리로 줄여라.
@@ -104,7 +161,7 @@ PROMPT = '''아래는 하루 동안 레포(프로젝트)별 git 커밋 제목이
 - 프로젝트마다 2~5줄. 비슷한 커밋(오타 정정·이력 추가·되돌림)은 합쳐 결과만 쓴다. 되돌린 건 안 한 것으로 본다.
 - 한 줄은 30자 안팎, 쉬운 한국어, '~함/~추가' 같은 짧은 끝맺음. 커밋에 없는 내용은 지어내지 않는다.
 - 많이 한 프로젝트부터. claude-library(지식·결정 기록)와 claude-config(도구 설정)는 맨 끝에 각각 1~2줄로만.
-- 프로젝트 사이엔 빈 줄 하나.
+- '커밋 없음 — 사용자 요청 기준' 프로젝트는 요청들을 보고 실제로 한 작업을 짐작해 1~3줄로 쓴다(질문·잡담만 있으면 그 프로젝트는 뺀다).\n- 프로젝트 사이엔 빈 줄 하나.
 
 커밋:
 '''
