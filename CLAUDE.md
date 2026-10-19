@@ -8,6 +8,7 @@
 ## 스킬 우선 사용 <!-- why: decisions/_global/process/use-matching-skills-before-custom-work.md -->
 - 작업 시작 전 available skills 목록을 확인하고, 매칭되는 스킬이 있으면 반드시 Skill 도구로 실행한다. 직접 수행 금지.
 - 세션을 이어받을 때도 동일하게 스킬/에이전트 매칭을 재점검한다.
+- 웹·콘솔 조작(Chrome 직접·Codex 위임)이 들어간 작업을 끝내면 `web-scriptify` 스킬로 그 과정을 스크립트화한다(불가능하면 안 함).
 
 ## ralph-x in-session 루프 — 절대 멈추지 말 것 <!-- why: decisions/_global/process/ralph-x-continue-until-declared-exit.md -->
 - ralph-x in-session 루프(`ralph-x-runs/*/session-state.json`에 `active=true`) 진행 중에는 **절대 멈추지 않는다**.
