@@ -2,6 +2,7 @@
   python3 naver_register.py add     https://site   → 확인 파일명(naverXXXX.html)과 meta 출력. 둘 다 사이트에 넣고 배포.
   python3 naver_register.py verify  https://site   → [소유확인] → 보안문자 그림을 텔레그램으로 보내고 답장(최대 15분) 받아 입력
   python3 naver_register.py sitemap https://site [sitemap.xml]
+  python3 naver_register.py rss     https://site [feed.xml]
 네이버는 경로 붙은 주소를 안 받는다(사이트 단위). 로그아웃이면 chrome-direct/scenarios/naver_login.py --qr --notify.
 백그라운드 탭은 Vue 화면이 안 그려지므로 c.shot()으로 탭을 앞으로 띄운 뒤 읽는다."""
 import os, re, subprocess, sys, time, urllib.parse, urllib.request, json
@@ -9,6 +10,9 @@ sys.path.insert(0, os.path.expanduser('~/.config/claude-accounts/personal/skills
 import chromectl as c
 TMP = '/tmp/site-launch'; os.makedirs(TMP, exist_ok=True)
 cmd, site = sys.argv[1], sys.argv[2].rstrip('/')
+# 한글 도메인은 네이버가 한글로 저장한다(xn-- 그대로 찾으면 목록에서 못 찾음)
+_u = urllib.parse.urlsplit(site)
+if 'xn--' in _u.netloc: site = f"{_u.scheme}://{_u.netloc.encode().decode('idna')}{_u.path}"
 q = urllib.parse.quote(site, safe='')
 
 def front(t):
@@ -70,12 +74,12 @@ try:
         tx = text(t); i = tx.find(site)
         ok = i >= 0 and '소유확인 진행' not in tx[i:i + 120]
         print('RESULT:', 'OK' if ok else 'FAIL', tx[i:i + 120] if i >= 0 else 'not listed')
-    elif cmd == 'sitemap':
-        sm = site + '/' + (sys.argv[3] if len(sys.argv) > 3 else 'sitemap.xml')
-        c.goto(t, f'https://searchadvisor.naver.com/console/site/request/sitemap?site={q}'); time.sleep(7); front(t)
+    elif cmd in ('sitemap', 'rss'):
+        sm = site + '/' + (sys.argv[3] if len(sys.argv) > 3 else 'sitemap.xml' if cmd == 'sitemap' else 'feed.xml')
+        c.goto(t, f'https://searchadvisor.naver.com/console/site/request/{cmd}?site={q}'); time.sleep(7); front(t)
         c.fill(t, 'input[type=text]', sm); time.sleep(1)  # 전체 URL이어야 확인 버튼이 켜진다
         c.run_js(t, "setTimeout(()=>{[...document.querySelectorAll('button')].find(b=>b.innerText.trim()=='확인').click()},10);'ok'"); time.sleep(5)
         captcha(t)
-        tx = text(t); i = tx.find('제출된 사이트맵'); print('RESULT:', tx[i:i + 160].replace('\n', ' '))
+        tx = text(t); i = tx.find('제출된 사이트맵' if cmd == 'sitemap' else '제출된 RSS'); print('RESULT:', tx[i:i + 160].replace('\n', ' ') if i >= 0 else tx[:300].replace('\n', ' '))
 finally:
     c.close_tab(t)
