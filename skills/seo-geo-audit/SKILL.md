@@ -14,6 +14,19 @@ python3 ~/.claude/skills/seo-geo-audit/scripts/audit.py https://site [--max 300]
 - 배포 주소를 자바스크립트 없이(크롤러 시점) 읽는다. sitemap의 URL을 `--max`개까지 전부 본다.
 - FAIL = 고쳐야 함(종료 코드 1). WARN = 권장. 같은 종류는 묶어서 `[N곳, 예: URL]`로 보여 준다.
 - 고친 뒤 배포하고 다시 돌려 FAIL 0을 확인한다.
+- 스크립트가 보는 것: robots(AI봇 차단), sitemap(호스트·lastmod 신선도·일괄 동일 lastmod), llms.txt·파비콘(리다이렉트 포함), 루트 임시 리다이렉트, **soft 404**(없는 주소와 sitemap 경로 패턴 아래 없는 주소가 200인지), www/비www, 페이지마다 canonical·title·description·og·lang 불일치·h1·JSON-LD/microdata·JS 없는 본문·내부 링크·alt, 질문형 제목·FAQ·RSS.
+
+## 1-1. 구글 색인 실제 상태
+```
+python3 ~/.claude/skills/seo-geo-audit/scripts/inspect_index.py https://site/ [URL ...]
+```
+- 서치콘솔 URL 검사 API. "검색에 안 나와"면 추측하지 말고 이것부터 돌린다(서비스 계정이 소유자가 아니면 site-launch의 `gsc_register.py verify`로 먼저 등록).
+- `Discovered - currently not indexed`: 새 도메인 초기엔 정상. `Crawled - currently not indexed`: 품질·중복 문제 의심. `URL is unknown`: sitemap 제출·내부 링크 확인.
+
+## 보고 규칙
+- 보고서의 모든 수치·주장은 raw 출력(스크립트·curl 결과)에 남은 것만 쓴다. `site:` 검색 결과처럼 기록이 없는 건 "확인 안 됨"으로 적는다.
+- 확인 못 한 것(서치콘솔 오류 리포트, Bing 색인, 실제 AI 인용 여부, Core Web Vitals)은 따로 "확인 못 함" 칸에 모은다.
+- 우선순위: FAIL → 색인·신선도 → 메타·구조화 데이터 → GEO 콘텐츠.
 
 ## 2. 체크리스트 (스크립트가 못 보는 것 포함)
 
@@ -26,6 +39,8 @@ python3 ~/.claude/skills/seo-geo-audit/scripts/audit.py https://site [--max 300]
 - [ ] 구글 서치콘솔·네이버 서치어드바이저 소유확인 + sitemap 제출 (site-launch)
 - [ ] IndexNow 키 파일 + 배포마다 전송 (네이버·빙)
 - [ ] 네이버 RSS 제출 (`naver_register.py rss`)
+- [ ] **Bing Webmaster Tools 등록**(ChatGPT 검색·Copilot이 Bing 색인을 쓴다) — 서치콘솔에서 가져오기로 등록 가능
+- [ ] 오래된 분석 코드(UA-로 시작하는 Universal Analytics) → GA4
 - [ ] URL 검사 API로 색인 상태 확인: 서비스 계정 `searchconsole.googleapis.com/v1/urlInspection/index:inspect` — "Discovered - currently not indexed"는 새 도메인 초기에 정상, 며칠 뒤 다시 본다
 
 ### 페이지 메타
@@ -51,6 +66,7 @@ python3 ~/.claude/skills/seo-geo-audit/scripts/audit.py https://site [--max 300]
 - [ ] 질문형 소제목(`~은?`) + 바로 아래 첫 문장에 직답(40~80단어) — AI가 이 문장을 그대로 인용
 - [ ] 수치·통계·출처를 넣는다(인용·통계·출처 추가가 노출을 최대 30~40% 올림). 키워드 반복은 효과 없음
 - [ ] 엔티티(사이트명·브랜드·지역)를 본문에 명시, 한 문단만 떼어 읽어도 뜻이 통하게(대명사로 시작 금지)
+- [ ] 브랜드명이 흔하면(다른 사이트가 선점) title·본문 앞쪽에 한국어 롱테일 설명을 붙인다
 - [ ] 비교 내용은 표, 절차는 번호 목록, 긴 글은 요약(TL;DR)·FAQ
 - [ ] 신선도: "YYYY년 M월 D일 기준"·dateModified·RSS, 1년 넘은 연도 표기 정리
 - [ ] 요약을 AI가 만들었으면 "원문 확인" 안내와 원문 링크(신뢰 신호)

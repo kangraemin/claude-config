@@ -38,11 +38,42 @@ else:
     if '<sitemapindex' in sm:  # 색인 사이트맵이면 하위 사이트맵을 펼친다
         subs, urls = urls, []
         for x in subs[:20]: urls += re.findall(r'<loc>\s*(.*?)\s*</loc>', get(x)[3])
-    if '<lastmod>' not in sm: note('WARN', 'sitemap.xml', 'lastmod 없음')
+    lm = re.findall(r'<lastmod>\s*(\d{4}-\d{2}-\d{2})', sm)
+    if not lm: note('WARN', 'sitemap.xml', 'lastmod 없음')
+    else:
+        import datetime
+        age = (datetime.date.today() - datetime.date.fromisoformat(max(lm))).days
+        if age > 30: note('WARN', 'sitemap.xml', f'가장 최근 lastmod가 {age}일 전({max(lm)}) — 갱신이 멈췄거나 lastmod가 틀림(신선도 신호)')
+        if len(lm) > 20 and len(set(lm)) == 1: note('WARN', 'sitemap.xml', f'lastmod {len(lm)}개가 전부 {lm[0]} — 페이지별 실제 수정일이 아니면 구글이 무시한다')
     off = [u for u in urls if not u.startswith(SITE)]
     if off: note('FAIL', 'sitemap.xml', f'다른 호스트 URL {len(off)}개 (예: {off[0]})')
 for p, lvl, why in [('/llms.txt', 'WARN', 'AI용 사이트 요약(llms.txt) 없음'), ('/favicon.ico', 'WARN', '검색결과 파비콘용 실파일 없음')]:
-    if get(SITE + p)[0] != 200: note(lvl, p, why)
+    st, fu, _, _ = get(SITE + p)
+    if st != 200: note(lvl, p, why + (f' (리다이렉트 → {fu} 에서 {st})' if fu != SITE + p else f' ({st})'))
+
+class NoRedir(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *a): return None
+def head_status(u):
+    try: r = urllib.request.build_opener(NoRedir).open(urllib.request.Request(u, headers={'User-Agent': UA}), timeout=15); return r.status, ''
+    except urllib.error.HTTPError as e: return e.code, e.headers.get('Location', '')
+    except Exception as e: return str(e), ''
+st, loc = head_status(SITE + '/')
+if st in (302, 303, 307): note('WARN', '/', f'루트가 임시 리다이렉트({st}) → {loc} — 대표 주소면 308/301, 아니면 루트에 본문')
+# 없는 주소가 200이면 soft 404(구글 서치콘솔 경고). 사이트맵의 경로 패턴(/c/xxx/ 등) 아래도 찔러 본다
+probes = {SITE + '/__seo-audit-404-check__/'}
+for u in urls[:50]:
+    segs = urllib.parse.urlsplit(u).path.strip('/').split('/')
+    if len(segs) >= 2: probes.add(f"{SITE}/{'/'.join(segs[:-1])}/__seo-audit-404__/")
+for u in list(probes)[:5]:
+    st, fu, _, h = get(u)
+    if st == 200 and not re.search(r'<meta[^>]+name="robots"[^>]+noindex', h, re.I):
+        note('FAIL', u, '없는 주소가 200(soft 404) — 404를 돌려주거나 noindex')
+host = urllib.parse.urlsplit(SITE).netloc
+alt = host[4:] if host.startswith('www.') else 'www.' + host
+PLATFORM = ('github.io', 'vercel.app', 'netlify.app', 'pages.dev', 'web.app', 'firebaseapp.com', 'herokuapp.com')
+st, fu = (200, f'https://{host}/') if host.endswith(PLATFORM) else get(f'https://{alt}/')[:2]  # 플랫폼 하위 주소엔 www가 없다
+if st != 200: note('WARN', alt, f'www/비www 다른 쪽이 안 열림({st}) — DNS 추가 후 대표 주소로 301/308')
+elif urllib.parse.urlsplit(fu).netloc != host: note('WARN', alt, f'{alt}가 대표 주소로 안 넘어감(→ {fu}) — 중복 사이트')
 
 # ── 페이지 단위 ──
 pages = (urls or [SITE + '/'])[:MAX]
@@ -68,11 +99,20 @@ for u, st, final, hd, h in res:
     for k in ['og:title', 'og:description', 'og:image', 'og:url']:
         if not re.search(rf'property="{k}"', head): note('WARN', u, f'{k} 없음(공유 미리보기·네이버 점검 항목)')
     if not re.search(r'name="twitter:card"', head): note('WARN', u, 'twitter:card 없음')
-    if not re.search(r'<html[^>]+lang="', h): note('WARN', u, 'html lang 없음')
+    lang = (re.search(r'<html[^>]+lang="([^"]+)"', h) or [None, None])[1]
+    body = text_of(h)
+    if not lang: note('WARN', u, 'html lang 없음')
+    elif len(re.findall(r'[가-힣]', body)) > 0.3 * max(1, len(re.findall(r'[A-Za-z가-힣]', body))) and not lang.lower().startswith('ko'):
+        note('WARN', u, f'본문은 한국어인데 html lang="{lang}" — ko로(og:locale도 ko_KR)')
+    if t:
+        parts = [x.strip() for x in re.split(r'[|—–-]', t) if x.strip()]
+        if len(parts) != len(set(parts)): note('WARN', u, 'title에 같은 이름 반복(예: "글 | 사이트 | 사이트")')
     h1 = len(re.findall(r'<h1[\s>]', h))
     if h1 != 1: note('WARN', u, f'h1 {h1}개(1개 권장)')
     lds = re.findall(r'<script[^>]+application/ld\+json[^>]*>(.*?)</script>', h, re.S)
-    if not lds: note('WARN', u, '구조화 데이터(JSON-LD) 없음')
+    micro = re.findall(r'itemtype="https?://schema\.org/(\w+)"', h)
+    for t_ in micro: types[t_ + '(microdata)'] += 1
+    if not lds and not micro: note('WARN', u, '구조화 데이터 없음(JSON-LD·microdata 모두)')
     for b in lds:
         try:
             j = json.loads(b)
