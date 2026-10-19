@@ -141,6 +141,18 @@ if home_html:
     if not re.search(r'(기준|updated|업데이트|갱신)', home_html): note('WARN', 'GEO', '기준일·갱신 시각 표기 없음(신선도)')
 if not any(t in types for t in ['Organization', 'WebSite']): note('WARN', '전체', 'Organization/WebSite 스키마 없음(엔티티 인식)')
 
+# ── Bing Webmaster 등록 (ChatGPT 검색·Copilot이 Bing 색인을 쓴다) ──
+import os
+bkey = next((l.split('=', 1)[1].strip() for l in open(os.path.expanduser('~/.claude/.env')) if l.startswith('BING_WEBMASTER_API_KEY=')), None)
+if not bkey: note('WARN', 'Bing', 'BING_WEBMASTER_API_KEY 없음 — 등록 여부 확인 못 함')
+else:
+    try:
+        bs = json.load(urllib.request.urlopen(f'https://ssl.bing.com/webmaster/api.svc/json/GetUserSites?apikey={bkey}', timeout=25))['d']
+        hit = [b for b in bs if (SITE + '/').startswith(b['Url'])]
+        if not hit: note('FAIL', 'Bing', '빙 웹마스터 미등록 — site-launch bing_register.py')
+        elif not any(b['IsVerified'] for b in hit): note('FAIL', 'Bing', '빙 웹마스터 소유확인 안 됨 — bing_register.py 다시 실행')
+    except Exception as e: note('WARN', 'Bing', f'빙 API 조회 실패 {e}')
+
 if '--json' in sys.argv:
     print(json.dumps({k: v for k, v in out.items()}, ensure_ascii=False, indent=1)); sys.exit(1 if out['FAIL'] else 0)
 print(f'점검: {SITE}  페이지 {len(res)}개  스키마 {dict(types)}')

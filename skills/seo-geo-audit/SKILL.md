@@ -25,7 +25,7 @@ python3 ~/.claude/skills/seo-geo-audit/scripts/inspect_index.py https://site/ [U
 
 ## 보고 규칙
 - 보고서의 모든 수치·주장은 raw 출력(스크립트·curl 결과)에 남은 것만 쓴다. `site:` 검색 결과처럼 기록이 없는 건 "확인 안 됨"으로 적는다.
-- 확인 못 한 것(서치콘솔 오류 리포트, Bing 색인, 실제 AI 인용 여부, Core Web Vitals)은 따로 "확인 못 함" 칸에 모은다.
+- 확인 못 한 것(서치콘솔 오류 리포트, Bing 색인 상태(등록 여부는 audit.py가 봄), 실제 AI 인용 여부, Core Web Vitals)은 따로 "확인 못 함" 칸에 모은다.
 - 우선순위: FAIL → 색인·신선도 → 메타·구조화 데이터 → GEO 콘텐츠.
 
 ## 2. 체크리스트 (스크립트가 못 보는 것 포함)
@@ -39,7 +39,7 @@ python3 ~/.claude/skills/seo-geo-audit/scripts/inspect_index.py https://site/ [U
 - [ ] 구글 서치콘솔·네이버 서치어드바이저 소유확인 + sitemap 제출 (site-launch)
 - [ ] IndexNow 키 파일 + 배포마다 전송 (네이버·빙)
 - [ ] 네이버 RSS 제출 (`naver_register.py rss`)
-- [ ] **Bing Webmaster Tools 등록**(ChatGPT 검색·Copilot이 Bing 색인을 쓴다) — 서치콘솔에서 가져오기로 등록 가능
+- [ ] **Bing Webmaster Tools 등록**(ChatGPT 검색·Copilot이 Bing 색인을 쓴다) — audit.py가 Bing API로 자동 확인(미등록·미확인 = FAIL). 등록은 site-launch `bing_register.py`
 - [ ] 오래된 분석 코드(UA-로 시작하는 Universal Analytics) → GA4
 - [ ] URL 검사 API로 색인 상태 확인: 서비스 계정 `searchconsole.googleapis.com/v1/urlInspection/index:inspect` — "Discovered - currently not indexed"는 새 도메인 초기에 정상, 며칠 뒤 다시 본다
 
