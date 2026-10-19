@@ -38,13 +38,22 @@ def tabs(with_id=False):
 tell application "Google Chrome"
   repeat with w from 1 to count windows
     repeat with t from 1 to count tabs of window w
-      set o to o & w & "\t" & t & "\t" & (title of tab t of window w) & "\t" & (URL of tab t of window w) & "\t" & (id of tab t of window w) & linefeed
+      set o to o & w & "\t" & t & "\t" & (title of tab t of window w) & "\t" & (URL of tab t of window w) & "\t" & (id of tab t of window w) & "\t" & (id of window w) & linefeed
     end repeat
   end repeat
 end tell
 return o''')
     rows = [l.split("\t") for l in out.splitlines() if l.strip()]
-    return rows if with_id else [r[:4] for r in rows]
+    return [r[:5] for r in rows] if with_id == True else rows if with_id == "full" else [r[:4] for r in rows]
+
+
+def ref(match):
+    """AppleScript specifier by ids ("tab id T of window id W"). Indexes shift when other sessions open/close
+    tabs or raise windows, so every action resolves to ids right before it runs."""
+    for w, t, title, url, tid, wid in tabs(with_id="full"):
+        if (match[3:] == tid) if match.startswith("id:") else (match in url or match in title):
+            return f"tab id {tid} of window id {wid}", f"window id {wid}"
+    raise RuntimeError(f"no tab matches {match!r}")
 
 
 def find_tab(match):
@@ -77,13 +86,13 @@ def new_tab(url, profile=None, timeout=15):
 
 
 def close_tab(match):
-    w, t = find_tab(match)
-    osa(f'tell application "Google Chrome" to close tab {t} of window {w}')
+    tab, _w = ref(match)
+    osa(f'tell application "Google Chrome" to close {tab}')
 
 
 def goto(match, url):
-    w, t = find_tab(match)
-    osa(f'tell application "Google Chrome" to set URL of tab {t} of window {w} to {q(url)}')
+    tab, _w = ref(match)
+    osa(f'tell application "Google Chrome" to set URL of {tab} to {q(url)}')
 
 
 def js_json(match, body, timeout=20):
@@ -95,7 +104,7 @@ def js_json(match, body, timeout=20):
 
 
 def run_js(match, code, timeout=20):
-    w, t = find_tab(match)
+    tab, _w = ref(match)
     if code.startswith(FIND):  # keep helpers out of page globals (re-runs would redeclare)
         code = "(() => {" + FIND + "return " + code[len(FIND):] + ";})()"
     fd, path = tempfile.mkstemp(suffix=".js")
@@ -104,7 +113,7 @@ def run_js(match, code, timeout=20):
             f.write(code)
         os.chmod(path, 0o600)
         return osa(f'''set js to read POSIX file "{path}" as «class utf8»
-tell application "Google Chrome" to execute tab {t} of window {w} javascript js''', timeout)
+tell application "Google Chrome" to execute {tab} javascript js''', timeout)
     finally:
         os.unlink(path)
 
@@ -160,11 +169,11 @@ def rclick(match, sel=None, text=None):
     js = FIND + f"""(() => {{ const e = {pick}; if (!e) return 'NOTFOUND'; e.scrollIntoView({{block:'center'}});
   const b = e.getBoundingClientRect(); const top = window.outerHeight - window.innerHeight;
   return Math.round(window.screenX + b.left + b.width / 2) + ',' + Math.round(window.screenY + top + b.top + b.height / 2); }})()"""
-    w, _ = find_tab(match)
+    _t, win = ref(match)
     r = run_js(match, js)
     if r == "NOTFOUND":
         raise RuntimeError(f"rclick {sel or text}: NOTFOUND")
-    osa(f'tell application "Google Chrome" to set index of window {w} to 1\ntell application "Google Chrome" to activate')
+    osa(f'tell application "Google Chrome" to set index of {win} to 1\ntell application "Google Chrome" to activate')
     time.sleep(0.4)
     subprocess.run(["cliclick", f"c:{r}"], check=True, capture_output=True)
 
@@ -182,9 +191,10 @@ def shot(match, path):
     """Screenshot the window showing this tab (brings it to front). path .png or .pdf.
     Needs Screen Recording permission for the terminal/tmux."""
     w, t = find_tab(match)
+    _t, win = ref(match)
     osa(f'''tell application "Google Chrome"
-  set active tab index of window {w} to {t}
-  set index of window {w} to 1
+  set active tab index of {win} to {t}
+  set index of {win} to 1
   activate
 end tell''')
     time.sleep(1.0)
@@ -208,8 +218,8 @@ def google_relogin(match, email="remin1994@gmail.com", tries=3):
             return True
         js_json(match, f"const a=document.querySelector('[data-identifier=\"{email}\"]');if(a)a.click();return !!a"); time.sleep(5)
         run_js(match, "setTimeout(()=>{const b=[...document.querySelectorAll('button')].find(b=>/^(계속|다시 시도)$/.test(b.innerText.trim()));b&&b.click()},10);'ok'"); time.sleep(3)
-        w, _t = find_tab(match)
-        osa(f'tell application "Google Chrome"\nset index of window {w} to 1\nactivate\nend tell'); time.sleep(0.5)
+        _t, win = ref(match)
+        osa(f'tell application "Google Chrome"\nset index of {win} to 1\nactivate\nend tell'); time.sleep(0.5)
         x1, y1, x2, y2 = [int(v) for v in osa('tell application "Google Chrome" to get bounds of window 1').split(", ")]
         subprocess.run(["cliclick", f"c:{(x1 + x2) // 2 + 197},{(y1 + y2) // 2 + 117}"], check=True); time.sleep(8)
         try:  # 시간 초과 창이 떠 있으면 닫는다
