@@ -18,6 +18,7 @@ python3 ga_property.py "<속성 이름>" https://site [--dry-run]
 - 마지막 줄 `MEASUREMENT_ID G-XXXX`. 같은 이름 속성이 있으면 ID만 출력.
 - GA 웹 화면을 Chrome 'Profile 1'(remin1994, 계정 Kangraemin 관리자)로 조작한다. 국가 대한민국·원화·업종(`GA_INDUSTRY` env, 기본 '도서 및 문학')·목표 2개·웹 스트림.
 - 다른 경로는 막혀 있다: 서비스 계정은 GA 뷰어라 속성 생성 403, `gcloud auth application-default login --scopes=analytics.edit`는 구글 '차단된 앱', GA 사용자 권한 편집 패널은 서비스 계정 행에서 로딩만 돈다.
+- 업종 값은 화면 이름 그대로(앞부분 일치): 음식 사이트는 `GA_INDUSTRY=식음료`('음식'은 NF). 목표 체크박스는 aria-label이 비어 있어 부모 글자(트래픽 파악·참여 발생)로 찾는다(2026-10-19 mukmap 성공).
 - 다른 프로젝트 측정 ID 재사용 금지(데이터 섞임). 사이트 전용 속성을 만든다.
 - 맞춤 측정기준·이벤트 설정은 서비스 계정 API로 가능(기존 속성에 edit 허용된 범위).
 

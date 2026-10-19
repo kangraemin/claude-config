@@ -52,7 +52,7 @@ try:
     c.press(t, text='작음 - 직원 1~10명'); time.sleep(1)
     btn('다음'); wait('비즈니스 목표 선택')
     # 3. 목표: 트래픽 파악 + 참여·유지율 (mat-checkbox는 내부 input을 눌러야 체크됨)
-    J(t, "const i=[...document.querySelectorAll('input.mdc-checkbox__native-control')].filter(x=>/트래픽 파악|참여 발생/.test(x.getAttribute('aria-label')||''));i.forEach(x=>x.checked||x.click());return i.length")
+    J(t, "const i=[...document.querySelectorAll('input.mdc-checkbox__native-control')].filter(x=>/트래픽 파악|참여 발생/.test((x.getAttribute('aria-label')||'')+' '+((()=>{let e=x;for(let k=0;k<6&&e.parentElement;k++)e=e.parentElement;return e.innerText||''})())));i.forEach(x=>x.checked||x.click());return i.length")
     if dry:
         print('RESULT: DRY_RUN (만들기 직전에서 멈춤)'); sys.exit(0)
     btn('만들기'); wait('플랫폼을 선택하세요', 30)
