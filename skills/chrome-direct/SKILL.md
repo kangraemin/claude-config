@@ -21,6 +21,7 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 | `gmail_search.py "<query>" [--limit N] [--open N] [--proof x.pdf]` | List search results / open one thread (`in:sent`, `in:spam` also work) | Read | yes |
 | `gmail_mailcheck.py [--days 5] [--out x.md] [--open-bodies]` | Contest-mail sweep (3 queries, ad/key classification, codes masked) | Read | yes |
 | `gmail_code.py [--from x] [--link pattern]` | Verification code (`CODE n`) or link (`LINK url`) from recent mail | Read | yes |
+| `notion_export.py <page_id> <out_dir> [--refresh] [--gap 2.5]` | Notion page tree (text+images) → local markdown book (INDEX.md, part<N>/NN-title.md, img/). Internal /api/v3 in logged-in tab; resumable, images 1-by-1 (server throttles after ~300) | Read | text yes / images partial (throttled) |
 | `gform_read.py <url> [--skeleton a.json]` | Every page, question, and required flag of a Google Form; checks for closed form or existing response | Read | yes |
 | `gform_fill.py <url> answers.json [--submit --contest-id id]` | Fill a form. Dry-run by default. File questions go to Codex | Submit | no |
 | `gmail_send.py --to --subject --body-file [--attach f]... [--submit --contest-id id]` | Send mail (SMTP if `GMAIL_APP_PASSWORD` is set, otherwise the web compose window). Checks Sent first to avoid duplicates | Submit | dry-run only |
