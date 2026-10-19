@@ -48,6 +48,13 @@ python3 indexnow.py <host> <key> <sitemap 경로|URL>
 ```
 - 키 파일 `https://<host>/<key>.txt`(내용 = 키)를 먼저 배포. 배포 직후 api.indexnow.org는 403 → 몇 분 뒤 200.
 - 배포 스크립트 끝에 붙여 매 배포마다 보낸다(예: 글쓰기공모전 `ops/vercel-deploy.sh`).
+- 키 파일은 32자 hex 이름으로 골라라(`ls public | sed -nE 's/^([0-9a-f]{32})\.txt$/\1/p'`). `*.txt` 첫 파일을 집으면 `ads.txt`가 키로 잡혀 422가 난다.
+
+## 5. 애드센스 (계정 pub-4785237655148075, remin1994)
+- 코드: 모든 정적 페이지 head에 `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4785237655148075" crossorigin="anonymous"></script>`(자동 광고). 앱인토스 등 다른 빌드엔 넣지 않는다. `ads.txt`: `google.com, pub-4785237655148075, DIRECT, f08c47fec0942fa0`.
+- 등록은 Chrome `https://adsense.google.com/adsense/u/0/pub-4785237655148075/sites/list`: `새 사이트` → `input[aria-label="웹 사이트"]`에 도메인(IDN은 punycode) → `저장` → "코드를 삽입했습니다" 체크박스 click → `.verify-button`(확인) → "사이트가 확인되었습니다" `다음` → `검토 요청`. 상태가 "준비 중"이면 끝. 심사는 며칠~2주.
+- 로그아웃돼 있으면 패스키 시트 `계속`만 누르면 된다(chrome-direct Pitfalls). 사용자에게 지문을 시키지 않는다.
+- 공고 모음·짧은 글 사이트는 "가치가 별로 없는 콘텐츠"로 거절된 전례(티스토리 3개)가 있다.
 
 ## 한글 도메인(IDN)
 - 스크립트·DNS·Vercel·GSC에는 punycode(`xn--…`)를 쓴다. 네이버 서치어드바이저는 목록에 한글(`https://글쓰기공모전.kr`)로 저장한다 → naver_register.py가 xn--를 한글로 바꿔 찾는다.
