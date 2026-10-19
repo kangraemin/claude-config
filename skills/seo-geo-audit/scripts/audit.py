@@ -2,7 +2,7 @@
   python3 audit.py https://site [--max 300] [--json]
 사이트 단위(robots·sitemap·llms.txt·RSS·파비콘)와 페이지 단위(sitemap의 URL 전부, --max까지)를 본다.
 결과: FAIL(고쳐야 함) / WARN(권장) / OK. 종료 코드 1 = FAIL 있음."""
-import collections, concurrent.futures as cf, json, re, sys, urllib.parse, urllib.request
+import collections, concurrent.futures as cf, html, json, re, sys, urllib.parse, urllib.request
 
 UA = 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)'
 AI_BOTS = ['GPTBot', 'OAI-SearchBot', 'ChatGPT-User', 'ClaudeBot', 'Claude-SearchBot', 'PerplexityBot', 'Google-Extended', 'Yeti', 'Bingbot']
@@ -85,7 +85,7 @@ for u, st, final, hd, h in res:
     if final.rstrip('/') != u.rstrip('/'): note('FAIL', u, f'리다이렉트 → {final} (sitemap엔 최종 주소만)')
     if u.rstrip('/') == SITE: home_html = h
     head = h  # Next.js 등은 title·meta를 </head> 뒤(본문 스트림)에 넣기도 한다 — 구글은 문서 전체에서 읽는다
-    m = lambda pat: (re.search(pat, head, re.I | re.S) or [None, None])[1]
+    m = lambda pat: (lambda x: x and html.unescape(x))((re.search(pat, head, re.I | re.S) or [None, None])[1])  # &lt; 등은 한 글자로 센다
     if re.search(r'<meta[^>]+name="robots"[^>]+noindex', head, re.I) or 'noindex' in str(hd.get('X-Robots-Tag', '')): note('FAIL', u, 'noindex')
     can = m(r'<link[^>]+rel="canonical"[^>]+href="([^"]+)"')
     if not can: note('FAIL', u, 'canonical 없음')
