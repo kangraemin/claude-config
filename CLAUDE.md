@@ -10,6 +10,13 @@
 - 세션을 이어받을 때도 동일하게 스킬/에이전트 매칭을 재점검한다.
 - 웹·콘솔 조작(Chrome 직접·Codex 위임)이 들어간 작업을 끝내면 `web-scriptify` 스킬로 그 과정을 스크립트화한다(불가능하면 안 함).
 
+## 사용자에게 넘기기 전 기존 스크립트부터 찾는다 <!-- why: decisions/_global/process/search-existing-scripts-before-handing-step-to-user.md -->
+- 로그인·본인인증(PASS/문자)·보안문자·결제 전 단계처럼 "사람이 해야 할 것 같은" 단계를 사용자에게 넘기기 **전에** 아래를 먼저 찾는다.
+- 스크립트 위치: `~/.claude/skills/chrome-direct/scenarios/`(웹 조작 시나리오, 목록은 같은 폴더 `../SKILL.md` Scenarios 표), `~/.claude/skills/*/scripts/`.
+- 찾는 법: `grep -rli "<키워드>" ~/.claude/skills/*/scripts ~/.claude/skills/chrome-direct/scenarios ~/.claude/skills/chrome-direct/SKILL.md` (예: 본인인증·통신사·문자·mobile-ok·로그인).
+- 개인정보 쪽 지시도 확인: `~/Documents/oguri-works/개인정보.md`에 통신사·인증 방식 같은 처리법이 적혀 있다.
+- 본인인증(문자)은 통신사·이름·생년월일·번호를 내가 넣고, 사용자에게는 **문자로 온 인증번호만** 묻는다.
+
 ## ralph-x in-session 루프 — 절대 멈추지 말 것 <!-- why: decisions/_global/process/ralph-x-continue-until-declared-exit.md -->
 - ralph-x in-session 루프(`ralph-x-runs/*/session-state.json`에 `active=true`) 진행 중에는 **절대 멈추지 않는다**.
 - **종료 조건은 단 두 가지**: `current_iteration >= max_iterations` OR checklist의 모든 항목 `[x]`. 그 전에 종료/대기 금지.

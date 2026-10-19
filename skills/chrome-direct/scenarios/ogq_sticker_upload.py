@@ -6,7 +6,9 @@
 - png_dir: 01.png..24.png(740×640) + main.png(240×240) + tab.png(96×74). drafts/set-v3/ogq 처럼.
 - 제목·설명·태그를 넣고, 26장을 일괄 업로드 칸에 drop 하고, AI 활용 여부를 고른다.
 - --submit 이 있을 때만 「판매 등록」(무료 심사)을 누른다. 「빠른 심사 등록」(유료 C)은 누르지 않는다.
-- 사전 조건: Profile 1 크롬에서 creators.ogq.me 로그인(OGQ_EMAIL/OGQ_PASSWORD), 통합계정 휴대전화 인증(PASS, 사람만 가능) 완료.
+- 사전 조건: Profile 1 크롬에서 creators.ogq.me 로그인(OGQ_EMAIL/OGQ_PASSWORD), **크리에이터 스튜디오** 휴대폰 인증 완료
+  (통합계정 oid.ogq.me/me 휴대전화 인증과 별개다. pass_sms_verify.py ogq-open → send → code, 사람 몫은 문자 6자리뿐).
+- 심사 영업일 최대 15일, 심사 중 수정 불가.
 - 왜 화면 조작인가: OGQ는 업로드 공개 API가 없다. 파일 칸은 input 없이 drop 이벤트만 받아 DataTransfer로 넣는다.
 """
 import argparse
@@ -71,18 +73,31 @@ def main():
         time.sleep(8)
         idx = {"none": 0, "part": 1, "all": 2}[a.ai]
         c.run_js(t, f"document.querySelectorAll('input[type=radio]')[{idx}].click()")
+        # 가이드 체크칸은 누르면 「마지막으로 확인해주세요!」 창이 뜨고, 그 창의 '확인'을 눌러야 체크된다
+        c.run_js(t, """(()=>{const e=document.querySelector('.checkbox-item');if(!e.classList.contains('is-checked'))e.click();return 1})()""")
+        time.sleep(1.5)
+        c.run_js(t, """(()=>{const m=[...document.querySelectorAll('*')].find(e=>e.children.length==0&&e.textContent.trim()=='마지막으로 확인해주세요!');
+          if(!m)return 0;let r=m;while(r.parentElement&&!r.querySelector('button'))r=r.parentElement;
+          const b=[...r.querySelectorAll('button')].find(b=>b.innerText.trim()=='확인');setTimeout(()=>b.click(),10);return 1})()""")
+        time.sleep(1.5)
         state = c.js_json(t, """return {title: document.querySelector("input[placeholder^='스티커의 제목']").value,
           imgs: [...document.querySelectorAll('.section-upload img')].length,
           ai: [...document.querySelectorAll('input[type=radio]')].map(r=>r.checked),
+          guide: document.querySelector('.checkbox-item').classList.contains('is-checked'),
+          twofa: document.body.innerText.includes('2단계 인증을 완료'),
           text: document.querySelector('.section-upload') ? document.querySelector('.section-upload').innerText.slice(0,300) : ''}""")
         print(json.dumps(state, ensure_ascii=False))
         c.shot(t, str(D / "upload-form.png"))
         if not a.submit:
             print("RESULT: FILLED (--submit 없음, 판매 등록 안 누름)")
             return
+        if state["twofa"] or not state["guide"]:
+            print("RESULT: BLOCKED 2단계 인증 미완료(pass_sms_verify.py ogq-open) 또는 가이드 체크 실패")
+            return
         c.run_js(t, "setTimeout(()=>[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='판매 등록').click(),10)")
-        time.sleep(6)
-        print("RESULT: SUBMITTED", c.run_js(t, "location.href"), c.page_text(t)[:300].replace("\n", " / "))
+        time.sleep(8)
+        body = c.page_text(t)
+        print("RESULT:", "SUBMITTED" if "성공적으로 등록" in body else "UNKNOWN " + body[-300:].replace("\n", " / "))
     finally:
         if not a.keep:
             c.close_tab(t)
