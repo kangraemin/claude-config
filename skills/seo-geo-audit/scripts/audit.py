@@ -23,7 +23,9 @@ def get(u):
 def text_of(h): return ' '.join(re.sub(r'<script.*?</script>|<style.*?</style>|<[^>]+>', ' ', h, flags=re.S).split())
 
 # ── 사이트 단위 ──
-s, _, _, robots = get(SITE + '/robots.txt')
+# 하위 경로 사이트(github.io/<repo>)는 robots.txt를 호스트 루트에서만 읽는다
+ROOT = re.match(r'https?://[^/]+', SITE).group(0)
+s, _, _, robots = get(ROOT + '/robots.txt')
 if s != 200: note('FAIL', 'robots.txt', f'없음({s})')
 else:
     if 'Sitemap:' not in robots: note('WARN', 'robots.txt', 'Sitemap: 줄 없음')
@@ -120,7 +122,8 @@ for u, st, final, hd, h in res:
         except Exception as e: note('FAIL', u, f'JSON-LD 파싱 오류 {e}')
     words = len(text_of(h).split())
     if words < 80: note('FAIL' if words < 20 else 'WARN', u, f'JS 없이 보이는 본문 {words}단어 — 프리렌더/SSR 필요(AI 크롤러는 JS 안 돌림)')
-    links = set(re.findall(r'<a[^>]+href="(/[^"]*|' + re.escape(SITE) + r'[^"]*)"', h))
+    # 상대 경로(d/x.html, ../)도 내부 링크로 센다
+    links = {l for l in re.findall(r'<a[^>]+href="([^"#]+)"', h) if urllib.parse.urljoin(u, l).startswith(SITE)}
     if len(links) < 2: note('WARN', u, f'내부 링크 {len(links)}개(2개 이상 권장)')
     noalt = len(re.findall(r'<img(?![^>]*\balt=)[^>]*>', h))
     if noalt: note('WARN', u, f'alt 없는 이미지 {noalt}개')
