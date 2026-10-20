@@ -8,7 +8,8 @@
 - 새 항목 폼 → 제목·설명(영/일)·저작권·AI 사용=예·카테고리 → 저장 → 수정 화면에서 판매 지역(선택 국가만) → 이미지 ZIP 업로드.
 - --submit 이 있을 때만 「Request」(심사 요청, 동의 체크 → OK)를 누른다.
 - 멱등: Manage Items 목록에 같은 영어 제목이 있으면 새로 만들지 않고 그 항목의 남은 단계만 한다.
-- 사전 조건: Profile 1 크롬에서 creator.line.me 로그인 + Creators 가입 완료(LINE_EMAIL/LINE_PASSWORD).
+- 사전 조건: Creators 가입 완료. 로그아웃돼 있으면 LINE_EMAIL/LINE_PASSWORD 로 로그인하고,
+  화면에 뜬 인증번호(PIN)를 텔레그램으로 보낸 뒤 사용자가 폰 LINE 앱에 넣을 때까지 3분 기다린다.
 - 왜 화면 조작인가: LINE Creators Market은 등록 API가 없다. 폼은 Vue라 값은 setter+input 이벤트로 넣는다.
 - 함정:
   - 언어 추가는 select 값만 바꾸면 안 되고 [data-test=btn-add-language] 를 눌러야 ja 칸이 생긴다.
@@ -18,6 +19,7 @@
   - 저장·요청 버튼은 확인창(OK)이 뜬다. setTimeout 으로 누르고 창의 OK를 다시 누른다.
   - 「Requests Remaining Today: 0/30」은 '0개 사용'이다(남은 수 아님).
   - 정산 계좌 미등록 경고가 떠도 심사 요청은 된다.
+  - 로그인 버튼(input[name=tid]/tpasswd 옆 「로그인」)은 값을 넣어도 disabled 로 남는다 → disabled=false 후 click.
 """
 import argparse
 import base64
@@ -33,6 +35,10 @@ sys.path.insert(0, os.path.expanduser("~/.config/claude-accounts/personal/skills
 import chromectl as c  # noqa: E402
 
 BASE = "https://creator.line.me/my/"
+for _l in Path("~/.claude/.env").expanduser().read_text().splitlines():  # 비밀값은 env 이름으로만 쓴다
+    if "=" in _l and not _l.lstrip().startswith("#"):
+        _k, _v = _l.split("=", 1)
+        os.environ.setdefault(_k.strip().removeprefix("export "), _v.strip().strip('"').strip("'"))
 
 
 def R(f, *a, **k):
@@ -80,6 +86,32 @@ def my_root(t):
     if "/my/" not in href:
         return None
     return href.split("/my/")[1].split("/")[0]
+
+
+def login(t):
+    """access.line.me 로그인. PIN 확인 단계는 사람(폰 앱) 몫이라 텔레그램으로 번호만 보낸다."""
+    import re
+    import subprocess
+    js(t, """(()=>{const f=(n,v)=>{const e=document.querySelector(`input[name=${n}]`);const set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+      set.call(e,v);['input','change','keyup','blur'].forEach(k=>e.dispatchEvent(new Event(k,{bubbles:true})))};f('tid',%s);f('tpasswd',%s);
+      const b=[...document.querySelectorAll('button[type=submit]')].find(b=>b.innerText.trim()=='로그인'||/log ?in/i.test(b.innerText));
+      b.disabled=false;setTimeout(()=>b.click(),10);return 1})()""" % (json.dumps(os.environ["LINE_EMAIL"]), json.dumps(os.environ["LINE_PASSWORD"])))
+    time.sleep(8)
+    sent = False
+    for _ in range(36):
+        if my_root(t):
+            return True
+        body = js(t, "document.body.innerText")
+        m = re.search(r"(?<!\d)(\d{4,6})(?!\d)", body)
+        if m and not sent:
+            subprocess.run(["curl", "-s", "-d", f"chat_id={os.environ.get('CONTEST_TG_CHAT_ID', '')}", "--data-urlencode",
+                            f"text=[LINE 로그인] 폰 LINE 앱에 인증번호 {m.group(1)} 입력해주세요(3분)",
+                            f"https://api.telegram.org/bot{os.environ.get('CONTEST_TG_TOKEN', '')}/sendMessage"], capture_output=True)
+            print("PIN sent to telegram")
+            sent = True
+        js(t, "(()=>{const b=[...document.querySelectorAll('button')].find(b=>/^(허용|Allow)$/.test(b.innerText.trim()));if(b)b.click();return 1})()")
+        time.sleep(5)
+    return bool(my_root(t))
 
 
 def find_item(t, root, title):
@@ -200,6 +232,11 @@ def main():
     try:
         time.sleep(5)
         root = my_root(t)
+        if not root and jj(t, "return !!document.querySelector('input[name=tid]')"):
+            login(t)
+            c.goto(t, "https://creator.line.me/my/")
+            time.sleep(5)
+            root = my_root(t)
         if not root:
             print("RESULT: BLOCKED LINE 로그아웃 — creator.line.me 로그인 필요")
             return
