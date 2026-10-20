@@ -9,6 +9,7 @@
 - 텔레그램: ~/.claude/.env GA_TG_TOKEN(@ram_ga_bot) / GA_TG_CHAT_ID(없으면 getUpdates → 없으면 DAILY_TG_CHAT_ID로 시도 후 저장).
 - 서비스 계정: ~/.claude/ai-paper-analytics-sa.json (GA 뷰어).
 - launchd com.ram.ga-daily 09:00.
+- 끝에 SNS 조회수(쇼츠·릴스·스레드)를 전날 대비 증감으로 붙인다. 수집은 my-sns sns_stats.py(th-notify tmux 루프) → ~/.cache/sns-stats/<날짜>.json.
 
 출력 마지막 줄: RESULT: OK <속성 수> | FAIL <이유>
 """
@@ -92,6 +93,39 @@ def section(cl, pid, name, day, path=None):
     return '\n'.join(lines), cur[0]
 
 
+SNS = HOME / '.cache/sns-stats'
+SNS_NAME = {'yt': '유튜브 쇼츠', 'ig': '인스타 릴스', 'th': '스레드'}
+
+
+def sns_section():
+    """가장 최근 수집 파일과 그 전날 파일을 비교해 계정별 합계·글별 조회수 증감을 쓴다."""
+    files = sorted(SNS.glob('*.json'))
+    if not files:
+        return None
+    cur = json.loads(files[-1].read_text())
+    prev_f = SNS / f'{dt.date.fromisoformat(files[-1].stem) - dt.timedelta(days=1)}.json'
+    prev = {(x['site'], x['id']): x['views'] for x in json.loads(prev_f.read_text())['items']} if prev_f.exists() else {}
+    def d(n, key):
+        if not prev:
+            return ''
+        p = prev.get(key)
+        return ' (새 글)' if p is None else f' ({"+" if n - p >= 0 else ""}{n - p:,})'
+    lines = [f'🎬 SNS 조회수 ({cur["at"][5:10].replace("-", "/")} {cur["at"][11:]} 기준' + (', 전날 대비)' if prev else ', 비교할 전날 기록 없음)')]
+    groups = {}
+    for x in cur['items']:
+        if x['views'] is not None:
+            groups.setdefault((x['site'], x['handle']), []).append(x)
+    for (site, handle), xs in groups.items():
+        tot = sum(x['views'] for x in xs)
+        ptot = sum(prev.get((site, x['id']), 0) or 0 for x in xs)
+        lines.append(f'{SNS_NAME[site]} @{handle} 합계 {tot:,}' + (f' ({"+" if tot - ptot >= 0 else ""}{tot - ptot:,})' if prev else ''))
+        for x in sorted(xs, key=lambda x: -x['views'])[:5]:
+            lines.append(f'  · {x["title"][:24]} {x["views"]:,}{d(x["views"], (site, x["id"]))}')
+    if cur.get('errors'):
+        lines.append('⚠️ 못 읽음: ' + '; '.join(cur['errors']))
+    return '\n'.join(lines)
+
+
 def chat_id(token):
     cid = env('GA_TG_CHAT_ID')
     if cid:
@@ -142,6 +176,12 @@ def main():
             errs.append(f'{name}: {str(e)[:80]}')
     secs.sort(key=lambda s: -s[1])  # 어제 사용자 많은 순
     text = f'📈 GA {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 리포트\n\n' + '\n\n'.join(s[0] for s in secs)
+    try:
+        sns = sns_section()
+    except Exception as e:
+        sns = f'🎬 SNS 조회수 못 읽음: {str(e)[:80]}'
+    if sns:
+        text += '\n\n' + sns
     if errs:
         text += '\n\n⚠️ 못 읽음: ' + '; '.join(errs)
     OUT.mkdir(parents=True, exist_ok=True)
