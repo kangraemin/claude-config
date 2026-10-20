@@ -33,13 +33,24 @@ def parser(desc, submit=False):
     return ap
 
 
+# 편집기가 먼저 단 beforeunload 리스너는 stopImmediatePropagation으로 못 막는다(같은 대상에선 등록 순서대로 돈다)
+# → preventDefault·returnValue 자체를 무력화해 확인창이 아예 안 뜨게 한다
+NO_UNLOAD = ("window.onbeforeunload=null;window.addEventListener('beforeunload',e=>{e.stopImmediatePropagation()},true);"
+             "const P=BeforeUnloadEvent.prototype;P.preventDefault=function(){};"
+             "Object.defineProperty(P,'returnValue',{configurable:true,get(){return ''},set(){}});1")
+
+
 @contextlib.contextmanager
 def tab(url, args):
     """Open url in a NEW tab of args.profile; close it afterwards (unless --keep-tab)."""
     tid = c.new_tab(url, args.profile)
     try:
+        with contextlib.suppress(Exception):
+            time.sleep(1.5); c.run_js(tid, NO_UNLOAD, timeout=8)
         yield tid
     finally:
+        with contextlib.suppress(Exception):  # '사이트에서 나가시겠습니까?' 확인창이 뜨지 않게 먼저 끈다
+            c.run_js(tid, NO_UNLOAD, timeout=8)
         if not getattr(args, "keep_tab", False):
             with contextlib.suppress(Exception):
                 c.close_tab(tid)
