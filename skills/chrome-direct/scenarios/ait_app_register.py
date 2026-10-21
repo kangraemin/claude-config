@@ -5,6 +5,7 @@
   ait_app_register.py push   <appName> [--submit]                  # 버전 내역 첫 행 '테스트' → '푸시 보내기'
   ait_app_register.py meta   <appName> --deployment <id> --store <store-text.md> --icon <600png> --shots a.png,b.png,c.png[,d.png]
                              --category 생활/콘텐츠/운세 [--dark-icon png] [--submit]
+  ait_app_register.py review <appName> --version 20261022-3 --notes "출시 노트" [--submit]   # 업데이트 버전 검토 요청
 
 - create: 콘솔 화면의 '앱 만들기'는 appName이 이미 쓰이면(다른 워크스페이스 포함) 아무 표시 없이 실패한다.
   그래서 콘솔이 쓰는 API를 탭 안에서 직접 부른다(POST .../workspaces/{ws}/mini-app). 이미 이 워크스페이스에 있으면 EXISTS.
@@ -190,8 +191,51 @@ def cmd_meta(a):
         c.close_tab(t)
 
 
+def cmd_review(a):
+    """업데이트 버전: 버전 내역의 그 행 '검토 요청하기' → 창에 출시 노트(--notes) → 요청. 상태 '검토 중' 확인."""
+    t = console_tab(f'https://apps-in-toss.toss.im/workspace/{a.ws}/mini-app/{a.app}/app-build')
+    row = "var tr=[...document.querySelectorAll('table tbody tr')].find(r=>r.children[1]&&r.children[1].innerText.trim()==%s);" % json.dumps(a.version)
+    dlg = "var d=[...document.querySelectorAll('[role=dialog],[role=alertdialog]')].pop();"
+    status = lambda: c.js_json(t, row + "return tr?tr.children[3].innerText.trim():null")
+    try:
+        for _ in range(15):
+            if status():
+                break
+            time.sleep(1)
+        st = status()
+        print('STATUS', st)
+        if st is None:
+            sys.exit(f'RESULT: NO_VERSION {a.version}')
+        if st == '검토 중':
+            print('RESULT: REVIEW_REQUESTED 이미 검토 중'); return
+        b = c.js_json(t, row + "var b=[...tr.querySelectorAll('button')].find(b=>b.innerText.trim()=='검토 요청하기');return b?(b.disabled?'DISABLED':'OK'):'NONE'")
+        if b != 'OK':
+            sys.exit(f'RESULT: {b} 검토 요청하기 버튼 (DISABLED = 토스 앱에서 그 버전을 한 번 열어야 켜짐)')
+        c.js_json(t, row + "[...tr.querySelectorAll('button')].find(b=>b.innerText.trim()=='검토 요청하기').click();return 1")
+        time.sleep(2)
+        text = c.js_json(t, dlg + "return d?d.innerText:''")
+        print('DIALOG', text[:300].replace('\n', ' / '))
+        if not a.submit:
+            c.js_json(t, dlg + "var x=[...d.querySelectorAll('button')].find(b=>/취소|닫기/.test(b.innerText));if(x)x.click();return 1")
+            print('RESULT: DRY_RUN 창만 열어 봄'); return
+        if c.js_json(t, dlg + "return !!d.querySelector('textarea')"):
+            if not a.notes:
+                sys.exit('RESULT: NEED_NOTES --notes 필요')
+            c.js_json(t, SETV + dlg + "__setv(d.querySelector('textarea'),%s);return 1" % json.dumps(a.notes))
+        r = c.js_json(t, dlg + "var bs=[...d.querySelectorAll('button')].filter(b=>!b.disabled&&!/취소|닫기|출시하기/.test(b.innerText));"
+                      "var b=bs.find(b=>/검토 요청|요청하기|요청|확인/.test(b.innerText));if(!b)return 'NOBUTTON:'+bs.map(b=>b.innerText).join('|');b.click();return 'OK'")
+        print('PRESS', r)
+        for _ in range(20):
+            time.sleep(1.5)
+            if status() == '검토 중':
+                print('RESULT: REVIEW_REQUESTED'); return
+        print('RESULT: UNCONFIRMED', status(), '— 다시 누르지 말고 ait_builds.py 로 확인')
+    finally:
+        c.close_tab(t)
+
+
 ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-ap.add_argument('cmd', choices=['create', 'push', 'meta'])
+ap.add_argument('cmd', choices=['create', 'push', 'meta', 'review'])
 ap.add_argument('app')
 ap.add_argument('title', nargs='?')
 ap.add_argument('--ws', default='35273')
@@ -204,5 +248,7 @@ ap.add_argument('--dark-icon')
 ap.add_argument('--shots')
 ap.add_argument('--category', default='생활/콘텐츠/운세')
 ap.add_argument('--cs-from', default='oneul-kkum')
+ap.add_argument('--version')
+ap.add_argument('--notes')
 a = ap.parse_args()
-{'create': cmd_create, 'push': cmd_push, 'meta': cmd_meta}[a.cmd](a)
+{'create': cmd_create, 'push': cmd_push, 'meta': cmd_meta, 'review': cmd_review}[a.cmd](a)
