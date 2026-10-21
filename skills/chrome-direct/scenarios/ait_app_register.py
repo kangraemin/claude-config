@@ -149,6 +149,10 @@ def cmd_meta(a):
           return !!em""" % (json.dumps(base + a.cs_from), json.dumps(bullet(section(md, '영어 이름'))), json.dumps(bullet(section(md, '부제'))),
                             json.dumps(det), json.dumps(bullet(section(md, '출시 노트')))))
         print('CS_EMAIL_COPIED', r)
+        for _ in range(15):  # 재실행 때 draft 를 다시 그리느라 콤보박스 글자가 늦게 찬다(10/22 '생활 없음'으로 잘못 멈춤)
+            if c.js_json(t, "var e=[...document.querySelectorAll('[role=combobox]')][0];return e?e.innerText.trim():''"):
+                break
+            time.sleep(1)
         cur = lambda i: c.js_json(t, "var e=[...document.querySelectorAll('[role=combobox]')][%d];return e?e.innerText.trim():''" % i)
         for i, label in enumerate(a.category.split('/')):
             for _ in range(2):  # 이미 골라져 있으면 건너뛴다(재실행). 드롭다운이 늦게 열리면 한 번 더
