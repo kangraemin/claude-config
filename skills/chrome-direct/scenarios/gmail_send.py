@@ -62,6 +62,27 @@ def send_smtp(pw):
         s.send_message(m)
 
 
+def attach_via_datatransfer(tid, files):
+    """Inject File objects into input[type=file] via DataTransfer (no native dialog). Returns attached count."""
+    import base64, json
+    js(tid, "window.__f=[]; return 1")
+    for f in files:
+        b = base64.b64encode(Path(f).read_bytes()).decode()
+        js(tid, "window.__b=''; return 1")
+        for k in range(0, len(b), 300000):
+            js(tid, f"window.__b += {json.dumps(b[k:k+300000])}; return 1", 60)
+        mime = mimetypes.guess_type(str(f))[0] or "application/octet-stream"
+        js(tid, f"""const s=atob(window.__b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);
+          window.__f.push(new File([u],{json.dumps(Path(f).name)},{{type:{json.dumps(mime)}}}));window.__b='';return 1""")
+    n = js(tid, """const ins=[...document.querySelectorAll('input[type=file]')]; const i=ins.find(x=>x.multiple)||ins[0]; if(!i) return -1;
+      const dt=new DataTransfer(); window.__f.forEach(f=>dt.items.add(f)); i.files=dt.files;
+      i.dispatchEvent(new Event('change',{bubbles:true})); return i.files.length""")
+    if n != len(files):
+        raise RuntimeError(f"DataTransfer 파일 수 불일치: {n}/{len(files)}")
+    return poll(tid, f"return document.querySelectorAll('input[name=attach]').length >= {len(files)} && "
+                     "![...document.querySelectorAll('[role=progressbar]')].some(__vis)", 180, 2)
+
+
 def attach_via_dialog(tid, f):
     """Click 파일 첨부 → native dialog → ⌘⇧G, paste path, Return, Return."""
     n0 = js(tid, "return document.querySelectorAll('input[name=attach]').length")
@@ -88,8 +109,13 @@ def compose_web(tid):
     got = js(tid, "return document.querySelector('input[name=subjectbox]').value")
     if got != a.subject:
         raise RuntimeError(f"제목 채움 불일치: {got!r}")
-    for f in FILES:
-        attach_via_dialog(tid, f)
+    # 2026-10-22: native dialog + cliclick hung ("timeout waiting"); DataTransfer injection attached 11 files fine.
+    try:
+        attach_via_datatransfer(tid, FILES)
+    except Exception as e:
+        print(f"[attach] DataTransfer failed ({e}); falling back to native dialog", flush=True)
+        for f in FILES:
+            attach_via_dialog(tid, f)
     names = js(tid, "return [...document.querySelectorAll('input[name=attach]')].map(e => (e.parentElement||{}).innerText || '')") or []
     if len(names) != len(FILES):
         raise RuntimeError(f"첨부 수 불일치: {len(names)}/{len(FILES)}")
