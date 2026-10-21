@@ -52,6 +52,7 @@
 - 승인 답장(텔레그램 또는 대화창) 받은 뒤에만 커밋·push·게시. 답 없으면 발행하지 않고 보고.
 
 ## SNS 게시 알림은 텔레그램 SNS 봇으로 <!-- why: decisions/_global/process/telegram-notify-after-every-sns-upload.md -->
+- **SNS에 무엇이든 올리기 전에 `sns-post` 스킬을 먼저 연다**(계정·프로필, 하루 1개·출시 큐, 중복 확인, 게시 스크립트, 알림). 어느 세션·레포든 같다.
 - SNS(인스타·스레드·X·유튜브·블로그·답글 등, 모든 계정)에 올리면 바로 @sns_daily_noti_bot으로 "[업로드 완료] 서비스 계정 링크" + 본문 + 사진·영상을 보낸다.
 - 올리기 전 확인 요청도 같은 봇으로 "[게시 확인 요청]"을 보낸다.
 - 도구: `python3 ~/.claude/scripts/sns_tg.py done|ask --msg "..." [--text-file f] [사진·영상]`. my-sns·insta-web 게시 스크립트는 성공 시 자동으로 보낸다.
