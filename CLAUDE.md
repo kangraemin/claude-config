@@ -22,6 +22,7 @@
 - 스크립트 위치: `~/.claude/skills/chrome-direct/scenarios/`(웹 조작 시나리오, 목록은 같은 폴더 `../SKILL.md` Scenarios 표), `~/.claude/skills/*/scripts/`.
 - 찾는 법: `grep -rli "<키워드>" ~/.claude/skills/*/scripts ~/.claude/skills/chrome-direct/scenarios ~/.claude/skills/chrome-direct/SKILL.md` (예: 본인인증·통신사·문자·mobile-ok·로그인).
 - 개인정보 쪽 지시도 확인: `~/Documents/oguri-works/개인정보.md`에 통신사·인증 방식 같은 처리법이 적혀 있다.
+- 스토어·광고 개발자 계정(AdMob·Play Console·Apple Developer) 로그인과 남은 인증 단계: `~/Documents/oguri-works/계정.md` '스토어·광고 개발자 계정' 표.
 - 본인인증(문자)은 통신사·이름·생년월일·번호를 내가 넣고, 사용자에게는 **문자로 온 인증번호만** 묻는다.
 
 ## ralph-x in-session 루프 — 절대 멈추지 말 것 <!-- why: decisions/_global/process/ralph-x-continue-until-declared-exit.md -->
