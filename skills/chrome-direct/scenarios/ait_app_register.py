@@ -47,9 +47,13 @@ def console_tab(u):
 
 
 def xhr(t, method, path, body=None):
-    js = "var x=new XMLHttpRequest();x.open(%s,%s,false);x.setRequestHeader('Content-Type','application/json');x.send(%s);return x.responseText" % (
+    js = "var x=new XMLHttpRequest();x.open(%s,%s,false);x.setRequestHeader('Content-Type','application/json');x.send(%s);return x.status+' '+x.responseText" % (
         json.dumps(method), json.dumps(path), json.dumps(json.dumps(body)) if body is not None else 'null')
-    return json.loads(c.js_json(t, js))
+    status, _, text = str(c.js_json(t, js)).partition(' ')
+    try:
+        return json.loads(text)
+    except ValueError:  # 2026-10-22: 생성 POST가 성공했는데 본문이 JSON이 아니어서 죽었다 → 상태·원문을 돌려주고 호출부가 목록으로 확인
+        return {'status': status, 'raw': text[:300]}
 
 
 def click_text(t, text, last=False):
@@ -98,6 +102,8 @@ def cmd_create(a):
         r = xhr(t, 'POST', API.format(ws=a.ws) + '/mini-app', {'appName': a.app, 'title': a.title, 'appType': 'GAME' if a.game else 'NON_GAME'})
         if r.get('resultType') == 'SUCCESS':
             print(f"RESULT: CREATED {a.app} miniAppId {r['success'].get('miniAppId')}")
+        elif 'raw' in r and a.app in json.dumps(xhr(t, 'GET', API.format(ws=a.ws) + '/mini-app'), ensure_ascii=False):
+            print(f"RESULT: CREATED {a.app} (응답 {r['status']} 본문이 JSON 아님, 목록에서 확인)")
         else:
             print('RESULT: FAILED', json.dumps(r.get('error', r), ensure_ascii=False)[:300])
     finally:
