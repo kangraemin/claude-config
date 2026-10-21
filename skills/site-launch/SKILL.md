@@ -36,6 +36,7 @@ python3 naver_register.py add     https://site   # FILE/FILE_CONTENT/META 출력
 python3 naver_register.py verify  https://site   # 소유확인 → 보안문자 그림을 텔레그램 전송 → 답장 대기(15분) → 입력
 python3 naver_register.py sitemap https://site
 python3 naver_register.py rss     https://site   # RSS 피드(feed.xml) 제출
+# 하위 경로 사이트(github.io/<repo>/)는 세 번째 인자로 경로를 꼭 준다: rss https://kangraemin.github.io oneul-kkum/feed.xml (안 주면 루트 feed.xml=다른 사이트 피드가 제출됨)
 # 네이버 RSS는 RSS 2.0만 받는다(Jekyll atom.xml은 "형식이 올바르지 않습니다"). 제출마다 보안문자를 사용자에게 물으니 재시도 루프 금지, 한 번에 몰아서.
 ```
 - 사이트 단위만 받는다(경로 붙은 주소 불가). 확인 파일 내용은 `naver-site-verification: naverXXXX.html`.

@@ -80,3 +80,4 @@ python3 ~/.claude/skills/seo-geo-audit/scripts/inspect_index.py https://site/ [U
 
 ## 적용 사례
 - 글쓰기공모전.kr (2026-10-19): FAIL 0. og:image·파비콘·RSS(+네이버 RSS 제출)·홈/장르 FAQ+FAQPage 추가. 코드: `글쓰기공모전/web/scripts/prerender.mjs`
+- 오늘꿈해몽 kangraemin.github.io/oneul-kkum (2026-10-22): FAIL·WARN 0. og.png·favicon·apple-touch-icon(assets/web 복사), 구조화 데이터 없는 페이지에 WebPage 자동, sitemap lastmod를 날짜·데이터 커밋일로, RSS(날짜별 운세)·llms.txt·홈 질문형 FAQ. 코드: `next-product/scripts/build-web.mjs`
