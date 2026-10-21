@@ -27,29 +27,18 @@ LIST = url(a.workspace, a.app, "placement-group/list?tab=adUnitGroup")
 
 def main():
     with tab(LIST, a) as tid:
-        wait_page(tid, "광고 그룹 이름")
-        rows = table(tid)
-        groups = []
-        for r in rows:
-            cl = r["cells"]
-            if len(cl) < 2 or (a.name and cl[1] != a.name):
-                continue
-            det = None
-            for attempt in range(3):  # the detail panel sometimes ignores the first click
-                js(tid, f"""const tr = [...document.querySelectorAll('table tbody tr')].filter(__vis)[{r['i']}];
-                  if (tr) (tr.children[1].firstElementChild || tr.children[1]).click(); return 1;""")
-                try:
-                    det = poll(tid, DETAIL, 10)
-                    break
-                except RuntimeError:
-                    time.sleep(1)
-            if not det:
-                raise RuntimeError(f"광고 그룹 '{cl[1]}' 상세가 안 열림")
-            groups.append({"name": cl[1], "listType": cl[0], "listStatus": cl[2] if len(cl) > 2 else "", **det})
-            js(tid, "document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1")
-            c.goto(tid, LIST)
-            time.sleep(2)
-            wait_page(tid, "광고 그룹 이름")
+        wait_page(tid, "인앱 광고")
+        # 그룹이 0개면 표 대신 '광고를 등록하고 수익을 만들어 보세요' 화면이라 표를 기다리면 안 끝난다
+        poll(tid, "return /광고 그룹 이름|광고를 등록하고 수익을|약관에 먼저 동의/.test(document.body.innerText) ? 1 : null", 30)
+        rows = [] if js(tid, "return document.body.innerText.includes('광고를 등록하고 수익을')") else table(tid)
+        # 상세 패널은 '구글 반영 중'이면 안 열린다 → 콘솔이 쓰는 API로 읽는다(로그인 탭 안 XHR)
+        api = f"/console/api-public/v3/appsintossconsole/workspaces/{a.workspace}/mini-app/{a.app}/in-app-ads-v2/placement-groups"
+        res = js(tid, f"var x=new XMLHttpRequest();x.open('GET',{api!r},false);x.send();return JSON.parse(x.responseText)")
+        kind = {"BANNER": "배너", "INTERSTITIAL": "전면형", "REWARDED": "리워드"}
+        groups = [{"name": g["name"], "type": kind.get(g["adFormat"], g["adFormat"]), "id": g["groupId"], "state": g["state"],
+                   "reward": g.get("rewardSettings")} for g in (res.get("success") or []) if not a.name or g["name"] == a.name]
+        if not rows and groups:
+            raise RuntimeError("화면엔 그룹이 없는데 API엔 있음 — 화면 확인")
         emit({"app": a.app, "groups": groups}, "OK", f"{len(groups)} groups")
         for g in groups:
             print(f"AD_GROUP {a.app} {g['name']} {g['type'] or g['listType']} {g['id']}")

@@ -198,6 +198,8 @@ Full prompts are in the SP transcript (`console.txt`, `console2.txt`, `console3.
 ### 3.7 In-app purchase products
 - **You can't create IAP products until business info is registered.** The IAP list page shows: "먼저 사업자 정보를 등록해 주세요 검토는 약 2일 소요되며, 이후 정산 정보 등록 단계로 넘어가요." Codex stopped there with NEEDS_OWNER as instructed. [SD 2026-10-05 05:18]
 - Business registration (`/partner-info`) needs a 10-digit business registration number. Settlement info can be added only after the business info. This is owner-only data; Codex must not enter it. [SP console2, CX]
+- **After business info is approved, the IAP page asks for one more consent**: "인앱 상품을 등록하려면 약관에 먼저 동의해 주세요" → `/workspace/<ws>/iap-terms`, one required box "앱인토스 디지털콘텐츠 위탁매매 약관" → 동의하고 시작하기. [SP 2026-10-22]
+- Product form (`/in-app-purchase/create`): 유형 (소모품 / 비소모품 / 자동 갱신 구독; a Radix menu that opens on keyboard ArrowDown, not on a synthetic click), image **1024×1024**, name ≤30, description, **공급가 = VAT-excluded** (판매가 = ×1.1, so 1,100원 → 1000), 노출 checkbox, confirm checkbox. Fee 5% (VAT별도). The product ID `ait.<10 digits>.<hex>.<hex>.<digits>` is in the URL `inAppProductId=` after clicking the row on `?tab=products`. Script: chrome-direct `ait_iap_create.py`. [SP 2026-10-22]
 - Product limits: up to 80 for games, 30 for non-games. Digital goods must use in-app purchase. [LIB:unity-sdk-games-vs-nongame-constraints]
 - Unity IAP: `ProcessProductGrant` is a **synchronous bool** callback. On startup, query pending **and** completed/refunded orders. Grant records should live on a server. [LIB:unity-iap-sync-approval-needs-completed-order-recovery]
 - Ship monetization **flagged off with empty IDs** (`PlatformConfig.json` flags plus `rewardedAdGroupId` / `chapterPackProductId` / SKU slots), then fill the IDs once the console issues them and rebuild. [CP, SD]
@@ -279,3 +281,8 @@ Watch for one thing in this setup: a Claude Code Stop hook keeps asking for "커
 - Modal inputs have no `type` attribute (`input[type=text]` matches none; use `[role=dialog] input`). The tab must be in front (`c.shot`) or the modal isn't laid out. The 게임/비게임 options are DIVs, not buttons.
 - With all fields filled and 만들기 enabled, both JS presses and a real mouse click only trigger `GET .../workspaces/35273/mini-app` (no create call, no error, no toast). Codex hit the same wall twice.
 - The workspace had 12 apps, 10 of them PREPARE (unreleased). Cause unconfirmed: a cap on unreleased apps is the suspicion. Release or delete an old PREPARE app before retrying, or ask Toss via console chat.
+
+### App creation fails silently = appName taken (2026-10-22)
+- The console's '앱 만들기' did nothing visible when the appName was already used (any workspace). A direct `POST /console/api-public/v3/appsintossconsole/workspaces/{ws}/mini-app` `{appName,title,appType}` returned `miniApp.AppNameAlreadyTaken` "이미 사용 중인 appName이에요." This replaces the earlier "unreleased app cap" guess. Use `chrome-direct/scenarios/ait_app_register.py create` (prints the error).
+- First registration (non-game): app info is reviewed together with the bundle. `meta/edit?deploymentId=…` → step 1 (영어 이름 ≤15, 부제 ≤20, 상세, 이메일) → 다음 → category, logo + dark logo 600×600, screenshots 'direct upload' (portrait 636×1048 ≥3 or landscape 1504×741 ≥1), keywords ≤10, 5 confirmation checkboxes → 검토 요청하기. `ait_app_register.py meta`.
+- 2026-10 the console blocks new rewarded/interstitial ad groups; banners (문구 강조 = adStyles NORMAL) can still be created.

@@ -42,10 +42,10 @@ def main():
     if a.type == "리워드" and not (a.unit and a.amount):
         raise Blocked("리워드는 --unit --amount 필요")
     with tab(url(a.workspace, a.app, "placement-group/list?tab=adUnitGroup"), a) as tid:
-        poll(tid, "const t = document.body.innerText; return /광고 그룹 이름|약관에 먼저 동의/.test(t) ? 1 : null", 30)
+        poll(tid, "const t = document.body.innerText; return /광고 그룹 이름|광고를 등록하고 수익을|약관에 먼저 동의/.test(t) ? 1 : null", 30)
         if js(tid, "return document.body.innerText.includes('약관에 먼저 동의')"):
             raise Blocked("NEEDS_OWNER 'TOSS 광고대행 서비스 이용약관' 동의가 먼저 필요 — 사용자 승인 후 진행")
-        if existing(tid):
+        if not js(tid, "return document.body.innerText.includes('광고를 등록하고 수익을')") and existing(tid):
             out = subprocess.run([sys.executable, str(HERE / "ait_adgroups.py"), a.app, "--name", a.name, "--profile", a.profile, "--no-fallback"],
                                  capture_output=True, text=True)
             print(out.stdout)
