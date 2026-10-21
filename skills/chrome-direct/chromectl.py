@@ -33,6 +33,35 @@ def osa(script, timeout=20):
     return r.stdout.rstrip("\n")
 
 
+def chrome_pid():
+    """진짜 Chrome(사용자 프로필) 메인 프로세스 pid. 다른 세션의 Playwright가 같은 Google Chrome.app을
+    --user-data-dir로 띄우면 AppleScript `tell application "Google Chrome"`이 그쪽을 잡는다(2026-10-22).
+    그래서 Chrome 명령은 전부 JXA `Application(pid)`로 보낸다. 못 찾으면 None(이름으로 보냄)."""
+    # 새 탭을 여는 `Google Chrome --profile-directory=…`도 잠깐 메인처럼 보인다 → 가장 오래 돈 것을 고른다
+    r = subprocess.run(["ps", "-axo", "pid=,etime=,args="], capture_output=True, text=True)
+    best = None
+    for line in r.stdout.splitlines():
+        pid, et, args = (line.split(None, 2) + ["", ""])[:3]
+        if args.startswith(CHROME_BIN) and "--type=" not in args and "--user-data-dir" not in args:
+            d, _, hms = et.rpartition("-")
+            secs = int(d or 0) * 86400 + sum(int(x) * 60 ** i for i, x in enumerate(reversed(hms.split(":"))))
+            if best is None or secs > best[0]:
+                best = (secs, int(pid))
+    return best and best[1]
+
+
+def jxa(body, timeout=20):
+    """JXA로 진짜 Chrome에 명령. body는 `C`(Chrome 앱 객체)를 쓰고 return으로 값을 돌려준다."""
+    pid = chrome_pid()
+    app = str(pid) if pid else '"Google Chrome"'
+    script = f"ObjC.import('Foundation'); var C = Application({app}); (function(){{ {body} }})()"
+    r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, timeout=timeout)
+    if r.returncode:
+        raise RuntimeError(r.stderr.strip())
+    out = r.stdout.rstrip("\n")
+    return "" if out == "undefined" else out
+
+
 def tabs(with_id=False):
     # Retry when another session closes a tab mid-loop (-1719 invalid index)
     for i in range(5):
@@ -46,23 +75,19 @@ def tabs(with_id=False):
 
 
 def _tabs_raw():
-    return osa('''set o to ""
-tell application "Google Chrome"
-  repeat with w from 1 to count windows
-    repeat with t from 1 to count tabs of window w
-      set o to o & w & "\t" & t & "\t" & (title of tab t of window w) & "\t" & (URL of tab t of window w) & "\t" & (id of tab t of window w) & "\t" & (id of window w) & linefeed
-    end repeat
-  end repeat
-end tell
-return o''')
+    return jxa("""var w = C.windows.id(), ti = C.windows.tabs.title(), u = C.windows.tabs.url(), t = C.windows.tabs.id(), o = "";
+for (var i = 0; i < w.length; i++) for (var j = 0; j < t[i].length; j++)
+  o += [i + 1, j + 1, String(ti[i][j]).replace(/[\\t\\n]/g, " "), u[i][j], t[i][j], w[i]].join("\\t") + "\\n";
+return o;""")
 
 
 def ref(match):
-    """AppleScript specifier by ids ("tab id T of window id W"). Indexes shift when other sessions open/close
+    """JXA specifier by ids (C.windows.byId(W).tabs.byId(T)). Indexes shift when other sessions open/close
     tabs or raise windows, so every action resolves to ids right before it runs."""
     for w, t, title, url, tid, wid in tabs(with_id="full"):
         if (match[3:] == tid) if match.startswith("id:") else (match in url or match in title):
-            return f"tab id {tid} of window id {wid}", f"window id {wid}"
+            win = f"C.windows.byId({int(wid)})"
+            return f"{win}.tabs.byId({int(tid)})", win
     raise RuntimeError(f"no tab matches {match!r}")
 
 
@@ -85,7 +110,7 @@ def new_tab(url, profile=None, timeout=15):
         subprocess.Popen([CHROME_BIN, f"--profile-directory={profile}", url],
                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
-        osa(f'tell application "Google Chrome" to tell window 1 to make new tab with properties {{URL:{q(url)}}}')
+        jxa(f"C.windows[0].tabs.push(C.Tab({{url: {q(url)}}}))")
     end = time.time() + timeout
     while time.time() < end:
         time.sleep(1)
@@ -97,12 +122,12 @@ def new_tab(url, profile=None, timeout=15):
 
 def close_tab(match):
     tab, _w = ref(match)
-    osa(f'tell application "Google Chrome" to close {tab}')
+    jxa(f"{tab}.close()")
 
 
 def goto(match, url):
     tab, _w = ref(match)
-    osa(f'tell application "Google Chrome" to set URL of {tab} to {q(url)}')
+    jxa(f"{tab}.url = {q(url)}")
 
 
 def js_json(match, body, timeout=20):
@@ -122,10 +147,16 @@ def run_js(match, code, timeout=20):
         with os.fdopen(fd, "w") as f:
             f.write(code)
         os.chmod(path, 0o600)
-        return osa(f'''set js to read POSIX file "{path}" as «class utf8»
-tell application "Google Chrome" to execute {tab} javascript js''', timeout)
+        out = jxa(f"var js = $.NSString.stringWithContentsOfFileEncodingError({q(path)}, $.NSUTF8StringEncoding, null).js;"
+                  f" var r = {tab}.execute({{javascript: js}}); return r === undefined || r === null ? 'missing value' : String(r);", timeout)
+        return out
     finally:
         os.unlink(path)
+
+
+def window_bounds():
+    """맨 앞 창의 (x1, y1, x2, y2)."""
+    return [int(v) for v in jxa("var b = C.windows[0].bounds(); return [b.x, b.y, b.x + b.width, b.y + b.height].join(',')").split(",")]
 
 
 def q(s):
@@ -183,7 +214,7 @@ def rclick(match, sel=None, text=None):
     r = run_js(match, js)
     if r == "NOTFOUND":
         raise RuntimeError(f"rclick {sel or text}: NOTFOUND")
-    osa(f'tell application "Google Chrome" to set index of {win} to 1\ntell application "Google Chrome" to activate')
+    jxa(f"{win}.index = 1; C.activate()")
     time.sleep(0.4)
     subprocess.run(["cliclick", f"c:{r}"], check=True, capture_output=True)
 
@@ -202,13 +233,9 @@ def shot(match, path):
     Needs Screen Recording permission for the terminal/tmux."""
     w, t = find_tab(match)
     _t, win = ref(match)
-    osa(f'''tell application "Google Chrome"
-  set active tab index of {win} to {t}
-  set index of {win} to 1
-  activate
-end tell''')
+    jxa(f"{win}.activeTabIndex = {t}; {win}.index = 1; C.activate()")
     time.sleep(1.0)
-    x1, y1, x2, y2 = [int(v) for v in osa('tell application "Google Chrome" to get bounds of window 1').split(", ")]
+    x1, y1, x2, y2 = window_bounds()
     path = str(path)
     png = path if path.endswith(".png") else path + ".png"
     subprocess.run(["screencapture", "-x", "-R", f"{x1},{y1},{x2 - x1},{y2 - y1}", png], check=True)
@@ -229,8 +256,8 @@ def google_relogin(match, email="remin1994@gmail.com", tries=3):
         js_json(match, f"const a=document.querySelector('[data-identifier=\"{email}\"]');if(a)a.click();return !!a"); time.sleep(5)
         run_js(match, "setTimeout(()=>{const b=[...document.querySelectorAll('button')].find(b=>/^(계속|다시 시도)$/.test(b.innerText.trim()));b&&b.click()},10);'ok'"); time.sleep(3)
         _t, win = ref(match)
-        osa(f'tell application "Google Chrome"\nset index of {win} to 1\nactivate\nend tell'); time.sleep(0.5)
-        x1, y1, x2, y2 = [int(v) for v in osa('tell application "Google Chrome" to get bounds of window 1').split(", ")]
+        jxa(f"{win}.index = 1; C.activate()"); time.sleep(0.5)
+        x1, y1, x2, y2 = window_bounds()
         subprocess.run(["cliclick", f"c:{(x1 + x2) // 2 + 197},{(y1 + y2) // 2 + 117}"], check=True); time.sleep(8)
         try:  # 시간 초과 창이 떠 있으면 닫는다
             ex, ey = [int(v) for v in osa('tell application "System Events" to tell process "Google Chrome" to get position of window "문제가 발생했습니다"').split(", ")]
@@ -271,7 +298,7 @@ def open_url(url, profile=None):
     if profile:
         subprocess.run(["open", "-na", "/Applications/Google Chrome.app", "--args", f"--profile-directory={profile}", url], check=True)
     else:
-        osa(f'tell application "Google Chrome" to open location {q(url)}')
+        jxa(f"C.openLocation({q(url)})")
     time.sleep(3)
 
 
