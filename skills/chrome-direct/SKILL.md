@@ -1,6 +1,6 @@
 ---
 name: chrome-direct
-description: Run repeated web actions in the owner's real Mac Chrome without an LLM, using AppleScript + JS scenario scripts (Gmail search/send/codes/spam, Google Forms read/fill, Apps-in-Toss console builds/ad groups/review request, result-page checks, Google re-login when accounts show '로그아웃됨' / passkey prompt). Also phone identity verification (본인인증/휴대폰 인증/PASS/문자 인증/mobile-ok), OGQ sticker upload. Use this BEFORE asking the user to do a login/verification step and BEFORE handing a Chrome task to Codex; the script falls back to Codex (codex_console.sh) on its own when it fails.
+description: Run repeated web actions in the owner's real Mac Chrome without an LLM, using AppleScript + JS scenario scripts (Gmail search/send/codes/spam, Google Forms read/fill, Apps-in-Toss console builds/ad groups/review request, result-page checks, Google re-login when accounts show '로그아웃됨' / passkey prompt). Also phone identity verification (본인인증/휴대폰 인증/PASS/문자 인증/mobile-ok), OGQ sticker upload, 카카오톡 공유 미리보기 캐시 초기화(카카오 디벨로퍼스 공유 디버거, 카톡 미리보기 안 바뀜). Use this BEFORE asking the user to do a login/verification step and BEFORE handing a Chrome task to Codex; the script falls back to Codex (codex_console.sh) on its own when it fails.
 ---
 
 # chrome-direct
