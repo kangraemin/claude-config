@@ -46,7 +46,8 @@
 - 배포마다 deploymentId가 바뀌므로 매번 새 링크를 준다.
 
 ## 블로그 글 발행은 허가 후 <!-- why: decisions/_global/process/blog-post-publish-needs-user-approval-via-telegram.md -->
-- (2026-10-22 사용자 전면 사전 동의로 대체) 이제 발행도 묻지 않고 진행한다. 발행한 뒤 텔레그램으로 알림만 보낸다.
+- 개인 개발 블로그(kangraemin.github.io)는 사용자가 "올려"라고 콕 집은 글만 발행한다(10/22). 사전 동의 해당 없음.
+- (2026-10-22 사용자 전면 사전 동의로 대체) 개인 블로그 외 발행은 묻지 않고 진행한다. 발행한 뒤 텔레그램으로 알림만 보낸다.
 - (이전 규칙) 블로그(사용자 이름으로 공개되는 글)에 새 글 발행·기존 글 본문 수정은 **사용자 허가 없이 금지**. 초안 작성까지만 한다.
 - 허가 요청은 텔레그램으로: `source ~/.claude/.env; curl -s -d chat_id=$CONTEST_TG_CHAT_ID --data-urlencode text="[블로그 발행 허가 요청] 제목/요약/초안 위치" https://api.telegram.org/bot$CONTEST_TG_TOKEN/sendMessage`
 - 승인 답장(텔레그램 또는 대화창) 받은 뒤에만 커밋·push·게시. 답 없으면 발행하지 않고 보고.

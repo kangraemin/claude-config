@@ -21,7 +21,7 @@ description: 사용자 SNS 계정(개인 dev_ram_kang·@dev_ram_, 오구리웍�
 - my-sns 세션에 넘길 때는 `ListAgents`에서 `sns 홍보`가 살아 있는지 확인한다. 없으면 큐 표나 my-sns `drafts/`에 적어 두면 매일 10:07 cron이 집어 간다.
 
 ## 0-1. 개인 계정은 자동 게시 금지
-- 개인 계정(dev_ram_kang, @dev_ram_, 링크드인, GeekNews)은 사용자가 그 글을 콕 집어 "올려"라고 했을 때만 올린다(10/22 "절대 자동으로 올리지 말고 내가 올리라고 한 것만").
+- 개인 계정(dev_ram_kang, @dev_ram_, 링크드인, GeekNews, 개발 블로그 kangraemin.github.io)은 사용자가 그 글을 콕 집어 "올려"라고 했을 때만 올린다(10/22 "절대 자동으로 올리지 말고 내가 올리라고 한 것만").
 - 사전 동의·큐·cron·초안이 있어도 올리지 않는다. 초안까지만 만든다.
 
 ## 1. 계정과 Chrome 프로필을 맞춘다
