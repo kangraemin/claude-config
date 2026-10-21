@@ -22,7 +22,7 @@ import urllib.request
 from pathlib import Path
 
 from google.analytics.data_v1beta import BetaAnalyticsDataClient
-from google.analytics.data_v1beta.types import DateRange, Dimension, Filter, RunRealtimeReportRequest, FilterExpression, Metric, OrderBy, RunReportRequest
+from google.analytics.data_v1beta.types import DateRange, Dimension, Filter, RunRealtimeReportRequest, FilterExpression, FilterExpressionList, Metric, OrderBy, RunReportRequest
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 
@@ -48,9 +48,15 @@ def properties(cred):
     return [(p['property'].split('/')[1], p['displayName']) for a in r.get('accountSummaries', []) for p in a.get('propertySummaries', [])]
 
 
-def run(cl, pid, start, end, metrics, dims=(), limit=0, order=None, path=None):
-    flt = FilterExpression(filter=Filter(field_name='pagePath', string_filter=Filter.StringFilter(
-        match_type=Filter.StringFilter.MatchType.BEGINS_WITH, value=path))) if path else None
+def run(cl, pid, start, end, metrics, dims=(), limit=0, order=None, path=None, skip=()):
+    """path: 그 경로로 시작하는 것만. skip: 그 경로로 시작하는 것은 뺀다(같은 속성에 따로 칸이 있는 하위 사이트). localhost(개발 접속)는 늘 뺀다."""
+    def starts(v):
+        return Filter(field_name='pagePath', string_filter=Filter.StringFilter(match_type=Filter.StringFilter.MatchType.BEGINS_WITH, value=v))
+    parts = [FilterExpression(not_expression=FilterExpression(filter=Filter(field_name='hostName', string_filter=Filter.StringFilter(value='localhost'))))]
+    if path:
+        parts.append(FilterExpression(filter=starts(path)))
+    parts += [FilterExpression(not_expression=FilterExpression(filter=starts(v))) for v in skip]
+    flt = FilterExpression(and_group=FilterExpressionList(expressions=parts))
     r = cl.run_report(RunReportRequest(dimension_filter=flt,
         property=f'properties/{pid}', date_ranges=[DateRange(start_date=start, end_date=end)],
         metrics=[Metric(name=m) for m in metrics], dimensions=[Dimension(name=d) for d in dims],
@@ -65,9 +71,9 @@ def delta(cur, prev):
     return f' ({"+" if p >= 0 else ""}{p}%)'
 
 
-def section(cl, pid, name, day, path=None):
+def section(cl, pid, name, day, path=None, skip=()):
     y, y2, w = str(day), str(day - dt.timedelta(days=1)), str(day - dt.timedelta(days=6))
-    if not run(cl, pid, str(day - dt.timedelta(days=29)), y, ['activeUsers'], path=path):
+    if not run(cl, pid, str(day - dt.timedelta(days=29)), y, ['activeUsers'], path=path, skip=skip):
         # 새 속성은 하루치 집계가 1~2일 늦다(먹맵 10/19 생성 → 실시간 103명인데 일별 0). 실시간이라도 있으면 보낸다.
         if path:
             return None
@@ -75,19 +81,19 @@ def section(cl, pid, name, day, path=None):
         now = sum(float(x.metric_values[0].value) for x in rt.rows)
         return (f'📊 {name}\n일별 집계 아직 없음(새 속성) · 지금 30분 실시간 {now:.0f}명', now) if now else None
     m = ['activeUsers', 'sessions', 'screenPageViews']
-    cur = (run(cl, pid, y, y, m, path=path) or [([], [0, 0, 0])])[0][1]
-    prev = (run(cl, pid, y2, y2, m, path=path) or [([], [0, 0, 0])])[0][1]
-    week = (run(cl, pid, w, y, ['activeUsers'], path=path) or [([], [0])])[0][1][0]
+    cur = (run(cl, pid, y, y, m, path=path, skip=skip) or [([], [0, 0, 0])])[0][1]
+    prev = (run(cl, pid, y2, y2, m, path=path, skip=skip) or [([], [0, 0, 0])])[0][1]
+    week = (run(cl, pid, w, y, ['activeUsers'], path=path, skip=skip) or [([], [0])])[0][1][0]
     lines = [f'📊 {name}',
              f'어제 사용자 {cur[0]:.0f}{delta(cur[0], prev[0])} · 세션 {cur[1]:.0f} · 페이지뷰 {cur[2]:.0f}{delta(cur[2], prev[2])}',
              f'7일 사용자 {week:.0f}']
-    hosts = run(cl, pid, y, y, ['activeUsers'], ['hostName'], 5, 'activeUsers', path=path)
+    hosts = run(cl, pid, y, y, ['activeUsers'], ['hostName'], 5, 'activeUsers', path=path, skip=skip)
     if len(hosts) > 1:
         lines.append('사이트: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in hosts))
-    src = run(cl, pid, y, y, ['sessions'], ['sessionSource'], 3, 'sessions', path=path)
+    src = run(cl, pid, y, y, ['sessions'], ['sessionSource'], 3, 'sessions', path=path, skip=skip)
     if src:
         lines.append('유입: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in src))
-    pages = run(cl, pid, y, y, ['screenPageViews'], ['pagePath'], 3, 'screenPageViews', path=path)
+    pages = run(cl, pid, y, y, ['screenPageViews'], ['pagePath'], 3, 'screenPageViews', path=path, skip=skip)
     if pages:
         lines.append('페이지: ' + ', '.join(f'{d[0][:40]} {v[0]:.0f}' for d, v in pages))
     return '\n'.join(lines), cur[0]
@@ -169,7 +175,7 @@ def main():
     for pid, name in properties(cred):
         try:
             for nm, path in [(name, None)] + SPLITS.get(pid, []):
-                s = section(cl, pid, nm, day, path)
+                s = section(cl, pid, nm, day, path, () if path else [q for _, q in SPLITS.get(pid, [])])
                 if s:
                     secs.append(s)
         except Exception as e:
