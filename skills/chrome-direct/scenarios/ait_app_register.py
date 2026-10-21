@@ -15,7 +15,8 @@
 - 검토 요청은 테스트 푸시를 보내고 테스터가 토스 앱에서 한 번 열어야 풀리던 적이 있다(오늘꿈해몽). 오늘타로는 푸시 직후 바로 됐다.
 - 왜 화면 조작인가: 콘솔에 공개 API가 없다. 로그인 쿠키가 있는 탭 안에서 XHR/폼을 쓴다.
   탭은 이미 workspace 탭이 열린 창에 연다(다른 프로필 창은 콘솔 로그아웃 상태).
-검증: 2026-10-22 oneul-tarot-card(오늘타로) 손으로 같은 순서 성공 — create(API)·push·meta 전체·검토 요청. 스크립트 형태로는 create EXISTS 경로만 실행.
+검증: 2026-10-22 oneul-tarot-card(오늘타로) 손으로 같은 순서 성공. son-calendar(손없는날 달력)로 스크립트 create·push·meta --submit 전체 성공(검토 중 확인).
+  meta 재실행: 카테고리 이미 골라져 있으면 건너뜀, 스크린샷은 draft 에 0장일 때만 올림. 영어 이름 15자 초과면 '다음'이 조용히 막혀 사전 검사(TOO_LONG).
 """
 import argparse, base64, json, os, re, sys, time
 sys.path.insert(0, os.path.expanduser('~/.config/claude-accounts/personal/skills/chrome-direct'))
@@ -125,6 +126,10 @@ def cmd_meta(a):
     md = open(a.store).read()
     det = section(md, '상세 설명')
     kws = [k.strip() for k in bullet(section(md, '검색 키워드')).split(',') if k.strip()][:10]
+    # 콘솔 글자 수 상한(넘으면 '다음'이 조용히 안 넘어간다): 영어 이름 공백 빼고 15, 부제 20
+    en, sub = bullet(section(md, '영어 이름')), bullet(section(md, '부제'))
+    if len(en.replace(' ', '')) > 15 or len(sub) > 20:
+        sys.exit(f'RESULT: TOO_LONG 영어 이름 {len(en.replace(" ", ""))}/15, 부제 {len(sub)}/20')
     t = console_tab(f'https://apps-in-toss.toss.im/workspace/{a.ws}/mini-app/{a.app}/meta/edit?deploymentId={a.deployment}')
     try:
         c.js_json(t, "window.onbeforeunload=null;return 1")
@@ -137,21 +142,26 @@ def cmd_meta(a):
           return !!em""" % (json.dumps(base + a.cs_from), json.dumps(bullet(section(md, '영어 이름'))), json.dumps(bullet(section(md, '부제'))),
                             json.dumps(det), json.dumps(bullet(section(md, '출시 노트')))))
         print('CS_EMAIL_COPIED', r)
+        cur = lambda i: c.js_json(t, "var e=[...document.querySelectorAll('[role=combobox]')][%d];return e?e.innerText.trim():''" % i)
         for i, label in enumerate(a.category.split('/')):
-            c.js_json(t, "var e=[...document.querySelectorAll('[role=combobox]')][%d];e.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'mouse'}));e.click();return 1" % i)
-            time.sleep(1.2)
-            ok = c.js_json(t, "var o=[...document.querySelectorAll('[role=option]')].find(o=>o.innerText.trim()==%s);if(!o)return 0;o.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));o.click();return 1" % json.dumps(label))
-            if not ok and c.js_json(t, "return [...document.querySelectorAll('[role=combobox]')][%d].innerText" % i).strip() != label:
+            for _ in range(2):  # 이미 골라져 있으면 건너뛴다(재실행). 드롭다운이 늦게 열리면 한 번 더
+                if cur(i) == label:
+                    break
+                c.js_json(t, "var e=[...document.querySelectorAll('[role=combobox]')][%d];e.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'mouse'}));e.click();return 1" % i)
+                time.sleep(1.5)
+                c.js_json(t, "var o=[...document.querySelectorAll('[role=option]')].find(o=>o.innerText.trim()==%s);if(!o)return 0;o.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));o.click();return 1" % json.dumps(label))
+                time.sleep(1)
+            if cur(i) != label:
                 raise RuntimeError(f'category {label} 없음')
-            time.sleep(1)
         click_text(t, '임시저장'); time.sleep(3)
         click_text(t, '다음'); time.sleep(3)
         # 로고: 올리면 그 input 이 사라져서 두 번째도 index 0
         for p in [a.icon, a.dark_icon or a.icon]:
             files_into(t, "[...document.querySelectorAll('input[type=file][accept*=png]')][0]", [p])
-        c.js_json(t, "var e=[...document.querySelectorAll('*')].filter(e=>e.childElementCount==0&&e.textContent.trim()=='스크린샷 이미지 직접 올리기').pop();(e.closest('button')||e).click();return 1")
-        time.sleep(2)
-        files_into(t, "[...document.querySelectorAll('input[type=file]')].find(e=>e.multiple)", [os.path.expanduser(p) for p in a.shots.split(',')])
+        if len(xhr(t, 'GET', base + a.app)['success']['draft']['images']) == 0:  # 재실행 때 스크린샷이 중복으로 쌓이지 않게
+            c.js_json(t, "var e=[...document.querySelectorAll('*')].filter(e=>e.childElementCount==0&&e.textContent.trim()=='스크린샷 이미지 직접 올리기').pop();(e.closest('button')||e).click();return 1")
+            time.sleep(2)
+            files_into(t, "[...document.querySelectorAll('input[type=file]')].find(e=>e.multiple)", [os.path.expanduser(p) for p in a.shots.split(',')])
         have = c.js_json(t, "return [...document.querySelectorAll('[data-tds-desktop-multi-select-autocomplete-chip]')].map(e=>e.innerText.trim())")
         for k in kws:
             if k in have:
