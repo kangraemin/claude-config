@@ -274,4 +274,5 @@ def main():
             c.close_tab(t)
 
 
-main()
+if __name__ == "__main__":
+    main()
