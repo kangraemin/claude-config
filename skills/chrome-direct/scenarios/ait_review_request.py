@@ -40,7 +40,7 @@ def main():
             emit(info, "NOT_AVAILABLE", f"'검토 요청하기' 없음 (상태 {r['cells'][3]})")
             raise Blocked("NOT_AVAILABLE")
         if btn["disabled"]:
-            emit(info, "DISABLED", "버튼 비활성 — 이미 검토 중인 버전이 있으면 그게 끝나거나 요청 취소해야 함")
+            emit(info, "DISABLED", "버튼 비활성 — 토스앱에서 그 버전을 한 번 열어야 켜짐(콘솔 반영 ~20분 지연) · 검토 중인 다른 버전이 있어도 꺼짐")
             raise Blocked("DISABLED")
         if not a.submit:
             emit(info, "DRY_RUN", "검토 요청 가능 — --submit 으로 요청")
