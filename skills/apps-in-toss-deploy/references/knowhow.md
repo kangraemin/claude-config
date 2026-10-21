@@ -21,7 +21,7 @@ Secrets are redacted. "Owner's email" stands in for the real support address.
 (2) Register the app        Console, once per app (Codex drives Chrome). The CLI cannot create apps.
 (3) Register the API key    `ait token add --api-key <key> <profile>`, once per machine
 (4) Test deploy             `ait deploy --profile <p> --location <file>.ait -m "<memo>"`
-                            -> intoss-private://<appName>?_deploymentId=...&host=appsInTossHost -> make a QR
+                            -> intoss-private://<appName>?_deploymentId=... (as printed, no extra params) -> make a QR
 (5) Monetization (optional) Console: ad terms -> rewarded ad group -> adGroupId into the build -> rebuild -> redeploy
 (6) Release (owner)         Console: fill the release fields -> 검토 요청하기 -> wait for approval -> press 출시
 ```
@@ -115,7 +115,7 @@ Success output [SP 2026-10-05 01:26]:
 ◇  screw-toktok 배포가 완료되었어요
 │  intoss-private://screw-toktok?_deploymentId=01a109aa-…&host=appsInTossHost
 ```
-- Make a QR: `npx --yes qrcode -w 600 -o test-qr.png "intoss-private://<appName>?_deploymentId=<id>&host=appsInTossHost"` (Python `qrcode` also works). Scan it with the phone camera or the Toss app. Opening the link on an iPhone launches Toss straight into the test build. [SP, TW]
+- Make a QR: `npx --yes qrcode -w 600 -o test-qr.png "intoss-private://<appName>?_deploymentId=<id>"` (Python `qrcode` also works). **Never append `&host=appsInTossHost`** — React Native SDK 2.x apps then open to Toss "일시적인 오류가 생겼어요" while web-framework 3.x apps still open, so it looks like an app bug. The console's own QR link has no host param. [SE 2026-10-16: seoultax failed with host on 3 builds, opened without it; screw-toktok opened with it] Scan it with the phone camera or the Toss app. Opening the link on an iPhone launches Toss straight into the test build. [SP, TW]
 - In the console the build appears under 앱 출시 → version `YYYYMMDD-N` (e.g. `20261005-1`) → 테스트(QR), with SDK 3.5.0 and status **검토 필요**. [SP via Codex 2026-10-05 01:35]
 - Every redeploy issues a new deploymentId and link, so send a new QR each time. [SP v0.2–v0.4]
 - Sandbox (local dev, no QR): the Toss sandbox app (`com.vivarepublica.ent.cash.test`) needs a Toss **business** account login. Enter only the path after the fixed `intoss://` prefix in the scheme field. `xcrun simctl openurl intoss://…` does not work. [SE `qa/README.md`, `docs/RUN_LOCAL.md`]
@@ -253,6 +253,9 @@ Full prompts are in the SP transcript (`console.txt`, `console2.txt`, `console3.
     - Fields: 앱마켓 게임등록자명, 대표자명, 주소, 전화번호; 자체등급분류 등록자명 (Google Play developer name); 자체등급분류사업자명 (the market, e.g. 구글); 등급분류일자; 등급분류번호; 이용등급 (전체/12/15/청소년 이용불가/평가용); 내용정보 (multi-select); **대표자 인감 또는 사인 이미지**; 게임 주요화면 1 and 2 as pairs (store build vs Apps-in-Toss build, unedited originals).
   - Final checkboxes (all required): 앱인토스에서 오픈할 수 있는 서비스 / 환전·현금화·자금세탁 우려 없음 / 인허가·등록·신고 완료 / 부정행위·위법 없음 / 위반 시 파트너사 책임.
   - "검토 요청하기" stays disabled until all of these are filled.
+- **Resubmitting a newer version while an older one is 검토 중** (threads-unfollow 2026-10-21): the new row's 검토 요청하기 stays disabled until the old one is cancelled. Press 요청 취소 on the old row, then the 취소하기 button in the "검토 요청을 취소할까요?" modal (it is not role=dialog, so look for the button by text). The new row's button enables right away. The meta form keeps step 1/2 values from the last submission, except the release note (출시 노트), main features (주요 기능) and the final checkboxes, which you re-enter.
+- Main-feature English names must start every word with a capital letter or a digit ("Unfollow Check", not "Unfollow check"). Otherwise submit silently bounces back to step 1.
+- Non-game apps in the 소셜 category also have a hidden 12-item dating checklist. Tick only the 5 visible attestation boxes; leave the hidden ones unchecked.
 - Game launch checklist: https://developers-apps-in-toss.toss.im/checklist/app-game (launch, sound, Safe Area, data persistence, ads and payments). [SP console5]
 - Rating guides: https://developers-apps-in-toss.toss.im/guide/operation/console-workspace#id-5-3, https://toss.im/apps-in-toss/blog/self-rated_game_distribution, https://toss.im/apps-in-toss/blog/game_rating_classification. [SP console5]
 - Critical path for a game release: with the store route, a new personal Google Play account must run a closed test (12 testers for 14 days) before production. Start that early. [LIB:game-release-needs-rating-proof-store-iarc-route-means-play-closed-test-first]
@@ -271,3 +274,8 @@ Full prompts are in the SP transcript (`console.txt`, `console2.txt`, `console3.
 | Issue the API key | | possible but not done | Done once; saved per profile |
 
 Watch for one thing in this setup: a Claude Code Stop hook keeps asking for "커밋하고 푸시" while Codex is still running in the background. Commit only after the Codex result has been applied. [SD]
+
+## Observed 2026-10-22: '앱 만들기' does nothing (workspace 35273)
+- Modal inputs have no `type` attribute (`input[type=text]` matches none; use `[role=dialog] input`). The tab must be in front (`c.shot`) or the modal isn't laid out. The 게임/비게임 options are DIVs, not buttons.
+- With all fields filled and 만들기 enabled, both JS presses and a real mouse click only trigger `GET .../workspaces/35273/mini-app` (no create call, no error, no toast). Codex hit the same wall twice.
+- The workspace had 12 apps, 10 of them PREPARE (unreleased). Cause unconfirmed: a cap on unreleased apps is the suspicion. Release or delete an old PREPARE app before retrying, or ask Toss via console chat.
