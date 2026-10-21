@@ -51,6 +51,12 @@
 - 허가 요청은 텔레그램으로: `source ~/.claude/.env; curl -s -d chat_id=$CONTEST_TG_CHAT_ID --data-urlencode text="[블로그 발행 허가 요청] 제목/요약/초안 위치" https://api.telegram.org/bot$CONTEST_TG_TOKEN/sendMessage`
 - 승인 답장(텔레그램 또는 대화창) 받은 뒤에만 커밋·push·게시. 답 없으면 발행하지 않고 보고.
 
+## SNS 게시 알림은 텔레그램 SNS 봇으로 <!-- why: decisions/_global/process/telegram-notify-after-every-sns-upload.md -->
+- SNS(인스타·스레드·X·유튜브·블로그·답글 등, 모든 계정)에 올리면 바로 @sns_daily_noti_bot으로 "[업로드 완료] 서비스 계정 링크" + 본문 + 사진·영상을 보낸다.
+- 올리기 전 확인 요청도 같은 봇으로 "[게시 확인 요청]"을 보낸다.
+- 도구: `python3 ~/.claude/scripts/sns_tg.py done|ask --msg "..." [--text-file f] [사진·영상]`. my-sns·insta-web 게시 스크립트는 성공 시 자동으로 보낸다.
+- 키: `~/.claude/.env`의 SNS_UPLOAD_TG_TOKEN / SNS_UPLOAD_TG_CHAT_ID. 공모전 봇(CONTEST_TG)으로 보내지 않는다.
+
 ## 토큰 절약 <!-- why: decisions/_global/process/reduce-session-context-overhead.md -->
 - 단순 셸 명령(ls, pwd, which 등)은 `!` prefix로 직접 실행. Claude 컨텍스트 소비 불필요.
 - 컨텍스트가 무거워지면 `/compact` 또는 세션 정리 후 `/clear`.
