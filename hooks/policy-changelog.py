@@ -295,6 +295,10 @@ def main():
             else:
                 state['files'].pop(key, None)
             continue
+        if not Path(key).is_file():
+            # 이 세션이 지우거나 이름을 바꾼 파일은 이력 달 곳이 없다. 이력은 새 경로 파일에 단다.
+            state['files'].pop(key, None)
+            continue
         missing.append(f'{Path(key)} → 이력 위치: {location(Path(key))}')
     counts = {k: count(location(Path(k))) for k in owned}
     # 차단 중인 이 세션 파일에 이력이 늘었을 때만 연속 차단 횟수를 되돌린다.
