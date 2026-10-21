@@ -13,7 +13,6 @@
 import datetime as dt
 import json
 import os
-import shutil
 import re
 import subprocess
 import sys
@@ -92,7 +91,7 @@ def build(arg):
         raw += [f'- 요청: {a}' for a in asks[:25]]
         raw.append('')
     raw = '\n'.join(raw).strip()
-    body = (summarize(raw) if raw else None) or raw or '커밋한 작업 없음'
+    body = (summarize(raw) if raw else None) or (short(groups) if groups else raw) or '커밋한 작업 없음'
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f'{d}.raw.txt').write_text(raw + '\n')
     f = OUT / f'{d}.txt'
@@ -168,19 +167,35 @@ PROMPT = '''아래는 하루 동안 레포(프로젝트)별 git 커밋 제목이
 
 
 def summarize(raw):
-    """claude -p(구독 로그인, API 키 아님)로 축약. 실패하면 None → 커밋 목록 그대로 보낸다."""
-    exe = shutil.which('claude') or str(HOME / '.local/bin/claude')
+    """claude -p(구독 로그인, API 키 아님)로 축약. claude-p.sh가 한도 걸린 계정은 건너뛴다. 실패하면 None → short()."""
     env = {k: v for k, v in os.environ.items() if k not in ('ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL')}
-    env['CLAUDE_CONFIG_DIR'] = str(HOME / '.config/claude-accounts/personal')
     env['PATH'] = env.get('PATH', '') + ':/opt/homebrew/bin:/usr/local/bin:' + str(HOME / '.local/bin')
     try:
-        r = subprocess.run([exe, '-p', PROMPT + raw, '--system-prompt', '너는 커밋 목록을 짧게 요약하는 도구다.', '--tools', '',
+        r = subprocess.run([str(HOME / '.claude/scripts/claude-p.sh'), '-p', PROMPT + raw, '--system-prompt', '너는 커밋 목록을 짧게 요약하는 도구다.', '--tools', '',
                             '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence', '--model', 'sonnet'],
-                           capture_output=True, text=True, timeout=600, env=env, cwd='/tmp')
+                           capture_output=True, text=True, timeout=1200, env=env, cwd='/tmp')
         out = r.stdout.strip()
         return out if r.returncode == 0 and out.count('\n- ') >= 2 else None
     except Exception:
         return None
+
+
+TOOLS = {'claude-library', 'claude-config', '.claude'}
+
+
+def short(groups):
+    """요약 실패 때: 커밋 제목을 다 보내면 수백 줄이 된다(10/20 663줄) → 프로젝트마다 개수 + 최근 3줄, 도구 레포는 개수만."""
+    out, tools = [], []
+    for name, subs in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+        if name in TOOLS:
+            tools.append(f'{name} {len(subs)}건')
+            continue
+        out.append(f'{name} ({len(subs)}건)')
+        out += [f'- {re.sub(r"^[a-z]+(\([^)]*\))?!?: ?", "", x)[:40]}' for x in subs[-3:]]
+        out.append('')
+    if tools:
+        out.append('기록·설정: ' + ', '.join(tools))
+    return '(자동 요약 실패 — 최근 커밋 3개씩)\n\n' + '\n'.join(out).strip()
 
 
 def chat_id(token):
