@@ -1,5 +1,5 @@
 {
-  "disableAutoMode": "disable",
+  "cleanupPeriodDays": 999999,
   "env": {
     "ENABLE_TOOL_SEARCH": "true",
     "PATH": "/Users/ram/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
@@ -9,7 +9,12 @@
     "WORKLOG_GIT_TRACK": "false",
     "WORKLOG_LANG": "ko",
     "AI_WORKLOG_DIR": "/Users/ram/.claude",
-    "LIBRARY_NOTION_DB_ID": "334d4919-b6eb-81bf-aee8-cffeb264f70d"
+    "LIBRARY_NOTION_DB_ID": "334d4919-b6eb-81bf-aee8-cffeb264f70d",
+    "LIBRARY_USAGE_LOG": "aggregate",
+    "OCTO_CAREFUL_MODE": "off",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
+    "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false",
+    "CLAUDE_CODE_GOAL_CHECKIN_MINUTES": "0"
   },
   "attribution": {
     "commit": "",
@@ -30,41 +35,59 @@
       "Glob",
       "Grep",
       "mcp__stitch__*",
-      "mcp__kaggle__*"
+      "mcp__kaggle__*",
+      "Bash(git worktree:*)",
+      "Bash(git rebase:*)",
+      "Bash(git merge --ff-only:*)",
+      "Agent",
+      "SendMessage",
+      "Skill",
+      "TaskStop",
+      "NotebookEdit",
+      "ToolSearch",
+      "mcp__claude-library__*",
+      "mcp__plugin_telegram_telegram__*",
+      "mcp__claude_ai_Claude_Docs__*",
+      "Monitor",
+      "Artifact",
+      "ArtifactData",
+      "ArtifactComments",
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "ReadNotifications",
+      "SendUserFile",
+      "PushNotification",
+      "ListAgents",
+      "ScheduleWakeup",
+      "mcp__context7__*",
+      "mcp__figma__*",
+      "Read(**)",
+      "Write(**)",
+      "Edit(**)",
+      "WebFetch(*)",
+      "TaskOutput",
+      "Workflow",
+      "AskUserQuestion",
+      "EnterWorktree",
+      "ExitWorktree",
+      "RemoteTrigger",
+      "DesignSync",
+      "ListMcpResourcesTool",
+      "ReadMcpResourceTool",
+      "ReadMcpResourceDirTool",
+      "FetchInboxMessage",
+      "SendFeedback",
+      "ReportFindings"
     ],
     "deny": [],
-    "ask": [
-      "Bash(sudo:*)",
-      "Bash(chmod 777:*)",
-      "Bash(npm publish:*)",
-      "Bash(eval:*)",
-      "Read(.env)",
-      "Read(.env.*)",
-      "Read(**/.env)",
-      "Read(**/.env.*)",
-      "Read(~/.ssh/**)",
-      "Read(~/.aws/**)",
-      "Read(**/*credential*)",
-      "Read(**/*secret*)",
-      "Read(**/*.pem)",
-      "Read(**/*.key)"
-    ],
+    "ask": [],
+    "defaultMode": "bypassPermissions",
     "additionalDirectories": [
       "/Users/ram/claude-library"
     ]
   },
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/suggestion-mode-label.sh",
-            "timeout": 3
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "hooks": [
@@ -80,7 +103,16 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/scripts/bouncer-update-check.sh",
+            "command": "/Users/ram/.claude/hooks/decision-inject.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/policy-changelog-check.sh",
             "timeout": 30
           }
         ]
@@ -97,6 +129,26 @@
     ],
     "PostToolUse": [
       {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-activity-log.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Skill|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-trigger.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
         "hooks": [
           {
             "type": "command",
@@ -107,34 +159,14 @@
         ]
       },
       {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
             "command": "/Users/ram/.claude/hooks/on-commit.sh",
             "timeout": 5
           }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/commit-doc-check.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/session-end.sh",
-            "timeout": 15
-          }
-        ]
+        ],
+        "matcher": "Bash"
       }
     ],
     "Stop": [
@@ -169,7 +201,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/completion-gate.sh"
+            "command": "/Users/ram/.claude/hooks/policy-changelog-check.sh",
+            "timeout": 30
           }
         ]
       },
@@ -177,19 +210,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/stop-active-cleanup.sh"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/library-allow.sh",
-            "timeout": 3
+            "command": "/Users/ram/.claude/hooks/library-usage-log.sh",
+            "timeout": 30,
+            "async": true
           }
         ]
       },
@@ -197,37 +220,42 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/plan-gate.sh"
-          }
-        ],
-        "matcher": "Write|Edit|MultiEdit"
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/bash-gate.sh"
-          }
-        ],
-        "matcher": "Bash"
-      }
-    ],
-    "SubagentStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/subagent-track.sh"
+            "command": "python3 /Users/ram/.claude/hooks/ram-proxy-gate.py",
+            "timeout": 10
           }
         ]
       }
     ],
-    "SubagentStop": [
+    "PreCompact": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/ram/.claude/ai-bouncer/hooks/subagent-cleanup.sh"
+            "command": "/Users/ram/.claude/hooks/library-save-check.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-trigger.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/session-end.sh",
+            "timeout": 15
           }
         ]
       }
@@ -238,25 +266,45 @@
     "command": "~/.claude/statusline.sh"
   },
   "enabledPlugins": {
-    "swift-lsp@claude-plugins-official": true,
+    "swift-lsp@claude-plugins-official": false,
     "telegram@claude-plugins-official": true,
-    "ralph-x@ralph-x": true
+    "ralph-x@ralph-x": true,
+    "figma@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "octo@nyldn-plugins": false
   },
+  "extraKnownMarketplaces": {
+    "nyldn-plugins": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/nyldn/plugins.git"
+      }
+    }
+  },
+  "modelSettings": {
+    "claude-opus-5": {
+      "effortLevel": "medium"
+    },
+    "claude-opus-5-5": {
+      "autoCompactWindow": 250000
+    }
+  },
+  "autoCompactWindow": 250000,
+  "promptSuggestionEnabled": false,
+  "remote": {
+    "defaultEnvironmentId": "env_014X3Bc9uz6hSCDhWP2niHih"
+  },
+  "tui": "fullscreen",
   "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "disableAutoMode": "disable",
+  "theme": "dark",
   "preferredNotifChannel": "ghostty",
+  "switchModelsOnFlag": false,
   "teammateMode": "tmux",
   "remoteControlAtStartup": false,
   "agentPushNotifEnabled": true,
   "mcpServers": {
-    "telegram": {
-      "command": "/opt/homebrew/bin/bun",
-      "args": [
-        "/Users/ram/.claude/plugins/cache/claude-plugins-official/telegram/0.0.1/server.ts"
-      ],
-      "env": {
-        "TELEGRAM_STATE_DIR": "/Users/ram/.claude/channels/telegram"
-      }
-    },
     "kaggle": {
       "command": "npx",
       "args": [
@@ -269,11 +317,14 @@
     "claude-library": {
       "command": "uvx",
       "args": [
-        "claude-library-mcp"
+        "--with",
+        "mcp<2",
+        "claude-library-mcp@latest"
       ],
       "env": {
         "LIBRARY_ROOT": "/Users/ram/claude-library"
-      }
+      },
+      "alwaysLoad": true
     }
   }
 }

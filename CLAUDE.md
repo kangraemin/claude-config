@@ -10,6 +10,13 @@
 - 세션을 이어받을 때도 동일하게 스킬/에이전트 매칭을 재점검한다.
 - 웹·콘솔 조작(Chrome 직접·Codex 위임)이 들어간 작업을 끝내면 `web-scriptify` 스킬로 그 과정을 스크립트화한다(불가능하면 안 함).
 
+## 묻지 말고 끝까지 한다 <!-- why: decisions/_global/process/finish-to-the-end-without-asking-user.md -->
+- 시킨 일은 중간에 "할까요?", "괜찮으면 '올려'라고 해 주세요", "어떻게 할지 정해 주세요"로 멈추지 않고 끝까지 한다.
+- 사용자가 결과물(사진·화면)을 보고 싶다고 한 경우에도 보여 주고 바로 다음 단계로 간다. 답을 기다리지 않는다.
+- **사용자 사전 동의(2026-10-22): "앞으로 니가 하는 거 전부 다 동의할 테니까 멈추지 마라."** 출시 버튼, 콘솔 약관·동의 체크, 서명형 확인 체크박스, 공개 글 발행까지 묻지 않고 진행한다.
+- 남는 예외는 물리적으로 사람만 할 수 있는 단계뿐이다: 결제 본인인증, 문자 인증번호, 토스 앱에서 직접 열기, 실물 도장.
+- 플랫폼이 사람 손을 요구하는 단계(토스 앱에서 열기, 문자 인증번호)만 짧게 요청하고, 나머지는 그 전후로 다 해 둔다.
+
 ## 사용자에게 넘기기 전 기존 스크립트부터 찾는다 <!-- why: decisions/_global/process/search-existing-scripts-before-handing-step-to-user.md -->
 - 로그인·본인인증(PASS/문자)·보안문자·결제 전 단계처럼 "사람이 해야 할 것 같은" 단계를 사용자에게 넘기기 **전에** 아래를 먼저 찾는다.
 - 스크립트 위치: `~/.claude/skills/chrome-direct/scenarios/`(웹 조작 시나리오, 목록은 같은 폴더 `../SKILL.md` Scenarios 표), `~/.claude/skills/*/scripts/`.
@@ -18,16 +25,24 @@
 - 본인인증(문자)은 통신사·이름·생년월일·번호를 내가 넣고, 사용자에게는 **문자로 온 인증번호만** 묻는다.
 
 ## ralph-x in-session 루프 — 절대 멈추지 말 것 <!-- why: decisions/_global/process/ralph-x-continue-until-declared-exit.md -->
-- ralph-x in-session 루프(`ralph-x-runs/*/session-state.json`에 `active=true`) 진행 중에는 **절대 멈추지 않는다**.
-- **종료 조건은 단 두 가지**: `current_iteration >= max_iterations` OR checklist의 모든 항목 `[x]`. 그 전에 종료/대기 금지.
-- 결과 fail이든 success든, 가설이 막혀 보이든, 사용자가 질문하든 — **무조건 같은 응답에서 다음 iter Write/Bash로 즉시 진행**.
-- **금지**: "어떻게 갈지 정해주면", "방향 전환 필요", "이거 의미 있나", "계속 진행할까요?" 등 사용자 컨펌 요청.
-- **금지**: fail N개 누적 후 "남은 X개 같은 패턴 반복 무의미" 자체 판단으로 멈추기.
-- **필수**: 결과 짧게 보고 → 즉시 다음 가설 코드 작성·실행. 가설 떨어지면 시도 안 한 영역 자체 발굴(레버리지/단일주식/시간대/매크로/페어/ML 등).
-- **사용자 명시 룰**: "갯수 다 돌 때까지 사용자 컨펌 절대 받지 말고 니 알아서 판단·수정·결과 내라"
+- `ralph-x-runs/*/session-state.json`이 `active=true`면 종료 조건(`current_iteration >= max_iterations` 또는 체크리스트 전부 `[x]`) 전에는 멈추지 않는다. fail이 쌓여도 사용자 컨펌 없이 결과 한 줄 보고 후 같은 응답에서 다음 가설을 실행한다(Stop 훅 `ralph-x-gate.sh`가 강제).
+
+## Codex 사용 범위 <!-- why: decisions/_global/process/codex-only-for-image-web-computer-use-or-when-claude-cannot.md -->
+- Codex는 이미지 생성·웹 작업·컴퓨터 유즈에만 쓴다.
+- 웹 작업은 LLM 없이 도는 기존 웹 조작 스크립트(`chrome-direct` scenarios, `~/.claude/skills/*/scripts/`)를 먼저 찾아 쓴다. 스크립트가 없어도 chromectl 등으로 스크립트 조작이 가능하면 그걸로 한다. 그게 안 될 때만 Codex로 조작한다.
+- 요약·추출·글쓰기·개발 등 나머지는 Claude가 한다.
+- Claude가 못 하는 일이면 Codex를 쓴다.
+- 사용자가 "코덱스로 해"라고 하면 그때 Codex로 한다.
+- Claude 한도 초과 시 Codex로 자동 전환(fallback) 금지.
+
+## 토스 테스트 배포는 링크로 준다 <!-- why: decisions/_global/process/toss-test-deploy-always-send-tappable-link.md -->
+- `ait deploy` 후에는 QR만 보내지 말고 **누르면 열리는 링크를 항상 같이** 준다.
+- 형식: `https://httpbin.org/redirect-to?url=<ait deploy가 출력한 intoss-private:// 링크를 URL 인코딩>`
+- 배포마다 deploymentId가 바뀌므로 매번 새 링크를 준다.
 
 ## 블로그 글 발행은 허가 후 <!-- why: decisions/_global/process/blog-post-publish-needs-user-approval-via-telegram.md -->
-- 블로그(사용자 이름으로 공개되는 글)에 새 글 발행·기존 글 본문 수정은 **사용자 허가 없이 금지**. 초안 작성까지만 한다.
+- (2026-10-22 사용자 전면 사전 동의로 대체) 이제 발행도 묻지 않고 진행한다. 발행한 뒤 텔레그램으로 알림만 보낸다.
+- (이전 규칙) 블로그(사용자 이름으로 공개되는 글)에 새 글 발행·기존 글 본문 수정은 **사용자 허가 없이 금지**. 초안 작성까지만 한다.
 - 허가 요청은 텔레그램으로: `source ~/.claude/.env; curl -s -d chat_id=$CONTEST_TG_CHAT_ID --data-urlencode text="[블로그 발행 허가 요청] 제목/요약/초안 위치" https://api.telegram.org/bot$CONTEST_TG_TOKEN/sendMessage`
 - 승인 답장(텔레그램 또는 대화창) 받은 뒤에만 커밋·push·게시. 답 없으면 발행하지 않고 보고.
 
@@ -94,67 +109,18 @@
 - infra — **Supabase 직결 'tenant not found'=풀러 aws-0→aws-1 이전**(REST 대량배치 오진 금지), **Turso --from-dump 0B·shell 70초 끊김·unistr()** — `~/claude-library/CATALOG.md` 참조
 
 <!-- learnings-for-claude:rules start -->
-
 ### 읽기
-- 툴: `library_search` `library_read` `library_list` / `decision_list(repo)` `decision_search` `decision_read`
-- `library_search`는 **deferred tool** — 매 세션/작업 시작 시 반드시 먼저 `ToolSearch("select:mcp__claude-library__library_search")`로 로드한 뒤 사용한다
-- 아래 상황에서 **반드시** `library_search(query)`를 호출한다:
-  - 기술 질문에 답하거나 접근법을 제안할 때
-  - 구현을 시작할 때
-  - 에러/삽질이 발생했을 때 — 이미 기록된 해결책이 있을 수 있다
-- 결과가 있으면 `📚 library 참조: [topic]`로 시작하고 저장된 내용을 따른다
-- 결과가 없으면 별도 언급 없이 진행한다
-- 관련 주제가 발견되면 `library_read(path)`로 index.md를 읽어 상세 확인
-- 이미 기록된 방향은 재제안하지 않는다
+- 기술 질문에 답하거나, 구현을 시작하거나, 에러가 나면 `library_search(query)`를 부른다. deferred tool이라 먼저 `ToolSearch("select:mcp__claude-library__library_search")`로 로드한다.
+- 결과가 있으면 `📚 library 참조: [topic]`로 시작하고 저장된 내용을 따른다. 이미 기록된 방향은 재제안하지 않는다.
+- 결정사항(`decisions/`)은 SessionStart에 자동 주입된다. 전문은 `decision_read`, 세션 중 추가분은 `decision_search`.
 
 ### 쓰기
-아래 경우 library에 기록한다:
-- 실험/백테스트 결론이 났을 때
-- 아티클/논문에서 유효한 인사이트를 얻었을 때
-- 사용자가 접근법을 수정했을 때
-- 더 나은 방법을 발견했을 때
-- **개발 중 삽질로 알게 된 API/라이브러리 동작** — 에러로 발견한 것, 문서에 없는 것, 다음에 또 삽질할 것 같은 것. 발견 즉시 기록한다. 사용자가 요청하기 전에.
-- **틀린 내용을 교정받았을 때** — "그게 아니야"라고 교정받으면 그 자리에서 바로 저장. "저장할까요?" 묻지 않는다.
-
-
-### 지식이냐 결정사항이냐 — 먼저 가른다
-
-| | 지식 `library/` | 결정사항 `decisions/` |
-|---|---|---|
-| 판별 | **남의 프로젝트에도 그대로 참** | **우리가 이렇게 하기로 정한 것** |
-| 예 | "Granite에 react-native-svg 이미 번들됨" | "우리는 통과조건을 셸로 표현한다" |
-| 분류 | 카테고리/서브카테고리/주제 | **레포별 → 카테고리별** |
-| 꺼내기 | `library_search` (pull) | SessionStart 자동 주입 (push) |
-
-결정사항 카테고리 5개 고정: `architecture` `stack` `convention` `process` `scope`
-경로: `~/claude-library/decisions/<레포명>/<카테고리>/<slug>.md` (레포명 = git remote basename)
-
-### 형식 — OKF v0.2
-
-모든 문서는 Open Knowledge Format v0.2 프론트매터를 갖는다. `type`이 유일한 필수 필드.
-**상세 규칙·필드·이유는 `~/claude-library/GUIDE.md` 를 읽어라.** 여기에 중복 기술하지 않는다
-(같은 규칙을 두 곳에 적어서 실제로 드리프트가 난 전례가 있다).
-
-분류는 `~/claude-library/TAXONOMY.md`를 먼저 확인하고, 없으면 거기에 먼저 추가한다.
-
-기록 방법:
-1. **지식/결정사항 판별** → 저장소 결정
-2. TAXONOMY.md 확인 (지식) 또는 레포·카테고리 확정 (결정사항)
-3. 파일 생성 — OKF 프론트매터 + 교훈이 드러나는 파일명 (날짜 없음)
-4. **`index.md` / `LIBRARY.md` 는 손대지 않는다.** 자동 생성 대상이다
-5. **Synthesis 체크**: 같은 서브카테고리 3개 이상이면 종합 문서 검토 → `library/synthesis/`
-6. `~/claude-library/CATALOG.md` 에 한 줄 요약 추가 (CLAUDE.md `### 목차`는 카테고리 요약만 — 새 카테고리·핵심 결론일 때만 갱신)
-7. 즉시 commit/push:
-   ```
-   git -C ~/claude-library add -A
-   git -C ~/claude-library commit -m "feat: [주제] 추가"
-   git -C ~/claude-library push
-   ```
-8. 한 줄로 알린다: `📚 library에 추가: [경로]`
-
-- **사용자가 정한 결정은 메모리에만 두지 않는다** — 자동 메모리(memory/*.md)는 그 프로젝트·계정 세션에만 보인다. "~하기로 함"·"~안 한다고 했잖아" 같은 결정은 한 프로젝트 전용이어도 `decisions/<레포|_global>/<카테고리>/`에 쓴다(메모리엔 포인터만).
-
-미결 상태는 기록하지 않는다.
+- 기록 대상: 실험·백테스트 결론, 삽질로 알게 된 API·라이브러리 동작, 사용자 교정("그게 아니야"), 더 나은 방법. 묻지 말고 그 자리에서 기록한다.
+- 먼저 가른다: 남의 프로젝트에도 참이면 지식 `library/<카테고리>/...`(TAXONOMY.md 먼저 확인), 우리가 정한 것이면 결정 `decisions/<레포|_global>/<architecture|stack|convention|process|scope>/<slug>.md`.
+- 사용자가 정한 결정은 메모리에만 두지 않는다. 한 프로젝트 전용이어도 decisions/에 쓰고 메모리엔 포인터만 둔다.
+- 형식(OKF v0.2 프론트매터, `type` 필수)은 `~/claude-library/GUIDE.md`를 따른다. 파일명은 교훈이 드러나게, 날짜 없이. `index.md`·`LIBRARY.md`는 자동 생성이라 손대지 않는다.
+- 저장 후 `CATALOG.md`에 한 줄 추가 → `git -C ~/claude-library add -A && git -C ~/claude-library commit -m "feat: [주제] 추가" && git -C ~/claude-library push` → `📚 library에 추가: [경로]` 한 줄로 알린다.
+- 미결 상태는 기록하지 않는다.
 <!-- learnings-for-claude:rules end -->
 
 
