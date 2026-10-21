@@ -1,23 +1,4 @@
 #!/bin/bash
-# --- ai-bouncer start ---
-# ai-bouncer NORMAL 모드 팀 작업 중이면 미커밋 체크 스킵
-# stdin을 먼저 읽고, 절대경로로 체크 후, 원본 스크립트에 stdin 재주입
-_bouncer_stdin=$(cat)
-_bouncer_cwd=$(echo "$_bouncer_stdin" | jq -r '.cwd' 2>/dev/null)
-if [ -n "$_bouncer_cwd" ] && { [ -f "$_bouncer_cwd/.claude/ai-bouncer/config.json" ] || [ -f "$HOME/.claude/ai-bouncer/config.json" ]; }; then
-  for _bouncer_active in "$_bouncer_cwd"/.ai-bouncer-tasks/*/*/.active "$_bouncer_cwd"/.ai-bouncer-tasks/*/.active; do
-    [ -f "$_bouncer_active" ] || continue
-    _bouncer_state="$(dirname "$_bouncer_active")/state.json"
-    [ -f "$_bouncer_state" ] || continue
-    _bouncer_wf=$(jq -r '.workflow_phase // "done"' "$_bouncer_state" 2>/dev/null)
-    case "$_bouncer_wf" in
-      development|verification)
-        _BOUNCER_SKIP_DIRTY=true ;;
-    esac
-  done
-fi
-exec <<< "$_bouncer_stdin"
-# --- ai-bouncer end ---
 
 # Stop hook gate: in-session ralph 루프가 미완이면 종료 차단
 
@@ -40,9 +21,17 @@ for state_file in "$CWD"/ralph-x-runs/*/session-state.json; do
   [ "$ACTIVE" != "true" ] && continue
 
   STORED_SESSION=$(jq -r '.session_id // ""' "$state_file")
-  if [ -z "$STORED_SESSION" ] || [ "$STORED_SESSION" != "$CURRENT_SESSION" ]; then
-    continue
+  # ralph-x 가 session_id 에 None·"in-session-xxx" 같은 임의 값을 써서 22개 중 14개가 영영 매칭되지 않았다(2026-10-22 감사: 차단 0회).
+  # UUID 가 아니고 최근 2시간 안에 갱신된 state 면 이 세션 것으로 가져와 실제 id 를 적어 둔다.
+  UUID_RE='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  if ! [[ "$STORED_SESSION" =~ $UUID_RE ]] && [[ "$CURRENT_SESSION" =~ $UUID_RE ]]; then
+    AGE=$(( $(date +%s) - $(stat -f %m "$state_file") ))
+    [ "$AGE" -gt 7200 ] && continue
+    TMP=$(mktemp)
+    jq --arg s "$CURRENT_SESSION" '.session_id = $s' "$state_file" > "$TMP" && mv "$TMP" "$state_file"
+    STORED_SESSION="$CURRENT_SESSION"
   fi
+  [ "$STORED_SESSION" != "$CURRENT_SESSION" ] && continue
 
   MAX_ITER=$(jq -r '.max_iterations // 0' "$state_file")
   CURRENT_ITER=$(jq -r '.current_iteration // 0' "$state_file")

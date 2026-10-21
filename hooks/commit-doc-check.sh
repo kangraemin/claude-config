@@ -1,37 +1,4 @@
 #!/bin/bash
-# PostToolUse(Bash) hook: git commit 감지 → PROJECT.md 업데이트 체크
-# Claude Code settings.json의 PostToolUse Bash matcher에 등록
-
-set -euo pipefail
-
-# git commit 명령어가 아니면 스킵
-command -v jq &>/dev/null || exit 0
-INPUT=$(cat)
-COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // ""')
-printf '%s' "$COMMAND" | grep -qE '(^|\n|;|&&|\|\|)\s*git\s+commit(\s|$)' || exit 0
-
-# PROJECT.md 없으면 스킵
-if [ ! -f "PROJECT.md" ]; then
-    exit 0
-fi
-
-# git repo 아니면 스킵
-if ! git rev-parse --is-inside-work-tree &>/dev/null; then
-    exit 0
-fi
-
-THRESHOLD="${PROJECT_DOC_CHECK_INTERVAL:-5}"
-
-# PROJECT.md 마지막 수정 커밋 hash
-LAST_HASH=$(git log -1 --format="%H" -- PROJECT.md 2>/dev/null || echo "")
-
-if [ -z "$LAST_HASH" ]; then
-    # PROJECT.md 수정 기록 없음 → 전체 커밋 수
-    COMMITS_SINCE=$(git log --oneline 2>/dev/null | wc -l | tr -d ' ')
-else
-    COMMITS_SINCE=$(git log --oneline "${LAST_HASH}..HEAD" 2>/dev/null | wc -l | tr -d ' ')
-fi
-
-if [ "$COMMITS_SINCE" -ge "$THRESHOLD" ]; then
-    echo "📝 PROJECT.md 업데이트 필요: 마지막 업데이트 이후 ${COMMITS_SINCE}개 커밋 쌓임. analyze_gaps를 실행해서 반영할 내용 확인을 권장합니다."
-fi
+# 비활성(2026-10-22 훅 감사). settings.json 에서 뺐지만, 그 전에 뜬 세션이 예전 설정으로 계속 부르므로 본문을 비워 둔다.
+# worklog-update-check 는 GitHub 판으로 hooks/stop.sh 등을 덮어쓰던 원인이다. 되살리지 말 것.
+exit 0
