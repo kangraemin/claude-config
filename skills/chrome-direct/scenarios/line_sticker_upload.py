@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """[제출] LINE Creators Market에 정지 스티커 세트(24개+main+tab)를 등록하고 심사 요청.
 
-  line_sticker_upload.py <png_dir> --en-title T --en-desc D [--ja-title T --ja-desc D] [--areas JP,TW,HK]
+  line_sticker_upload.py <png_dir> --en-title T --en-desc D [--ja-title T --ja-desc D] [--zh-title T --zh-desc D] [--areas JP,TW,HK]
                          [--style 6] [--character 14] [--creator "Raemin Kang"] [--submit]
 
 - png_dir: 01.png..24.png(370×320) + main.png(240×240) + tab.png(96×74). drafts/set-kb/line 처럼.
@@ -62,7 +62,7 @@ def jj(t, code):
 
 def click_ok(t, text):
     """text 가 보이는 확인창의 OK 를 누른다."""
-    return js(t, """(()=>{const m=[...document.querySelectorAll('*')].find(e=>e.children.length==0&&e.textContent.includes(%s)&&e.offsetParent);
+    return js(t, """(()=>{const m=[...document.querySelectorAll('*')].find(e=>e.children.length==0&&e.textContent.includes(%s)&&e.getClientRects().length);
       if(!m)return 0;let d=m;while(d.parentElement&&![...d.querySelectorAll('button')].some(b=>b.innerText.trim()=='OK'))d=d.parentElement;
       const b=[...d.querySelectorAll('button')].find(b=>b.innerText.trim()=='OK');setTimeout(()=>b.click(),10);return 1})()""" % json.dumps(text))
 
@@ -78,7 +78,8 @@ def select(t, test, value):
 
 
 def close_notices(t):
-    js(t, "(()=>{[...document.querySelectorAll('button.FnCloseDialogBtn')].filter(b=>b.offsetParent).forEach(b=>b.click());return 1})()")
+    # 공지 팝업은 position:fixed 라 offsetParent 가 null — getClientRects 로 판정. 안 닫으면 저장이 조용히 무시된다
+    js(t, "(()=>{[...document.querySelectorAll('button.FnCloseDialogBtn,button')].filter(b=>b.getClientRects().length&&(b.classList.contains('FnCloseDialogBtn')||b.innerText.trim()=='Close')).forEach(b=>b.click());return 1})()")
 
 
 def my_root(t):
@@ -127,13 +128,18 @@ def create(t, root, a):
     c.goto(t, f"{BASE}{root}/sticker/create")
     time.sleep(5)
     close_notices(t)
-    if a.ja_title:
-        select(t, "select-language", "ja")
-        js(t, "setTimeout(()=>document.querySelector('[data-test=btn-add-language]').click(),300);1")
-        time.sleep(2)
     vals = {"meta[en][title]": a.en_title, "meta[en][description]": a.en_desc, "copyright": a.creator}
-    if a.ja_title:
-        vals.update({"meta[ja][title]": a.ja_title, "meta[ja][description]": a.ja_desc})
+    for lang, ti, de in (("ja", a.ja_title, a.ja_desc), ("zh-Hant", a.zh_title, a.zh_desc)):
+        if not ti:
+            continue
+        # 칸이 늦게 생긴다(값을 먼저 넣으면 'miss'·'2 or more characters'). 칸이 보일 때까지 기다린다
+        for _ in range(10):
+            if jj(t, "return !!document.querySelector('[name=\"meta[%s][title]\"]')" % lang):
+                break
+            select(t, "select-language", lang)
+            js(t, "setTimeout(()=>document.querySelector('[data-test=btn-add-language]').click(),300);1")
+            time.sleep(2)
+        vals.update({f"meta[{lang}][title]": ti, f"meta[{lang}][description]": de})
     print("fill", set_values(t, vals))
     jj(t, """for(const[n,v] of [['sticker_type','static'],['is_ai_generated',%s]])document.querySelector(`input[name="${n}"][value="${v}"]`).click();return 1"""
        % json.dumps("true" if a.ai else "false"))
@@ -151,6 +157,10 @@ def create(t, root, a):
     click_ok(t, "Save this form")
     time.sleep(6)
     href = js(t, "location.href")
+    # 저장돼도 주소가 /create 로 남을 때가 있다 — 화면의 Sticker ID 로 판정
+    sid = jj(t, "const m=document.body.innerText.match(/Sticker ID\\s*(\\d{6,})/);return m?m[1]:null")
+    if sid:
+        return sid
     if "/create" in href:
         err = jj(t, "return [...document.querySelectorAll('[class*=rror]')].filter(e=>e.offsetParent&&e.innerText.trim()).map(e=>e.innerText.trim())")
         raise SystemExit(f"RESULT: BLOCKED 저장 실패 {err}")
@@ -167,6 +177,7 @@ def fix_areas(t, root, sid, areas):
     time.sleep(1)
     js(t, """(()=>{const keep=%s;document.querySelectorAll('input[name="areas[]"]').forEach(e=>{if(e.checked!==keep.includes(e.value))e.click()});return 1})()""" % json.dumps(areas))
     time.sleep(1)
+    js(t, "document.querySelector('input[name=is_auto_release][value=true]').click();1")  # 심사 통과 즉시 판매(1탄과 같게)
     got = jj(t, """return [...document.querySelectorAll('input[name="areas[]"]:checked')].map(e=>e.value)""")
     if sorted(got) != sorted(areas):
         raise SystemExit(f"RESULT: BLOCKED 지역 선택 불일치 {got}")
@@ -174,6 +185,8 @@ def fix_areas(t, root, sid, areas):
     time.sleep(3)
     click_ok(t, "Save this form")
     time.sleep(6)
+    if js(t, "location.href").endswith("/update"):
+        raise SystemExit("RESULT: BLOCKED 지역 저장 안 됨(수정 화면에 머묾)")
 
 
 def upload(t, root, sid, files):
@@ -214,6 +227,8 @@ def main():
     ap.add_argument("--en-desc", required=True)
     ap.add_argument("--ja-title")
     ap.add_argument("--ja-desc")
+    ap.add_argument("--zh-title", help="번체(zh-Hant) — TW·HK 검색용")
+    ap.add_argument("--zh-desc")
     ap.add_argument("--areas", default="JP,TW,HK")
     ap.add_argument("--style", default="1", help="1 Cute, 6 Humorous, 22 Greetings, 23 Polite Language")
     ap.add_argument("--character", default="16", help="14 Birds, 16 Other, 10 Cats ...")
