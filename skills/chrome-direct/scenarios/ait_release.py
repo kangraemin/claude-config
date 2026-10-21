@@ -18,7 +18,7 @@ ap.add_argument("--version", required=True, help="버전 내역의 '버전' 값 
 ap.add_argument("--workspace", default="35273")
 a = ap.parse_args()
 ROW = f"const tr = [...document.querySelectorAll('table tbody tr')].find(r => r.children[1] && r.children[1].innerText.trim() === {a.version!r});"
-DLG = "const d = [...document.querySelectorAll('[role=dialog], [role=alertdialog]')].filter(__vis).pop();"
+DLG = "const d = [...document.querySelectorAll('[role=dialog], [role=alertdialog]')].pop();"  # __vis 필터는 창이 떠도 0개가 돼 시간 초과(10/22)
 CUR = r"return (document.body.innerText.match(/현재 출시된 버전:\s*(\S+)/) || [, ''])[1];"
 
 
