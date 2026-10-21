@@ -58,11 +58,11 @@ def send(msg, texts=(), media=()):
         return False
 
 
-def log(service, account, url):
+def log(service, account, url, what=''):
     os.makedirs(os.path.dirname(LEDGER), exist_ok=True)
     with open(LEDGER, 'a', encoding='utf-8') as f:
         f.write(json.dumps({'at': datetime.datetime.now().isoformat(timespec='minutes'), 'service': service,
-                            'account': account.lstrip('@'), 'url': url}, ensure_ascii=False) + '\n')
+                            'account': account.lstrip('@'), 'url': url, 'what': what[:80]}, ensure_ascii=False) + '\n')
 
 
 def today(account):
@@ -75,7 +75,7 @@ def today(account):
 
 
 def uploaded(service, account, url, texts=(), media=()):
-    log(service, account, url)
+    log(service, account, url, next((t.strip().splitlines()[0] for _, t in texts if t and t.strip()), ''))
     return send(f'[업로드 완료] {service} {account}\n{url}', texts, media)
 
 
@@ -90,17 +90,18 @@ if __name__ == '__main__':
     ap.add_argument('--service', default='')
     ap.add_argument('--account', default='')
     ap.add_argument('--url', default='')
+    ap.add_argument('--what', default='', help='무엇을 올렸나(앱·주제 한 줄)')
     ap.add_argument('--text-file', action='append', default=[])
     ap.add_argument('media', nargs='*')
     a = ap.parse_args()
     if a.kind == 'check':  # 오늘 이 계정에 이미 올렸는지(서비스 무관, 하루 1개 규칙)
         rows = today(a.account)
         for r in rows:
-            print(r['at'], r['service'], r['url'])
+            print(r['at'], r['service'], r['url'], r.get('what', ''))
         print('RESULT:', f'ALREADY_TODAY {len(rows)}' if rows else 'FREE')
         raise SystemExit(0)
     if a.kind == 'log':  # 스크립트 밖에서 손으로 올린 게시를 기록
-        log(a.service, a.account, a.url)
+        log(a.service, a.account, a.url, a.what)
         print('RESULT: LOGGED')
         raise SystemExit(0)
     texts = [(os.path.basename(f), open(f, encoding='utf-8').read()) for f in a.text_file]

@@ -16,7 +16,9 @@ description: 사용자 SNS 계정(개인 dev_ram_kang·@dev_ram_, 오구리웍�
 - 앱 레포 세션은 카드·캡션 같은 재료까지만 만든다.
   - 그다음 오구리웍스면 큐 표(`my-sns/drafts/oguri-release-queue.md`)에 날짜를 잡아 적는다.
   - 다른 계정이면 my-sns 세션에 SendMessage로 넘긴다.
-- 사용자가 그 세션에서 직접 "올려"라고 했을 때만 거기서 올린다. 그때도 아래 1~5를 지킨다.
+- 앱 레포 세션에서 사용자가 "올려"라고 해도 큐에 이미 날짜가 잡혀 있으면 그 날짜를 따른다. 사용자에게는 "오늘 몇 개 나갔고 ○일에 잡혀 있다"고 한 줄로 알린다. 큐에 날짜가 있으면 my-sns 세션에 따로 알릴 필요는 없다.
+- 사용자가 "오늘 꼭", "지금 바로"처럼 날짜를 콕 집으면 그 지시가 하루 1개·간격 규칙보다 우선한다. 올린 뒤 큐의 다음 항목을 하루씩 뒤로 민다.
+- my-sns 세션에 넘길 때는 `ListAgents`에서 `sns 홍보`가 살아 있는지 확인한다. 없으면 큐 표나 my-sns `drafts/`에 적어 두면 매일 10:07 cron이 집어 간다.
 
 ## 1. 계정과 Chrome 프로필을 맞춘다
 | 페르소나 | 계정 | Chrome 프로필 |
@@ -33,12 +35,14 @@ description: 사용자 SNS 계정(개인 dev_ram_kang·@dev_ram_, 오구리웍�
 
 ## 2. 오늘 이미 올렸는지, 같은 걸 올렸는지 본다
 ```bash
-python3 ~/.claude/scripts/sns_tg.py check --account oguriworks   # 오늘 이 계정 게시 목록, RESULT: ALREADY_TODAY n | FREE
+python3 ~/.claude/scripts/sns_tg.py check --account oguriworks   # 오늘 이 계정 게시(시각·서비스·링크·무엇), RESULT: ALREADY_TODAY n | FREE
 ```
+- 오구리웍스 출시 소식이면 큐 표(`my-sns/drafts/oguri-release-queue.md`)의 상태 칸부터 읽는다. 어느 앱이 어느 서비스에 이미 나갔는지 거기 적혀 있다.
 - **한 계정에는 하루에 글 하나만 올린다.** 같은 글을 인스타와 스레드에 함께 올리면 하나로 친다.
   - 사용자 지시(10/22): "하루에 와다다 올리지 말고 며칠에 걸쳐서".
   - 사용자가 정한 주기가 따로 있으면 그것을 따른다. 예: 글마감은 07시와 19시에 번갈아 올린다.
 - ALREADY_TODAY가 나오면 오늘은 올리지 않는다. 큐에서 다음 빈 날로 옮긴다.
+- 이미 하루에 2개 이상 나갔으면 지우지 않는다. 그 계정의 다음 게시를 하루 비워서 간격을 되찾는다.
 - 같은 앱·같은 주제가 이미 나갔는지도 확인한다. 그 계정 프로필 화면을 보거나 `ls ~/programming/vibecoding/my-sns/posted/`를 본다.
   - 한쪽 서비스에만 나갔으면 나머지 서비스에만 올린다.
 - 출시 소식은 큐(`my-sns/drafts/oguri-release-queue.md`)를 따른다. 간격은 2일이다.
@@ -77,7 +81,7 @@ python3 ~/.claude/scripts/sns_tg.py ask --msg "<계정> <서비스>: <무엇>" -
 - 스크립트 없이 손으로 올렸으면 둘 다 직접 한다.
 ```bash
 python3 ~/.claude/scripts/sns_tg.py done --msg "<서비스> <계정>\n<링크>" --text-file caption.txt 01.png ...
-python3 ~/.claude/scripts/sns_tg.py log --service 인스타 --account oguriworks --url <링크>
+python3 ~/.claude/scripts/sns_tg.py log --service 인스타 --account oguriworks --url <링크> --what "오늘타로 출시 소식"
 ```
 - my-sns `posted/YYYY-MM-DD-<slug>.md`에 링크를 적고 커밋·푸시한다. 오구리웍스 출시 소식이면 큐 표의 상태 칸도 채운다.
 - 알림은 공모전 봇(CONTEST_TG)으로 보내지 않는다. SNS 봇(SNS_UPLOAD_TG_*)으로만 보낸다.
