@@ -4,6 +4,7 @@
   ait_users.py oneul-tarot-card son-calendar               # 최근 7일
   ait_users.py son-calendar --from 2026-10-15 --to 2026-10-22
 콘솔 '홈 대시보드'가 부르는 API(POST .../mini-app/{app}/analytics/au, 본문 {timeUnit,startDate,endDate})를 로그인 탭 안 XHR로 읽는다.
+앱은 appName(예: byeoljari-unse)으로만 부른다. miniAppId(숫자)를 넣으면 4031. 사용자가 없는 날은 au가 빈 {}로 온다(오류 아님).
 본문 키는 timeUnit (timeUnitType 이면 4000, GET 이면 500). 집계는 하루 단위, 오늘 값은 캐시(cacheTime) 기준.
 """
 import datetime as dt
