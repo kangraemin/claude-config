@@ -7,6 +7,7 @@
   ait_adgroup_create.py seoultaxdev --name "카드 한 장 더 dev" --type 리워드 --unit 카드 --amount 1
   ait_adgroup_create.py ttuk-chiro --name 한판더 --type 전면형 --submit
 """
+import json
 import subprocess
 import sys
 import time
@@ -74,15 +75,20 @@ def main():
         if not a.submit:
             emit({"app": a.app, "filled": filled}, "DRY_RUN", "채우기만 — 확인 체크·등록하기 안 누름 (--submit)")
             return
-        r = js(tid, """const cb = [...document.querySelectorAll('input[type=checkbox]')].find(e => __vis(e) || (e.parentElement && __vis(e.parentElement)));
-          if (!cb) return 'NOTFOUND'; if (!cb.checked) __press(cb.closest('label') || cb); return cb.checked ? 'OK' : 'UNCHECKED';""")
-        if r != "OK":
-            raise RuntimeError(f"확인 체크박스: {r}")
-        r = js(tid, """const b = [...document.querySelectorAll('button')].filter(e => __vis(e) && e.innerText.trim() === '등록하기').pop();
-          if (!b || b.disabled) return b ? 'DISABLED' : 'NOTFOUND'; __press(b); return 'OK';""")
-        if r != "OK":
-            raise RuntimeError(f"등록하기: {r}")
-        poll(tid, "return /placement-group\\/list/.test(location.pathname) || /groupId=/.test(location.search) ? 1 : null", 30)
+        # 등록하기 클릭은 서버가 거절해도 화면에 아무 반응이 없다(토스트가 DOM에 안 남음) → 콘솔이 쓰는 같은 API를 직접 호출해 오류 사유를 읽는다.
+        # 2026-10-22: '같은 이름의 지면이 이미 있어요'(목록엔 안 보이는 잔존 이름)가 원인이었다 → 이름을 바꿔 재시도.
+        kind = {"리워드": "REWARDED", "전면형": "INTERSTITIAL", "배너": "BANNER"}[a.type]
+        body = {"displayName": a.name, "adFormat": kind}
+        if a.type == "배너":
+            body["adStyles"] = ["NORMAL" if a.banner_kind == "문구 강조" else "IMAGE"]  # IMAGE 값은 미검증
+        if a.type == "리워드":
+            body["rewardSettings"] = {"unitType": a.unit, "unitAmount": int(a.amount)}  # 필드명 미검증
+        api = f"/console/api-public/v3/appsintossconsole/workspaces/{a.workspace}/mini-app/{a.app}/in-app-ads-v2/placement-group"
+        res = js(tid, f"""var x=new XMLHttpRequest();x.open('POST',{api!r},false);x.setRequestHeader('Content-Type','application/json');
+          x.send({json.dumps(json.dumps(body, ensure_ascii=False))});return JSON.parse(x.responseText)""")
+        if res.get("resultType") != "SUCCESS":
+            raise RuntimeError(f"등록 실패: {(res.get('error') or {}).get('reason')}")
+        print(f"CREATED_ID {res['success']['groupId']}")
     out = subprocess.run([sys.executable, str(HERE / "ait_adgroups.py"), a.app, "--name", a.name, "--profile", a.profile, "--no-fallback"],
                          capture_output=True, text=True)
     print(out.stdout)
