@@ -107,15 +107,6 @@
             "timeout": 10
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/policy-changelog-check.sh",
-            "timeout": 30
-          }
-        ]
       }
     ],
     "PostToolUse": [
@@ -181,15 +172,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/ram/.claude/hooks/policy-changelog-check.sh",
-            "timeout": 30
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
             "command": "/Users/ram/.claude/hooks/library-usage-log.sh",
             "async": true,
             "timeout": 30
@@ -219,7 +201,8 @@
           }
         ]
       }
-    ]
+    ],
+    "UserPromptSubmit": []
   },
   "statusLine": {
     "type": "command",
