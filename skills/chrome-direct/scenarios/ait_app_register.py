@@ -17,6 +17,7 @@
 - 왜 화면 조작인가: 콘솔에 공개 API가 없다. 로그인 쿠키가 있는 탭 안에서 XHR/폼을 쓴다.
   탭은 이미 workspace 탭이 열린 창에 연다(다른 프로필 창은 콘솔 로그아웃 상태).
 검증: 2026-10-22 oneul-tarot-card(오늘타로) 손으로 같은 순서 성공. son-calendar(손없는날 달력)로 스크립트 create·push·meta --submit 전체 성공(검토 중 확인).
+  새 앱 첫 meta 는 1단계 글(영어 이름·부제·상세·이메일)이 빈 채 CHECK_SCREEN 으로 끝날 수 있다 → 같은 명령 재실행으로 해결(10/22 ireum-match).
   meta 재실행: 카테고리 이미 골라져 있으면 건너뜀, 스크린샷은 draft 에 0장일 때만 올림. 영어 이름 15자 초과면 '다음'이 조용히 막혀 사전 검사(TOO_LONG).
 """
 import argparse, base64, json, os, re, sys, time
