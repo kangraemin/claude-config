@@ -24,6 +24,7 @@ Usage:
 Exit 0 = ok, 1 = step failed (caller may fall back to Codex), 2 = macOS permission needed (a person allows it once).
 Secrets (--env) never hit argv or stdout: JS goes through a 0600 temp file, rtype text through cliclick's stdin.
 """
+import urllib.parse
 import argparse, contextlib, json, os, subprocess, sys, tempfile, time
 from pathlib import Path
 
@@ -312,6 +313,11 @@ def jxa(body, timeout=20):
     app = str(pid) if pid else '"Google Chrome"'
     script = f"ObjC.import('Foundation'); var C = Application({app}); (function(){{ {body} }})()"
     r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, timeout=timeout)
+    if r.returncode and pid and "(-600)" in r.stderr:
+        # Chrome을 실행 파일로 직접 띄우면(open/LaunchServices를 안 거침) pid로는 Apple Event가 안 간다(-600, 2026-10-22).
+        # 그때는 이름으로 보낸다
+        script = script.replace(f"Application({app})", 'Application("Google Chrome")', 1)
+        r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, timeout=timeout)
     if r.returncode:
         raise RuntimeError(r.stderr.strip())
     out = r.stdout.rstrip("\n")
@@ -371,9 +377,27 @@ def new_tab(url, profile=None, timeout=15):
     while time.time() < end:
         time.sleep(1)
         new = [r for r in tabs(with_id=True) if r[4] not in before]
+        # 다른 세션이 같은 순간 연 탭을 집지 않게, 요청한 주소의 호스트와 맞는 새 탭만 고른다.
+        # 다른 호스트로 바로 넘어가는 주소(로그인 등)는 시간이 반쯤 지나면 아무 새 탭이나 받는다.
+        host = urllib.parse.urlsplit(url).netloc.removeprefix("www.")
+        if time.time() < end - timeout / 2:
+            new = [r for r in new if not host or host in r[3]]
         if new:
-            return "id:" + new[-1][4]
+            tid = "id:" + new[-1][4]
+            # 메모리가 빠듯하면 뒤쪽 탭은 렌더가 멈춰 execute가 타임아웃난다. 새 탭을 앞으로 띄운다.
+            try:
+                front(tid)
+            except Exception:
+                pass
+            return tid
     raise RuntimeError(f"new tab did not appear for {url}")
+
+
+def front(match):
+    """탭을 그 창의 활성 탭으로 만들고 창을 맨 앞으로 올린다. 가려진 창은 Chrome이 렌더를 멈춘다."""
+    _t, w = ref(match)
+    _wi, ti = find_tab(match)
+    jxa(f"{w}.activeTabIndex = {ti}; {w}.index = 1")
 
 
 def close_tab(match):
@@ -406,7 +430,19 @@ def run_js(match, code, timeout=20):
         body = (f"var js = $.NSString.stringWithContentsOfFileEncodingError({q(path)}, $.NSUTF8StringEncoding, null).js;"
                 f" var r = {tab}.execute({{javascript: js}}); return r === undefined || r === null ? 'missing value' : String(r);")
         try:
-            return jxa(body, timeout)
+            for i in range(4):
+                if os.environ.get("CD_FRONT") == "1":  # 다른 세션과 창을 다툴 때: 매번 이 탭을 앞으로
+                    with contextlib.suppress(Exception):
+                        front(match)
+                try:
+                    return jxa(body, timeout if i == 0 else min(timeout, 12))
+                except subprocess.TimeoutExpired:
+                    # 다른 세션이 자기 창을 앞으로 가져가 이 탭이 가려지면 렌더가 멈춰 execute가 안 돌아온다(2026-10-22).
+                    # 이 탭을 앞으로 올리고 다시 시도
+                    if i == 3:
+                        raise
+                    front(match)
+                    time.sleep(1.5)
         except RuntimeError as e:
             if not _js_off(e):
                 raise
