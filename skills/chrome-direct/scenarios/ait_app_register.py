@@ -18,6 +18,7 @@
   탭은 이미 workspace 탭이 열린 창에 연다(다른 프로필 창은 콘솔 로그아웃 상태).
 검증: 2026-10-22 oneul-tarot-card(오늘타로) 손으로 같은 순서 성공. son-calendar(손없는날 달력)로 스크립트 create·push·meta --submit 전체 성공(검토 중 확인).
   새 앱 첫 meta 는 1단계 글(영어 이름·부제·상세·이메일)이 빈 채 CHECK_SCREEN 으로 끝날 수 있다 → 같은 명령 재실행으로 해결(10/22 ireum-match).
+  카테고리 이름이 틀리면 CATEGORY_NF 와 고를 수 있는 목록을 출력(10/22 2단계: 음식·음료|교육|건강|교통|공공·행정|소셜|편의|쇼핑|AI|비즈니스|콘텐츠|여행|일상|정보|재테크, 편의→도구|구독·렌탈|기타).
   meta 재실행: 카테고리 이미 골라져 있으면 건너뜀, 스크린샷은 draft 에 0장일 때만 올림. 영어 이름 15자 초과면 '다음'이 조용히 막혀 사전 검사(TOO_LONG).
 """
 import argparse, base64, json, os, re, sys, time
@@ -164,7 +165,10 @@ def cmd_meta(a):
                 c.js_json(t, "var o=[...document.querySelectorAll('[role=option]')].find(o=>o.innerText.trim()==%s);if(!o)return 0;o.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));o.click();return 1" % json.dumps(label))
                 time.sleep(1)
             if cur(i) != label:
-                raise RuntimeError(f'category {label} 없음')
+                c.js_json(t, "var e=[...document.querySelectorAll('[role=combobox]')][%d];e.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'mouse'}));e.click();return 1" % i)
+                time.sleep(1.5)
+                opts = c.js_json(t, "return [...document.querySelectorAll('[role=option]')].map(o=>o.innerText.trim()).join('|')")
+                sys.exit(f'RESULT: CATEGORY_NF {label} 없음 — 고를 수 있는 것: {opts}')
         click_text(t, '임시저장'); time.sleep(3)
         click_text(t, '다음'); time.sleep(3)
         # 로고: 올리면 그 input 이 사라져서 두 번째도 index 0
