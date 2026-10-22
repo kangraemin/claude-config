@@ -33,7 +33,10 @@ SHELL_NOISE = re.compile(r'^(?:\(eval\):\d+:|zsh:|bash: line \d+:|✓|The above 
 # 내장 예외만 있는 실패는 대개 방금 쓴 코드의 버그다. 모듈·패키지 오류는 유지한다.
 LOCAL_BUG = re.compile(r'^(?:TypeError|KeyError|ValueError|IndexError|AttributeError|NameError|'
                        r'UnboundLocalError|ZeroDivisionError|FileNotFoundError|SyntaxError|IndentationError|'
+                       r'AssertionError|PermissionError|UnicodeDecodeError|'
                        r'(?:json\.(?:decoder\.)?)?JSONDecodeError)\b')
+# 트레이스백에 찍힌 소스 줄은 오류 내용이 아니다(2026-10 오류 트리거 827회 중 주입 159회, 소스 줄 질의는 대부분 weak_evidence).
+SOURCE_LINE = re.compile(r'^(?:raise |except\b|with |try:|return |File ")')
 
 
 def result_rows(context):
@@ -50,7 +53,8 @@ def core_error(text):
     lines = [x for x in lines if not SHELL_NOISE.match(x)]
     # 오류 표식이 없는 줄(진행 로그 등)로는 검색하지 않는다.
     matches = [x for x in lines if (ERROR.search(x) or x.startswith('✗')) and not x.startswith('Traceback (')]
-    if not matches or all(LOCAL_BUG.match(x) or x.startswith('raise ') for x in matches):
+    matches = [x for x in matches if not SOURCE_LINE.match(x)]
+    if not matches or all(LOCAL_BUG.match(x) for x in matches):
         return ''
     return '\n'.join(matches[-2:])[:2000]
 

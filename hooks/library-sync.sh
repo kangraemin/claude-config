@@ -7,7 +7,8 @@ LIB_DIR="$HOME/claude-library"
 [ -f "$LIBRARY" ] || exit 0
 
 # 세션 카운터 파일 청소
-rm -f "$HOME/.claude/hooks/.library-check-counter-"* 2>/dev/null || true
+rm -f "$HOME/.claude/hooks/.counters/.library-check-counter-"* 2>/dev/null
+rm -f "$HOME/.claude/hooks/.library-check-counter-"* 2>/dev/null   # 옛 위치 잔재
 
 # 새 파일 있으면 commit + push
 if [ -d "$LIB_DIR/.git" ] && [ -n "$(git -C "$LIB_DIR" status --porcelain 2>/dev/null)" ]; then
