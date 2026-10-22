@@ -20,6 +20,7 @@
   새 앱 첫 meta 는 1단계 글(영어 이름·부제·상세·이메일)이 빈 채 CHECK_SCREEN 으로 끝날 수 있다 → 같은 명령 재실행으로 해결(10/22 ireum-match).
   카테고리 이름이 틀리면 CATEGORY_NF 와 고를 수 있는 목록을 출력(10/22 2단계: 음식·음료|교육|건강|교통|공공·행정|소셜|편의|쇼핑|AI|비즈니스|콘텐츠|여행|일상|정보|재테크, 편의→도구|구독·렌탈|기타).
   meta 재실행: 카테고리 이미 골라져 있으면 건너뜀, 스크린샷은 draft 에 0장일 때만 올림. 영어 이름 15자 초과면 '다음'이 조용히 막혀 사전 검사(TOO_LONG).
+  영어 이름은 단어 첫 글자만 대문자(약어 'BMI'도 거절) → 사전 검사(BAD_CASE).
 """
 import argparse, base64, json, os, re, sys, time
 sys.path.insert(0, os.path.expanduser('~/.config/claude-accounts/personal/skills/chrome-direct'))
@@ -139,6 +140,9 @@ def cmd_meta(a):
     en, sub = bullet(section(md, '영어 이름')), bullet(section(md, '부제'))
     if len(en.replace(' ', '')) > 15 or len(sub) > 20:
         sys.exit(f'RESULT: TOO_LONG 영어 이름 {len(en.replace(" ", ""))}/15, 부제 {len(sub)}/20')
+    # 영어 이름은 단어마다 첫 글자만 대문자('BMI Calculator' 거절 → 'Bmi Calculator', 10/22 bmi-gyesan)
+    if any(w[1:] != w[1:].lower() for w in en.split()):
+        sys.exit(f'RESULT: BAD_CASE 영어 이름은 단어 첫 글자만 대문자: {en}')
     t = console_tab(f'https://apps-in-toss.toss.im/workspace/{a.ws}/mini-app/{a.app}/meta/edit?deploymentId={a.deployment}')
     try:
         c.js_json(t, "window.onbeforeunload=null;return 1")
