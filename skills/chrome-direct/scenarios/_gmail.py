@@ -16,7 +16,7 @@ def search_url(query, account):
 def check_account(tid, account, timeout=30):
     """Wait for Gmail to load; raise Blocked if logged out or another account."""
     st = poll(tid, r"""if (/accounts\.google\.com/.test(location.host)) return {login: location.href};
-      if (!/Gmail/.test(document.title)) return null; return {title: document.title};""", timeout)
+      if (!/@/.test(document.title) || !document.querySelector('div[role=main]')) return null;  // Workspace 계정은 제목에 'Gmail'이 없다 return {title: document.title};""", timeout)
     if "login" in st:
         raise Blocked(f"LOGIN_REQUIRED Gmail 로그아웃 상태 ({st['login'][:80]}) — Chrome에서 직접 로그인 필요")
     if account not in st["title"]:
