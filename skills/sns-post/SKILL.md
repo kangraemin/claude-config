@@ -1,6 +1,6 @@
 ---
 name: sns-post
-description: 사용자 SNS 계정(개인 dev_ram_kang·@dev_ram_, 오구리웍스 oguriworks, 어디썼 eodi_sseot, 글마감 geulmagam, 먹맵 mukmap.kr)에 무엇이든 올리기 전에 반드시 거치는 공통 규칙. 어느 세션·어느 레포에서든 인스타·스레드·X·유튜브 쇼츠·링크드인·블로그에 게시·예약·댓글·답글을 하려 하면, 또는 "올려", "게시해", "홍보 글", "출시 소식 올려", "인스타에 카드", "스레드에 써" 같은 말이 나오면 이 스킬부터 연다. 앱 출시 홍보를 앱 레포 세션에서 하려 할 때도 해당한다.
+description: 광고·홍보·마케팅(지식iN·카페·커뮤니티·SNS) 작업을 어느 세션에서 하든, 그리고 사용자 SNS 계정(개인 dev_ram_kang·@dev_ram_, 오구리웍스 oguriworks, 어디썼 eodi_sseot, 글마감 geulmagam, 먹맵 mukmap.kr, 썸판독기 ssum.pandok)에 무엇이든 올리기 전에 반드시 거치는 공통 규칙. 어느 세션·어느 레포에서든 인스타·스레드·X·유튜브 쇼츠·링크드인·블로그에 게시·예약·댓글·답글을 하려 하면, 또는 "올려", "게시해", "홍보 글", "출시 소식 올려", "인스타에 카드", "스레드에 써" 같은 말이 나오면 이 스킬부터 연다. 앱 출시 홍보를 앱 레포 세션에서 하려 할 때도 해당한다.
 ---
 
 # SNS 게시 공통 규칙
@@ -10,6 +10,18 @@ description: 사용자 SNS 계정(개인 dev_ram_kang·@dev_ram_, 오구리웍�
 그래서 누가 올리든 아래 순서를 똑같이 밟는다.
 계정·말투·주기의 원본은 my-sns 레포(`~/programming/vibecoding/my-sns/CLAUDE.md`, `style/`)다.
 여기는 모든 세션이 지켜야 할 최소 규칙만 담는다.
+
+## 0-0. 광고·홍보·마케팅은 한 줄기로 (사용자 10/22 "다른 세션에서 광고 홍보 마케팅 하면 전부 이 세션 또는 그 세션에서 이 세션에서 하던 일 그대로 하게 해")
+- 대상: SNS 게시·예약, 지식iN·네이버 카페·커뮤니티 글, 출시 홍보, 홍보용 카드·영상, 유입 링크 추가 등 홍보·마케팅 전부.
+- 먼저 `ListAgents`로 `sns 홍보`(my-sns 세션)가 살아 있는지 본다. 살아 있으면 재료(파일 경로·캡션·링크·원하는 날짜)를 SendMessage로 넘기고, 그 세션이 큐·게시·알림·달력을 한다.
+- 그 세션이 없거나 직접 해야 하면 my-sns 세션이 하던 일을 **빠짐없이** 똑같이 한다.
+  1. 큐에 넣는다: `my-sns/drafts/queue.json`(예약 게시) 또는 오구리웍스 출시 표 `my-sns/drafts/oguri-release-queue.md`. 지식iN 링크는 `my-sns/drafts/kin/link-pool.md`.
+  2. 숫자 재검증 메타: `python3 my-sns/drafts/src/prepost_verify.py init --id <id>`(숫자가 들어간 카드면).
+  3. **게시 달력 아티팩트 갱신**: `my-sns/drafts/src/calendar/README.md` 순서대로(https://claude.ai/artifact/GW7GjbZTzLmAPayoEHKR5j). 새 계정이면 달력에 줄도 추가.
+  4. 게시 전 `sns_tg.py ask`, 게시 후 `[업로드 완료]`·`sns_tg.py log`, `posted/` 기록.
+  5. my-sns 레포 변경은 개별 git add·커밋·push.
+- 끝나면 결과를 `sns 홍보` 세션에도 한 줄 SendMessage로 남긴다(살아 있으면). 같은 계정 일정을 두 세션이 따로 잡지 않게.
+- **매번 더 좋은 방법을 제시한다.** 결과 보고 끝에 "더 좋은 방법:" 한 줄을 붙인다(유입이 더 큰 채널, 더 싼 자동화, 지금 방식의 낭비 등). 없으면 "더 좋은 방법: 없음(이유)". 사용자는 지금보다 나은 방법을 적극적으로 찾는 중이다. 바로 할 수 있는 개선이면 제안만 하지 말고 그 자리에서 한다.
 
 ## 0. 내가 올려도 되는 세션인가
 - SNS 운영은 my-sns 세션(`sns 홍보`)이 맡는다.
@@ -32,6 +44,7 @@ description: 사용자 SNS 계정(개인 dev_ram_kang·@dev_ram_, 오구리웍�
 | 오구리웍스(사업자) | oguriworks (인스타·스레드) | Profile 5 |
 | 글마감 | geulmagam | Profile 6 |
 | 먹맵 | mukmap.kr | Profile 7 |
+| 썸 판독기 | ssum.pandok (인스타·스레드) | Profile 8 |
 - 다른 프로필로 로그인하거나 게시하지 않는다. 페르소나가 섞인다.
 - 탭은 `--match id:`로 잡는다. URL로 잡으면 다른 프로필의 같은 사이트 탭을 잡는다.
 - 개인 프로필에는 "여기어때 개발자"라고 쓴다. "오구리웍스 대표"라고 쓰지 않는다.
