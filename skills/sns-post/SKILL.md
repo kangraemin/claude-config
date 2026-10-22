@@ -93,6 +93,7 @@ python3 ~/.claude/scripts/sns_tg.py ask --msg "<계정> <서비스>: <무엇>" -
   - 유튜브: `.../yt_post.py ... --post`
   - 스레드 답글: `.../th_reply.py ... --post`
   - 인스타: `~/programming/vibecoding/seoul-expense-app/.claude/skills/insta-web/scripts/ig_post.py 01.png ... --caption-file c.txt --profile "Profile N" --share`
+  - 네이버 블로그(오구리 blog.naver.com/oguriworks, Profile 5): `my-sns/drafts/src/naver_blog_post.py --dir drafts/naver-blog/<slug> [--post]` (post.md: `# 제목`, `![](01.png)` 자리에 그림, `태그:` 줄). 예약은 queue.json에 `"nb": {"dir": ...}` 항목.
 - 인스타 `--share`가 "기다림 시간 초과"로 FAIL을 내도 실제로는 올라갔을 수 있다.
   - 다시 올리기 전에 `ig_status.py --profile "Profile N"`으로 게시물 수를 확인한다. 중복 게시는 지우기 어렵다.
 - 다른 앱이 화면 앞으로 튀어나오면 붙여넣기가 엉뚱한 곳에 간다.

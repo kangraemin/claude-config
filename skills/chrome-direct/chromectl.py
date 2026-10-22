@@ -295,7 +295,7 @@ def chrome_pid():
     --user-data-dir로 띄우면 AppleScript `tell application "Google Chrome"`이 그쪽을 잡는다(2026-10-22).
     그래서 Chrome 명령은 전부 JXA `Application(pid)`로 보낸다. 못 찾으면 None(이름으로 보냄)."""
     # 새 탭을 여는 `Google Chrome --profile-directory=…`도 잠깐 메인처럼 보인다 → 가장 오래 돈 것을 고른다
-    r = subprocess.run(["ps", "-axo", "pid=,etime=,args="], capture_output=True, text=True)
+    r = subprocess.run(["ps", "-axwwo", "pid=,etime=,args="], capture_output=True, text=True)
     best = None
     for line in r.stdout.splitlines():
         pid, et, args = (line.split(None, 2) + ["", ""])[:3]
