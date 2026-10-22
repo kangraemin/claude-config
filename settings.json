@@ -202,7 +202,19 @@
         ]
       }
     ],
-    "UserPromptSubmit": []
+    "UserPromptSubmit": [],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/stdin-multiprocessing-guard.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   },
   "statusLine": {
     "type": "command",
