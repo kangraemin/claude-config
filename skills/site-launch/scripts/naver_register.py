@@ -3,6 +3,7 @@
   python3 naver_register.py verify  https://site   → [소유확인] → 보안문자 그림을 텔레그램으로 보내고 답장(최대 15분) 받아 입력
   python3 naver_register.py sitemap https://site [sitemap.xml]
   python3 naver_register.py rss     https://site [feed.xml]
+  python3 naver_register.py crawl   https://site URL [URL ...]  → '웹 페이지 수집' 요청(사이트 하위 URL). URL마다 RESULT 줄
 네이버는 경로 붙은 주소를 안 받는다(사이트 단위). 로그아웃이면 chrome-direct/scenarios/naver_login.py --qr --notify.
 백그라운드 탭은 Vue 화면이 안 그려지므로 c.shot()으로 탭을 앞으로 띄운 뒤 읽는다."""
 import os, re, subprocess, sys, time, urllib.parse, urllib.request, json
@@ -39,10 +40,15 @@ def captcha(t):
     sent = json.loads(subprocess.check_output(['curl', '-s', '-F', f'chat_id={chat}', '-F', f'photo=@{TMP}/cap.png', '-F',
         f'caption={site} 네이버 서치어드바이저 보안문자 — 보이는 글자를 답장해 주세요', f'https://api.telegram.org/bot{tok}/sendPhoto']))
     t0 = sent['result']['date']
-    print('CAPTCHA sent to telegram, waiting reply', flush=True)
+    print(f'CAPTCHA sent to telegram, waiting reply (or write it to {TMP}/answer.txt)', flush=True)
     for _ in range(180):
-        ups = json.load(urllib.request.urlopen(f'https://api.telegram.org/bot{tok}/getUpdates?offset=-10'))['result']
+        # python urllib은 텔레그램 TLS가 가끔 Connection reset → curl로 읽고 실패하면 다음 회차
+        try: ups = json.loads(subprocess.check_output(['curl', '-s', '-m', '15', f'https://api.telegram.org/bot{tok}/getUpdates?offset=-10']))['result']
+        except Exception: time.sleep(5); continue
         rep = [u['message']['text'] for u in ups if u.get('message', {}).get('date', 0) > t0 and u['message'].get('text')]
+        # 텔레그램 채널 플러그인을 켠 다른 Claude 세션이 답장을 먼저 가져가면 여기로 안 온다 → 채팅으로 받은 답을 이 파일에 쓴다
+        af = f'{TMP}/answer.txt'
+        if not rep and os.path.exists(af) and os.path.getmtime(af) > t0: rep = [open(af).read().strip()]
         if rep: break
         time.sleep(5)
     else:
@@ -81,5 +87,16 @@ try:
         c.run_js(t, "setTimeout(()=>{[...document.querySelectorAll('button')].find(b=>b.innerText.trim()=='확인').click()},10);'ok'"); time.sleep(5)
         captcha(t)
         tx = text(t); i = tx.find('제출된 사이트맵' if cmd == 'sitemap' else '제출된 RSS'); print('RESULT:', tx[i:i + 160].replace('\n', ' ') if i >= 0 else tx[:300].replace('\n', ' '))
+    elif cmd == 'crawl':
+        c.goto(t, f'https://searchadvisor.naver.com/console/site/request/crawl?site={q}'); time.sleep(7); front(t)
+        for url in sys.argv[3:]:
+            path = urllib.parse.urlsplit(url).path
+            c.fill(t, 'input[type=text]', url); time.sleep(1)
+            c.run_js(t, "setTimeout(()=>{[...document.querySelectorAll('button')].find(b=>b.innerText.trim()=='확인').click()},10);'ok'"); time.sleep(4)
+            if captcha(t): front(t)
+            time.sleep(2); tx = text(t)
+            i = tx.find('수집 요청 내역')
+            ok = path in tx[i:i + 3000] if i >= 0 else False
+            print('RESULT', url, '요청됨' if ok else '확인 안 됨: ' + tx[max(i, 0):max(i, 0) + 200].replace('\n', ' '), flush=True)
 finally:
     c.close_tab(t)
