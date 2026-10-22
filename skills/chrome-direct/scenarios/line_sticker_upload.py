@@ -27,6 +27,7 @@ import io
 import json
 import re
 import os
+import subprocess
 import sys
 import time
 import zipfile
@@ -43,11 +44,13 @@ for _l in Path("~/.claude/.env").expanduser().read_text().splitlines():  # 비�
 
 
 def R(f, *a, **k):
-    """chromectl 이 간헐적으로 RuntimeError(-600/-609)를 내서 재시도한다."""
+    """chromectl 이 간헐적으로 RuntimeError(-600/-609)를 내서 재시도한다.
+    부하가 높으면(load 100+) 페이지 로딩 중 execute가 20초를 넘긴다 → 대기 90초, 타임아웃도 재시도(2026-10-22)."""
+    k.setdefault("timeout", 90)
     for _ in range(10):
         try:
             return f(*a, **k)
-        except RuntimeError as e:
+        except (RuntimeError, subprocess.TimeoutExpired) as e:
             last = e
             time.sleep(1.5)
     raise last
@@ -94,11 +97,18 @@ def close_notices(t):
     js(t, "(()=>{[...document.querySelectorAll('button.FnCloseDialogBtn,button')].filter(b=>b.getClientRects().length&&(b.classList.contains('FnCloseDialogBtn')||b.innerText.trim()=='Close')).forEach(b=>b.click());return 1})()")
 
 
-def my_root(t):
-    href = js(t, "location.href")
-    if "/my/" not in href:
-        return None
-    return href.split("/my/")[1].split("/")[0]
+def my_root(t, wait=30):
+    """/my/ → /my/<root>/ 리다이렉트를 기다린다(부하가 높으면 5초 넘게 걸린다, 2026-10-22)."""
+    end = time.time() + wait
+    while True:
+        try:
+            href = js(t, "location.href")
+        except Exception:  # 페이지 로딩 중엔 execute가 20초 넘게 막힌다
+            href = ""
+        root = href.split("/my/")[1].split("/")[0] if "/my/" in href else ""
+        if root or time.time() > end or (href and jj(t, "return !!document.querySelector('input[name=tid]')")):
+            return root or None
+        time.sleep(2)
 
 
 def login(t):
