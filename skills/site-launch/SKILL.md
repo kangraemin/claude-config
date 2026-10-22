@@ -64,6 +64,7 @@ python3 indexnow.py <host> <key> <sitemap 경로|URL>
 python3 bing_register.py https://site --public web/public   # BingSiteAuth.xml 생성 → 배포 → 같은 명령 다시 → 확인·sitemap 제출
 ```
 - 키 `BING_WEBMASTER_API_KEY`(~/.claude/.env). 이미 확인·제출된 사이트는 건너뛰고 상태만 출력.
+- URL 직접 제출: `POST /webmaster/api.svc/json/SubmitUrlBatch?apikey=` `{siteUrl, urlList(≤500)}`. 할당량은 `GetUrlSubmissionQuota`(2026-10-22 kangraemin.github.io 하루 10,000). 새 사이트는 sitemap 전체를 500개씩 한 번에 낸다.
 - sitemap은 `SubmitFeed`로 낸다. `SubmitSitemap`은 null만 주고 목록에 안 남는다.
 - GSC에 URL-prefix로 등록된 사이트는 웹 'Import from GSC'로 한 번에 가져올 수 있다. "Site addition unsuccessful"이 떠도 실제론 들어간다. GSC 도메인 속성(sc-domain)은 목록에 안 나와 이 스크립트로 넣는다.
 
