@@ -3,7 +3,7 @@
 배포 직후 api.indexnow.org는 403일 수 있다(키 파일 전파 대기) — 몇 분 뒤 다시."""
 import json, re, sys, urllib.request
 host, key, sm = sys.argv[1:4]
-xml = urllib.request.urlopen(sm).read().decode() if sm.startswith('http') else open(sm).read()
+xml = urllib.request.urlopen(urllib.request.Request(sm, headers={'User-Agent': 'Mozilla/5.0'})).read().decode() if sm.startswith('http') else open(sm).read()
 urls = re.findall(r'<loc>(.*?)</loc>', xml)[:10000]
 for ep in ['https://searchadvisor.naver.com/indexnow', 'https://api.indexnow.org/indexnow']:
     try:
