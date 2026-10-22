@@ -21,6 +21,7 @@ ap.add_argument("--name", required=True)
 ap.add_argument("--type", required=True, choices=["리워드", "전면형", "배너"])
 ap.add_argument("--unit", help="리워드 보상 단위 (예: 카드)")
 ap.add_argument("--amount", help="리워드 수량 (예: 1)")
+ap.add_argument("--banner-kind", default="문구 강조", choices=["문구 강조", "이미지 강조"], help="배너 광고 종류 (배너만)")
 ap.add_argument("--workspace", default="35273")
 a = ap.parse_args()
 HERE = Path(__file__).resolve().parent
@@ -60,6 +61,12 @@ def main():
         if r != "OK":
             raise RuntimeError(f"유형 '{a.type}': {r}")
         time.sleep(0.8)
+        if a.type == "배너":  # 2026-10 콘솔에 '배너 광고 종류'가 생김. 안 고르면 등록하기가 반응 없음
+            r = js(tid, f"""const c = [...document.querySelectorAll('label, [role=radio], button, div')].filter(e => __vis(e) && e.innerText.trim().split('\\n')[0] === {a.banner_kind!r})
+                .sort((x, y) => x.innerText.length - y.innerText.length)[0]; if (!c) return 'NOTFOUND'; __press(c); return 'OK';""")
+            if r != "OK":
+                raise RuntimeError(f"배너 종류 '{a.banner_kind}': {r}")
+            time.sleep(0.8)
         if a.type == "리워드":
             setv(tid, "보석", a.unit)
             setv(tid, "100", a.amount)

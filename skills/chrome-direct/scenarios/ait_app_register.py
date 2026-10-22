@@ -173,12 +173,21 @@ def cmd_meta(a):
                 time.sleep(1.5)
                 opts = c.js_json(t, "return [...document.querySelectorAll('[role=option]')].map(o=>o.innerText.trim()).join('|')")
                 sys.exit(f'RESULT: CATEGORY_NF {label} 없음 — 고를 수 있는 것: {opts}')
-        click_text(t, '임시저장'); time.sleep(3)
+        try:
+            click_text(t, '임시저장'); time.sleep(3)
+        except RuntimeError as e:  # 1단계에 바뀐 게 없으면 버튼이 꺼져 있다(재실행). 그대로 다음으로
+            if 'DISABLED' not in str(e):
+                raise
         click_text(t, '다음'); time.sleep(3)
         # 로고: 올리면 그 input 이 사라져서 두 번째도 index 0
         for p in [a.icon, a.dark_icon or a.icon]:
             files_into(t, "[...document.querySelectorAll('input[type=file][accept*=png]')][0]", [p])
-        if len(xhr(t, 'GET', base + a.app)['success']['draft']['images']) == 0:  # 재실행 때 스크린샷이 중복으로 쌓이지 않게
+        if a.replace_shots:  # 스크린샷마다 div.delete-button > button[aria-label=삭제]. 누르면 확인 창 없이 바로 빠진다(10/22 ssum-pandok)
+            for _ in range(30):
+                if not c.js_json(t, "var b=document.querySelector('.delete-button > button[aria-label=\"삭제\"]');if(!b)return 0;b.click();return 1"):
+                    break
+                time.sleep(0.8)
+        if a.replace_shots or len(xhr(t, 'GET', base + a.app)['success']['draft']['images']) == 0:  # 재실행 때 스크린샷이 중복으로 쌓이지 않게
             c.js_json(t, "var e=[...document.querySelectorAll('*')].filter(e=>e.childElementCount==0&&e.textContent.trim()=='스크린샷 이미지 직접 올리기').pop();(e.closest('button')||e).click();return 1")
             time.sleep(2)
             files_into(t, "[...document.querySelectorAll('input[type=file]')].find(e=>e.multiple)", [os.path.expanduser(p) for p in a.shots.split(',')])
@@ -265,6 +274,7 @@ ap.add_argument('--store')
 ap.add_argument('--icon')
 ap.add_argument('--dark-icon')
 ap.add_argument('--shots')
+ap.add_argument('--replace-shots', action='store_true', help='올라가 있는 스크린샷을 지우고 --shots 로 바꾼다')
 ap.add_argument('--category', default='생활/콘텐츠/운세')
 ap.add_argument('--cs-from', default='oneul-kkum')
 ap.add_argument('--version')
