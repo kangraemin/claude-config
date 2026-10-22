@@ -18,7 +18,8 @@ ap.add_argument("--version", required=True, help="버전 내역의 '버전' 값 
 ap.add_argument("--workspace", default="35273")
 a = ap.parse_args()
 ROW = f"const tr = [...document.querySelectorAll('table tbody tr')].find(r => r.children[1] && r.children[1].innerText.trim() === {a.version!r});"
-DLG = "const d = [...document.querySelectorAll('[role=dialog], [role=alertdialog]')].pop();"  # __vis 필터는 창이 떠도 0개가 돼 시간 초과(10/22)
+# 확인 창은 role=dialog가 아니라 body 맨 끝 div로 뜬다('…버전을 출시할까요?'). role로 찾으면 0개라 시간 초과(10/22 seoultax).
+DLG = "const d = [...document.querySelectorAll('[role=dialog], [role=alertdialog], body > div')].reverse().find(x => /출시할까요/.test(x.innerText));"
 CUR = r"return (document.body.innerText.match(/현재 출시된 버전:\s*(\S+)/) || [, ''])[1];"
 
 
@@ -47,17 +48,17 @@ def main():
         if not a.submit:
             emit(info, "DRY_RUN", "출시 가능 — --submit 으로 출시")
             return
-        # 백그라운드 탭에선 확인 창이 안 그려지고, __press 로는 창이 안 뜰 때가 있다(10/22 세 앱 모두 시간 초과).
+        # 확인 창은 click() 으로 안 뜰 때가 있고 __press 로는 떴다(10/22 seoultax). 둘 다 안 되면 탭을 앞으로 띄운 뒤 다시.
         # 탭을 앞으로 띄우고 평범한 click() 으로 누르면 바로 뜬다.
-        if js(tid, ROW + "const b = [...tr.querySelectorAll('button')].find(b => b.innerText.trim() === '출시하기'); b.click(); return 1") != 1:
+        if js(tid, ROW + "const b = [...tr.querySelectorAll('button')].find(b => b.innerText.trim() === '출시하기'); __press(b); return 1") != 1:
             raise RuntimeError("버튼 누르기 실패")
         dtext = poll(tid, DLG + "return d ? d.innerText : null", 15)
         info["dialog"] = dtext[:800]
         if any(k in dtext for k in ("약관", "동의")):
             raise Blocked("NEEDS_OWNER 출시 창에 약관/동의 — " + dtext[:200].replace("\n", " "))
-        ok = js(tid, DLG + """const bs = [...d.querySelectorAll('button')].filter(b => __vis(b) && !b.disabled && !/취소|닫기/.test(b.innerText));
+        ok = js(tid, DLG + """const bs = [...d.querySelectorAll('button')].filter(b => !b.disabled && !/취소|닫기/.test(b.innerText));
           const b = bs.find(b => /출시/.test(b.innerText)) || bs.find(b => /확인/.test(b.innerText)); if (!b) return 'NOBUTTON:' + bs.map(b => b.innerText).join('|');
-          b.click(); return 'OK';""")
+          __press(b); return 'OK';""")
         if ok != "OK":
             raise RuntimeError(f"창 출시 버튼: {ok}")
         for _ in range(20):
