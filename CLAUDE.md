@@ -30,7 +30,7 @@
 - Claude 한도 초과 시 Codex로 자동 전환(fallback) 금지.
 
 ## Anthropic API 크레딧 <!-- why: decisions/_global/process/anthropic-api-credit-shared-100usd-avoid-in-tests-benchmark-in-prod.md -->
-- 매달 받는 API 크레딧은 월 $100 한도 안에서 돈 되는 상용 서비스들이 나눠 쓴다. API가 없어서 못 만드는 서비스가 없게 한다.
+- 매달 받는 API 크레딧은 월 $200 한도 안에서 돈 되는 상용 서비스들이 나눠 쓴다. API가 없어서 못 만드는 서비스가 없게 한다.
 - 개발·테스트에선 최대한 피한다: 목업·녹화 응답·규칙·`claude -p`·로컬 LLM. 실제 호출 테스트는 최소 건수만.
 - 상용은 실제 입력 표본으로 모델(Haiku·Sonnet·Opus 등)을 벤치마크해 품질 기준을 넘는 것 중 가장 적절한 것을 쓴다. 서비스별 키·월 예산 상한을 둔다.
 
