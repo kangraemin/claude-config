@@ -4,6 +4,7 @@
   kin_answer.py --url <질문 URL> --text-file a.txt            # dry-run: 상태 확인 + 입력창에 붙여넣기까지
   kin_answer.py --url <질문 URL> --text-file a.txt --submit   # '등록'까지 누르고 내 답변이 보이는지 확인
   kin_answer.py --url <질문 URL> --check                      # 상태만(마감·채택·내 답변 있음)
+  --image shot.png                                             # 본문 뒤에 사진 1장 첨부(에디터에 <img>가 들어간 걸 확인한 뒤에만 등록)
   --shot evidence.png                                          # 등록 후 화면 캡처
 
 - SmartEditor ONE은 JS 값 넣기·가짜 paste 이벤트를 무시한다 → 실제 클릭(cliclick) + pbcopy + ⌘V.
@@ -15,7 +16,7 @@ Exit 0 = OK/POSTED, 1 = 실패, 2 = BLOCKED(로그아웃·마감·채택·이미
 import subprocess, time
 from pathlib import Path
 
-from _common import Blocked, emit, js, parser, poll, run, tab
+from _common import NO_UNLOAD, Blocked, emit, js, parser, poll, run, tab
 import chromectl as c
 
 ap = parser(__doc__)
@@ -24,6 +25,7 @@ ap.add_argument("--text-file")
 ap.add_argument("--submit", action="store_true")
 ap.add_argument("--check", action="store_true")
 ap.add_argument("--shot")
+ap.add_argument("--image")
 a = ap.parse_args()
 a.no_fallback = True  # 답변 등록은 Codex로 넘기지 않는다(중복 등록 위험)
 
@@ -39,6 +41,7 @@ STATE = r"""if (document.readyState !== 'complete') return null;
 GUARD = r"""if (!window.__kinGuard) { window.__kinGuard = 1; window.__kinMsgs = [];
   window.alert = m => { window.__kinMsgs.push('alert:' + m); };
   window.confirm = m => { window.__kinMsgs.push('confirm:' + m); return true; }; } return 1;"""
+IMG_COUNT = "return document.querySelectorAll('.se-content img.se-image-resource, .se-content .se-module-image img').length"
 EDITOR_TEXT = "const e = document.querySelector('.se-content'); return e ? e.innerText : '';"
 
 
@@ -46,11 +49,52 @@ def key(*k):
     subprocess.run(["cliclick", *k], check=True, capture_output=True)
 
 
+def attach_image(tid, path, out):
+    """SE ONE 사진 버튼이 쓰는 숨은 input[type=file]에 base64→File→DataTransfer로 넣고 change 이벤트. 에디터에 img가 늘어야 성공."""
+    import base64, mimetypes
+    p = Path(path).expanduser()
+    b64 = base64.b64encode(p.read_bytes()).decode()
+    mime = mimetypes.guess_type(p.name)[0] or "image/png"
+    before = js(tid, IMG_COUNT) or 0
+    # 사진 버튼을 눌러 숨은 file input을 만들게 한다(파일 대화상자가 뜨면 안 되므로 input.click은 막는다)
+    js(tid, """if (!window.__kinNoPick) { window.__kinNoPick = 1;
+      const o = HTMLInputElement.prototype.click;
+      HTMLInputElement.prototype.click = function () { if (this.type === 'file') { window.__kinFile = this; return; } return o.call(this); }; } return 1;""")
+    try:
+        c.press(tid, sel="button.se-image-toolbar-button")
+    except Exception as e:  # 버튼 셀렉터가 다르면 텍스트로
+        out["image_btn_err"] = str(e)[:100]
+    time.sleep(1.5)
+    r = js(tid, f"""const inp = window.__kinFile || document.querySelector('input[type=file]');
+      if (!inp) return 'NO_INPUT';
+      const bin = atob({c.q(b64)}); const u8 = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+      const f = new File([u8], {c.q(p.name)}, {{type: {c.q(mime)}}});
+      const dt = new DataTransfer(); dt.items.add(f); inp.files = dt.files;
+      inp.dispatchEvent(new Event('input', {{bubbles: true}})); inp.dispatchEvent(new Event('change', {{bubbles: true}}));
+      return 'SET';""", timeout=60)
+    out["image_set"] = r
+    deadline = time.time() + 40
+    n = before
+    while time.time() < deadline:
+        n = js(tid, IMG_COUNT) or 0
+        if n > before:
+            break
+        time.sleep(1.5)
+    out["image_count"] = n
+    out["image_src"] = (js(tid, "const i = document.querySelector('.se-content img'); return i ? (i.currentSrc || i.src || '').slice(0, 80) : ''") or "")
+    if n <= before:
+        raise RuntimeError(f"image not in editor (input={r}, imgs {before}->{n})")
+
+
 def main():
     out = {"url": a.url}
     with tab(a.url, a) as tid:
         st = poll(tid, STATE, 30)
         out["state"] = st
+        # 점검 화면엔 로그인 표시가 없어 LOGGED_OUT으로 오판한다(10/22 오후 내내) → 점검이면 따로 알린다
+        if js(tid, "return /서비스 점검 중/.test(document.body.innerText.slice(0,500))"):
+            raise Blocked("MAINTENANCE 지식iN 서비스 점검 중 — 이번 회차 넘김(로그인 확인·QR 불필요)")
         if not st["login"]:
             raise Blocked("LOGGED_OUT naver_login.py --qr 먼저")
         if st["warn"]:
@@ -65,26 +109,34 @@ def main():
             emit(out, "OK", "답변 가능")
             return
         text = Path(a.text_file).read_text().strip()
+        js(tid, NO_UNLOAD)
         c.press(tid, sel="._answerWriteButton")
         poll(tid, "return [...document.querySelectorAll('.se-content .se-text-paragraph')].some(__vis)", 15)
-        for _ in range(3):  # 다른 앱·창이 앞으로 오면 ⌘V가 엉뚱한 곳에 들어간다 → 포커스 확인 후에만 붙여넣기
-            c.rclick(tid, sel=".se-content .se-text-paragraph")
-            time.sleep(0.8)
-            front = c.osa('tell application "System Events" to get name of first process whose frontmost is true')
-            if front == "Google Chrome" and js(tid, "return document.hasFocus() && /IFRAME|DIV/.test(document.activeElement.tagName)"):
-                break
-        else:
-            raise RuntimeError(f"editor focus failed (frontmost={front})")
-        key("kd:cmd", "t:a", "ku:cmd", "kp:delete")
-        time.sleep(0.5)
-        subprocess.run(["pbcopy"], input=text.encode(), check=True)
-        key("kd:cmd", "t:v", "ku:cmd")
-        time.sleep(2)
-        got = js(tid, EDITOR_TEXT)
         norm = lambda s: "".join(s.split())  # noqa: E731
-        if norm(got) != norm(text):
+        for attempt in range(4):  # 포커스·붙여넣기가 가끔 빗나간다 → 클릭부터 다시(질문 페이지는 그대로)
+            for _ in range(3):  # 다른 앱·창이 앞으로 오면 ⌘V가 엉뚱한 곳에 들어간다 → 포커스 확인 후에만 붙여넣기
+                c.rclick(tid, sel=".se-content .se-text-paragraph")
+                time.sleep(0.8)
+                front = c.osa('tell application "System Events" to get name of first process whose frontmost is true')
+                if front == "Google Chrome" and js(tid, "return document.hasFocus() && /IFRAME|DIV/.test(document.activeElement.tagName)"):
+                    break
+            else:
+                raise RuntimeError(f"editor focus failed (frontmost={front})")
+            key("kd:cmd", "t:a", "ku:cmd", "kp:delete")
+            time.sleep(0.5)
+            subprocess.run(["pbcopy"], input=text.encode(), check=True)
+            key("kd:cmd", "t:v", "ku:cmd")
+            time.sleep(2)
+            got = js(tid, EDITOR_TEXT)
+            if norm(got) == norm(text):
+                break
+            out.setdefault("paste_retries", []).append(len(norm(got)))
+            time.sleep(2)
+        else:
             raise RuntimeError(f"editor mismatch: {len(norm(got))} vs {len(norm(text))} chars: {got[:80]!r}")
         out["pasted"] = len(text)
+        if a.image:
+            attach_image(tid, a.image, out)
         if not a.submit:
             emit(out, "OK", "dry-run 붙여넣기까지 (등록 안 함)")
             return
