@@ -116,15 +116,6 @@
             "timeout": 30
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/scripts/worklog-update-check.sh",
-            "timeout": 15
-          }
-        ]
       }
     ],
     "PostToolUse": [
@@ -147,26 +138,6 @@
             "timeout": 5
           }
         ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/worklog.sh",
-            "timeout": 5,
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/on-commit.sh",
-            "timeout": 5
-          }
-        ],
-        "matcher": "Bash"
       }
     ],
     "Stop": [
@@ -201,6 +172,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 /Users/ram/.claude/hooks/ram-proxy-gate.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "/Users/ram/.claude/hooks/policy-changelog-check.sh",
             "timeout": 30
           }
@@ -211,17 +191,8 @@
           {
             "type": "command",
             "command": "/Users/ram/.claude/hooks/library-usage-log.sh",
-            "timeout": 30,
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 /Users/ram/.claude/hooks/ram-proxy-gate.py",
-            "timeout": 10
+            "async": true,
+            "timeout": 30
           }
         ]
       }
@@ -245,17 +216,6 @@
             "type": "command",
             "command": "/Users/ram/.claude/hooks/library-trigger.sh",
             "timeout": 5
-          }
-        ]
-      }
-    ],
-    "SessionEnd": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/session-end.sh",
-            "timeout": 15
           }
         ]
       }

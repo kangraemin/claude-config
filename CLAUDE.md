@@ -1,13 +1,6 @@
 # Global Rules
 
-## 세션 시작 시 필수 <!-- why: decisions/_global/process/session-start-global-settings-and-library.md -->
-- 작업 시작 전 반드시 `~/.claude/settings.json` 글로벌 설정을 확인하고 hooks, env 등 설정을 파악할 것
-- 프로젝트 로컬 설정만 보지 말고 글로벌 설정도 함께 확인
-- 기술 작업 시작 전: `ToolSearch("select:mcp__claude-library__library_search")` 로드 후 작업 키워드로 `library_search()` 호출
-
 ## 스킬 우선 사용 <!-- why: decisions/_global/process/use-matching-skills-before-custom-work.md -->
-- 작업 시작 전 available skills 목록을 확인하고, 매칭되는 스킬이 있으면 반드시 Skill 도구로 실행한다. 직접 수행 금지.
-- 세션을 이어받을 때도 동일하게 스킬/에이전트 매칭을 재점검한다.
 - 웹·콘솔 조작(Chrome 직접·Codex 위임)이 들어간 작업을 끝내면 `web-scriptify` 스킬로 그 과정을 스크립트화한다(불가능하면 안 함).
 
 ## 묻지 말고 끝까지 한다 <!-- why: decisions/_global/process/finish-to-the-end-without-asking-user.md -->
@@ -49,9 +42,6 @@
 ## 블로그 글 발행은 허가 후 <!-- why: decisions/_global/process/blog-post-publish-needs-user-approval-via-telegram.md -->
 - 개인 개발 블로그(kangraemin.github.io)는 사용자가 "올려"라고 콕 집은 글만 발행한다(10/22). 사전 동의 해당 없음.
 - (2026-10-22 사용자 전면 사전 동의로 대체) 개인 블로그 외 발행은 묻지 않고 진행한다. 발행한 뒤 텔레그램으로 알림만 보낸다.
-- (이전 규칙) 블로그(사용자 이름으로 공개되는 글)에 새 글 발행·기존 글 본문 수정은 **사용자 허가 없이 금지**. 초안 작성까지만 한다.
-- 허가 요청은 텔레그램으로: `source ~/.claude/.env; curl -s -d chat_id=$CONTEST_TG_CHAT_ID --data-urlencode text="[블로그 발행 허가 요청] 제목/요약/초안 위치" https://api.telegram.org/bot$CONTEST_TG_TOKEN/sendMessage`
-- 승인 답장(텔레그램 또는 대화창) 받은 뒤에만 커밋·push·게시. 답 없으면 발행하지 않고 보고.
 
 ## SNS 게시 알림은 텔레그램 SNS 봇으로 <!-- why: decisions/_global/process/telegram-notify-after-every-sns-upload.md -->
 - **SNS에 무엇이든 올리기 전에 `sns-post` 스킬을 먼저 연다**(계정·프로필, 하루 1개·출시 큐, 중복 확인, 게시 스크립트, 알림). 어느 세션·레포든 같다.
@@ -60,21 +50,14 @@
 - 도구: `python3 ~/.claude/scripts/sns_tg.py done|ask --msg "..." [--text-file f] [사진·영상]`. my-sns·insta-web 게시 스크립트는 성공 시 자동으로 보낸다.
 - 키: `~/.claude/.env`의 SNS_UPLOAD_TG_TOKEN / SNS_UPLOAD_TG_CHAT_ID. 공모전 봇(CONTEST_TG)으로 보내지 않는다.
 
-## 토큰 절약 <!-- why: decisions/_global/process/reduce-session-context-overhead.md -->
-- 단순 셸 명령(ls, pwd, which 등)은 `!` prefix로 직접 실행. Claude 컨텍스트 소비 불필요.
-- 컨텍스트가 무거워지면 `/compact` 또는 세션 정리 후 `/clear`.
-
 ## 환경변수 조회 순서 <!-- why: decisions/_global/process/lookup-project-then-global-env.md -->
-- 환경변수가 없다고 바로 포기하지 말고 프로젝트 `.env` → `~/.claude/.env` 순으로 직접 뒤져라.
-- 빌드/배포 스크립트 실행 시 `source .env && <명령>` 으로 환경변수 주입 후 실행한다.
+- 환경변수는 프로젝트 `.env` → `~/.claude/.env` 순으로 찾고, `source .env && <명령>`으로 주입한다.
 
 ## 공식 문서 우선 <!-- why: decisions/_global/process/verify-support-in-official-docs.md -->
 - 기능/설정을 적용하기 전에 **공식 문서에서 지원 여부를 확인**한다. 학습 데이터 기반 추측으로 적용 금지.
 - 확인 불가 시 사용자에게 "공식 확인 안 됨"을 명시한다.
 
 ## 규칙 우선순위 <!-- why: decisions/_global/convention/project-rules-override-global.md -->
-- 프로젝트 `.claude/rules/git-rules.md` > 글로벌 `~/.claude/rules/git-rules.md`
-- 프로젝트 `.claude/settings.json` env 값 > 글로벌 env 값
 - `COMMIT_LANG=en`이면 커밋 메시지를 영어로 작성 (기본: 한글)
 
 ## Hook 차단 시 금지 행동 <!-- why: decisions/_global/process/preserve-blocked-hook-state.md -->
