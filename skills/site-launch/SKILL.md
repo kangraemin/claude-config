@@ -79,6 +79,8 @@ python3 adsense_add.py https://site [--dry-run]    # 마지막 줄 RESULT: <host
 - 로그아웃돼 있어도 스크립트가 `chromectl.google_relogin`으로 다시 로그인한다(패스키 시트 `계속` 클릭, 지문 불필요). 사용자에게 시키지 않는다.
 - 공고 모음·짧은 글 사이트는 "가치가 별로 없는 콘텐츠"로 거절된 전례(티스토리 3개)가 있다.
 
+- 수입 확인(읽기 전용): `python3 adsense_earnings.py` → 오늘·어제·7일·이번 달 예상 수입, 잔고, 지급 단계 경고(은행 세부정보 미등록 등), 사이트별 7일. 검증 2026-10-22.
+
 ## 한글 도메인(IDN)
 - 스크립트·DNS·Vercel·GSC에는 punycode(`xn--…`)를 쓴다. 네이버 서치어드바이저는 목록에 한글(`https://글쓰기공모전.kr`)로 저장한다 → naver_register.py가 xn--를 한글로 바꿔 찾는다.
 - 가비아 구매: 영문명·우편번호 검색(모달은 shadow DOM이라 탭을 앞에 띄워야 그려짐)·전화번호 칸도 필수·이메일 인증번호(Gmail MCP로 읽기).
