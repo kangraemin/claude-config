@@ -209,7 +209,13 @@ def cmd_meta(a):
         if not a.submit:
             print('RESULT: DRY_RUN 임시저장까지')
             return
-        click_text(t, '검토 요청하기', last=True)
+        try:
+            click_text(t, '검토 요청하기', last=True)
+        except RuntimeError as e:
+            if 'DISABLED' in str(e):  # 토스 앱에서 이 버전을 한 번 열어야 켜진다
+                print('RESULT: REVIEW_DISABLED 토스 앱에서 테스트 빌드를 먼저 열어야 함')
+                return
+            raise
         time.sleep(5)
         msg = c.js_json(t, "return [...document.querySelectorAll('[role=status],[role=alert],[role=dialog]')].map(e=>e.innerText).filter(Boolean).join(' | ')")
         print('MSG', msg)
