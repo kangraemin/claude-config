@@ -2,6 +2,10 @@
 """[제출] 앱인토스 콘솔 푸시알림(스마트 발송) — 기능성 캠페인 목록 / '토스에게 발송 요청하기' 정기 캠페인 만들기.
 
   ait_smart_message.py list   <appName>
+  ait_smart_message.py create <appName> --api --title 캠페인명 --push-title 제목 --body 내용 --code myorg-menu
+        --agreement "동의문 이름" --timing "1. …했을 때" --condition "…하면 알려드릴까요?" [--submit]
+        (직접 API로 발송: 서버가 mTLS로 send-message/send-bulk-message 호출. 변수는 '이름' 하나뿐이라 문구는 고정)
+        화면 대신 콘솔 내부 API(XHR)로 동의문·캠페인을 만든다(api_create). 같은 이름 동의문은 재사용.
   ait_smart_message.py create <appName> --title 캠페인명 --push-title 새메뉴판(7자) --body "내용(25자, ~요.)"
         --code weekly-menu --days 금 --start 2026-10-30 --time 12:00
         --agreement "동의문 이름" --timing "1. 매주 금요일 낮 12시, …때" --purpose "새 메뉴판" [--submit]
@@ -174,10 +178,12 @@ def finish_draft(t, a):
     time.sleep(7)
     front(t)
     js(t, SETV + "__setv(document.querySelector('[name=\"messageContent.0.code\"]'),%s);1" % json.dumps(a.code))
-    print('schedule', fill_schedule(t, a))
+    if not a.api:
+        print('schedule', fill_schedule(t, a))
     if '상세' not in (js(t, "document.querySelector('main').innerText") or ''):
         attach_agreement(t, a)
-        print('schedule', fill_schedule(t, a))
+        if not a.api:
+            print('schedule', fill_schedule(t, a))
     front(t)
     press_btn(t, '등록하기')
     time.sleep(6)
@@ -186,13 +192,63 @@ def finish_draft(t, a):
     return detail(t, a.title)
 
 
+def api(t, app, method, path, body=None):
+    """콘솔 내부 API를 탭 안 동기 XHR로 부른다(로그인 쿠키 그대로). 화면 클릭보다 빠르고 메모리 부족에도 안 멈춘다."""
+    url = f'/console/api-public/v3/appsintossconsole/workspaces/{WS}/mini-app/{app}{path}'
+    r = js(t, "var x=new XMLHttpRequest();x.open(%s,%s,false);x.setRequestHeader('Content-Type','application/json');x.send(%s);x.responseText"
+           % (json.dumps(method), json.dumps(url), json.dumps(json.dumps(body, ensure_ascii=False)) if body is not None else 'null'))
+    return json.loads(r)
+
+
+def api_create(t, a):
+    """'직접 API로 발송하기' 캠페인을 API로 만든다(10/22 eodimeok 성공).
+    동의문: POST /notification-agreements {agreementName,title,sendMethod:CONDITION_BASED,notificationTiming,sendCondition}
+      (API 발송 목록은 ?sendMethod=CONDITION_BASED 로만 보인다. 화면의 정기 발송용 칸 이름으로는 안 만들어진다)
+    캠페인: POST /templates-v2 — 응답에 AI 검수(final_result)와 status(APPROVED)가 바로 온다. 본문 끝 ' (<앱이름> 알림)'은 화면이 붙이던 것."""
+    found = api(t, a.app, 'GET', '/templates/search?page=0&size=100&contentReachType=FUNCTIONAL&isSmartMessage=true')['success']
+    if any(g['groupContext']['name'] == a.title for g in found['groupSendContextSimpleView']):
+        return f'EXISTS {a.title}'
+    agrs = api(t, a.app, 'GET', '/notification-agreements?sendMethod=CONDITION_BASED')['success']
+    agr = next((x for x in agrs if x['title'] == a.agreement), None)
+    if agr is None:
+        if not a.submit:
+            return f'DRY_RUN 동의문 {a.agreement} 없음 — --submit 이면 만든다'
+        r = api(t, a.app, 'POST', '/notification-agreements', {
+            'agreementName': a.agreement, 'title': a.agreement, 'sendMethod': 'CONDITION_BASED',
+            'notificationTiming': a.timing, 'sendCondition': a.condition, 'purpose': a.purpose})
+        if r.get('resultType') != 'SUCCESS':
+            raise RuntimeError(f"동의문 생성 실패: {r.get('error')}")
+        agr = r['success']
+    if not a.submit:
+        return f"DRY_RUN 동의문 {agr['agreementId']} — --submit 이면 캠페인 등록"
+    meta = api(t, a.app, 'GET', '')['success']
+    code = f'{a.app}-{a.code}'
+    msg = f"{a.body} ({meta.get('title') or a.app} 알림)"
+    icon = meta.get('iconUri')
+    link = f'intoss://{a.app}/'
+    r = api(t, a.app, 'POST', '/templates-v2', {
+        'type': 'SERVER', 'name': a.title, 'isSmartMessage': True, 'templateSetGroupRequest': {
+            'name': a.title, 'contentReachType': 'FUNCTIONAL', 'termsId': agr['agreementId'], 'code': code, 'templateSetList': [{
+                'enabled': True, 'code': code,
+                'pushTemplateRequest': {'title': a.push_title, 'msg': msg, 'linkUri': link, 'iconUri': icon, 'tag': a.title, 'mute': False, 'enableBadge': False,
+                                        'pushMessage': [{'locale': 'ko', 'title': a.push_title, 'msg': msg}]},
+                'inboxTemplateRequest': {'title': a.push_title, 'msg': a.body, 'linkUri': link, 'iconUri': icon, 'tag': a.title, 'contentViewType': 'TEXT',
+                                         'inboxMessage': [{'locale': 'ko', 'title': a.push_title, 'msg': a.body}], 'notice': False, 'important': False,
+                                         'overwrite': False, 'inboxEncrypt': False, 'enableBadge': False, 'grouping': False, 'data': {}}}]}})
+    s = r.get('success') or {}
+    review = [(i['id'], i['result'], i.get('reason')) for x in s.get('result') or [] for i in x['review']['items']]
+    print('review', json.dumps(review, ensure_ascii=False))
+    return f"{s.get('status') or r.get('error')} {code} 동의문 {agr['agreementId']}"
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('cmd', choices=['list', 'create'])
     ap.add_argument('app')
-    for k in ['title', 'push-title', 'body', 'code', 'start', 'time', 'agreement', 'timing', 'purpose']:
+    for k in ['title', 'push-title', 'body', 'code', 'start', 'time', 'agreement', 'timing', 'purpose', 'condition']:
         ap.add_argument('--' + k)
     ap.add_argument('--days', default='금')
+    ap.add_argument('--api', action='store_true', help="'직접 API로 발송하기'(서버가 원할 때 발송). 일정 칸 없음")
     ap.add_argument('--submit', action='store_true')
     a = ap.parse_args()
     t = console_tab(f'https://apps-in-toss.toss.im/workspace/{WS}/mini-app/{a.app}/smart-message')
@@ -214,6 +270,10 @@ def main():
             ok = '정기적으로 발송될 예정' in info or '승인' in info
             print(f"RESULT: {'REGISTERED' if ok else 'UNCONFIRMED'} {a.title} — {info[:200]}")
             sys.exit(0 if ok else 2)
+        if a.api:
+            res = api_create(t, a)
+            print(f'RESULT: {res}')
+            sys.exit(0 if res.startswith(('APPROVED', 'DRY_RUN', 'EXISTS')) else 1)
         c.goto(t, f'https://apps-in-toss.toss.im/workspace/{WS}/mini-app/{a.app}/functional-smart-message/create')
         time.sleep(7)
         front(t)
@@ -221,17 +281,24 @@ def main():
                         'messageContent.0.pushTemplate.content': a.body, 'messageContent.0.code': a.code}.items():
             js(t, SETV + "var e=document.querySelector('[name=\"%s\"]');__setv(e,%s);1" % (name, json.dumps(v)))
         # 발송 방법 카드는 div[role=button] — 평범한 click() 이라야 골라진다(PointerEvent 로는 안 바뀜, 10/22)
-        js(t, "[...document.querySelectorAll('div[role=button]')].find(e=>e.innerText.trim().startsWith('토스에게 발송 요청하기')).click();1")
+        method = '직접 API로 발송하기' if a.api else '토스에게 발송 요청하기'
+        js(t, "[...document.querySelectorAll('div[role=button]')].find(e=>e.innerText.trim().startsWith(%s)).click();1" % json.dumps(method))
         time.sleep(1)
-        js(t, "document.querySelector('button[value=RECURRING]').click();1")
-        time.sleep(1.5)
-        print('schedule', fill_schedule(t, a))
+        if not a.api:
+            js(t, "document.querySelector('button[value=RECURRING]').click();1")
+            time.sleep(1.5)
+            print('schedule', fill_schedule(t, a))
         if not a.submit:
             print('main', js(t, "document.querySelector('main').innerText.slice(0,1500)"))
             print('RESULT: DRY_RUN 채움(동의문 만들기·등록 안 누름)')
             return
+        if a.api:
+            # API 발송은 첫 '등록하기'에서 AI 검사가 돌고 나서야 '알림동의문 연결하기'가 나온다(10/22)
+            press_btn(t, '등록하기')
+            time.sleep(12)
         attach_agreement(t, a)
-        print('schedule', fill_schedule(t, a))
+        if not a.api:
+            print('schedule', fill_schedule(t, a))
         front(t)
         press_btn(t, '등록하기')
         for _ in range(12):
