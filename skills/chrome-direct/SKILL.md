@@ -65,7 +65,8 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 - Terms consent, payment, release, and review-request screens stop with `NEEDS_OWNER` unless the call explicitly asks for that step.
 
 ## Prerequisites
-- Chrome menu: View > Developer > Allow JavaScript from Apple Events (pref `browser.allow_javascript_apple_events`).
+- Chrome 메뉴 '보기 > 개발자 정보 > Apple Events의 자바스크립트 허용'(프로필마다 따로). 권한·이 메뉴가 의심되거나 종료코드 2에 'Apple Events' 안내가 나오면 `python3 ~/.claude/skills/chrome-direct/chromectl.py setup` → `READY`면 끝, `TODO` 줄만 사용자에게 전한다.
+  - 이 메뉴 항목은 System Events·cliclick 클릭을 Chrome이 무시한다(2026-10-22 실측). setup이 메뉴를 펼쳐 두면 사람이 한 번 누른다.
 - `shot`/`--proof` needs Screen Recording permission for the terminal. Codex fallback needs tmux and `~/.codex/plugins/cache/openai-bundled/chrome`.
 - Don't touch other sessions' tabs (e.g. X sign-up in Profile 4). The scripts only open and close their own tabs.
 

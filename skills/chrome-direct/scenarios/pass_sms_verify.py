@@ -72,7 +72,11 @@ def ogq_open():
 def main():
     if a.cmd == "ogq-open":
         return ogq_open()
-    t = c.ref(a.match) and a.match
+    try:
+        c.ref(a.match)  # 탭이 없으면 RuntimeError
+    except RuntimeError:
+        sys.exit(f"RESULT: FAILED '{a.match}' 탭 없음 — 사이트에서 휴대폰 인증 창을 먼저 연다")
+    t = a.match
     if a.cmd == "extend":
         c.press(t, text="시간연장")
         print("RESULT: EXTENDED")
@@ -98,16 +102,18 @@ def main():
     y, m, d = re.search(r"생년월일:\s*(\d{4})-(\d{2})-(\d{2})", info).groups()
     phone = re.search(r"01\d-\d{3,4}-\d{4}", info).group(0).replace("-", "")
     if "통신사를" in text(t):
-        c.press(t, sel="li.tel_item.save button[data-telco=skt]")  # SKT 알뜰폰
+        # SKT 알뜰폰 (siren24 창은 data-telco가 없어 첫 save 버튼)
+        c.press(t, sel="li.tel_item.save button[data-telco=skt],li.tel_item.save button")
         time.sleep(2)
     if "인증방법을" in text(t):
         c.press(t, text="문자(SMS) 인증")
         time.sleep(1)
-        c.press(t, sel="label[for=user_agree_checkbox]")
+        # mobile-ok: user_agree_checkbox / siren24(서울평가정보): check_txt
+        c.press(t, sel="label[for=user_agree_checkbox],label[for=check_txt]")
         time.sleep(1)
         nxt(t)
     if "이름을" in text(t):
-        put(t, 'e.name=="userName_sms"', name)
+        put(t, 'e.name=="userName_sms"||e.id=="userName"', name)
         time.sleep(0.5)
         nxt(t)
     if "생년월일/성별" in text(t):
@@ -116,15 +122,18 @@ def main():
         put(t, 'e.type=="tel"&&!e.placeholder', "1")
         time.sleep(1.5)
     if "휴대폰번호를" in text(t):
-        put(t, 'e.name=="mobileNo_sms"', phone)
+        put(t, 'e.name=="mobileNo_sms"||e.id=="mobileNo"', phone)
         time.sleep(1.5)
     if "보안문자를" in text(t):
         if not a.captcha:
-            src = c.run_js(t, '[...document.querySelectorAll("img")].find(i=>i.src.startsWith("data:")).src', 30)
+            # mobile-ok는 data URL, siren24는 같은 출처 jsp 이미지(#simpleCaptchaImg) → 캔버스로 이미 뜬 그림을 뽑는다(다시 받으면 글자가 바뀜)
+            src = c.run_js(t, """(()=>{const d=[...document.querySelectorAll("img")].find(i=>i.src.startsWith("data:"));if(d)return d.src;
+              const i=document.getElementById("simpleCaptchaImg"),k=document.createElement("canvas");k.width=i.naturalWidth;k.height=i.naturalHeight;
+              k.getContext("2d").drawImage(i,0,0);return k.toDataURL("image/png")})()""", 30)
             open(CAPTCHA_PNG, "wb").write(base64.b64decode(src.split(",", 1)[1]))
             print(f"RESULT: CAPTCHA {CAPTCHA_PNG} — 읽어서 send --captcha <값>")
             return
-        put(t, 'e.placeholder=="보안문자"', a.captcha)
+        put(t, 'e.placeholder=="보안문자"||e.id=="captchaInput"', a.captcha)
         time.sleep(1)
         nxt(t)
         time.sleep(1)

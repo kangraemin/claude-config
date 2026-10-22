@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Drive the owner's real Chrome without an LLM: AppleScript `execute javascript` + cliclick.
+"""Drive your real Chrome without an LLM: AppleScript `execute javascript` + cliclick.
 
-Needs once: Chrome '보기 > 개발자 > Apple Events의 자바스크립트 허용' (pref
-browser.allow_javascript_apple_events), Accessibility for tmux/cliclick.
+Chrome '보기 > 개발자 정보 > Apple Events의 자바스크립트 허용': the first time JS is refused, System Events
+tries the menu item and retries once (macOS asks once to allow the terminal app). If Chrome ignores the
+click (seen 2026-10-22), exit 2 with the menu path for a person to turn on once.
+Accessibility for the terminal/tmux and cliclick.
 
 Usage:
+  chromectl.py setup                     # 처음 한 번: 필수 권한·설정 점검, 켤 수 있는 건 바로 켬
   chromectl.py tabs
-  chromectl.py open <url> [--profile "Profile 4"]
+  chromectl.py open <url> [--profile "Profile 1"]
   chromectl.py js   --match <url-or-title substr> "<js expression>"
   chromectl.py fill --match M --sel CSS (--value V | --env VAR)
   chromectl.py click --match M (--sel CSS | --text "다음")
@@ -16,14 +19,216 @@ Usage:
   chromectl.py close --match id:<tab id>
   chromectl.py press --match M (--sel CSS | --text T) # pointer/mouse event sequence click
   chromectl.py shot --match M <out.png|out.pdf>       # screenshot of that tab's window
+  chromectl.py rtype (--value V | --env VAR) [--enter] # real keystrokes into the focused field
   chromectl.py run steps.json [--codex-fallback "<prompt>" --out FILE]
-Exit 0 = ok, 1 = step failed (caller may fall back to Codex).
-Secrets (--env) never hit argv or stdout: the JS goes through a 0600 temp file.
+Exit 0 = ok, 1 = step failed (caller may fall back to Codex), 2 = macOS permission needed (a person allows it once).
+Secrets (--env) never hit argv or stdout: JS goes through a 0600 temp file, rtype text through cliclick's stdin.
 """
-import argparse, json, os, subprocess, sys, tempfile, time
+import argparse, contextlib, json, os, subprocess, sys, tempfile, time
 from pathlib import Path
 
-CODEX = Path.home() / ".config/claude-accounts/personal/skills/apps-in-toss-deploy/scripts/codex_console.sh"
+# 선택 기능: Codex 폴백. CHROME_DIRECT_CODEX_SCRIPT(실행 가능한 래퍼: <prompt파일> <out파일> [cwd])가 있고
+# codex·tmux가 PATH에 있을 때만 쓴다. 없으면 폴백을 조용히 건너뛰고 실패를 그대로 보고한다.
+_cs = os.environ.get("CHROME_DIRECT_CODEX_SCRIPT", str(Path.home() / ".config/claude-accounts/personal/skills/apps-in-toss-deploy/scripts/codex_console.sh"))
+CODEX = Path(_cs).expanduser() if _cs else None
+
+
+def codex_available():
+    import shutil
+    return bool(CODEX and CODEX.is_file() and shutil.which("codex") and shutil.which("tmux"))
+
+
+class NeedsPermission(RuntimeError):
+    """macOS 권한이 없어 사람이 한 번 허용해야 함. Codex로 넘기지 않고 종료코드 2로 멈춘다."""
+
+
+def _terminal_app():
+    names = {"Apple_Terminal": "터미널", "iTerm.app": "iTerm", "ghostty": "Ghostty", "vscode": "VS Code", "WezTerm": "WezTerm",
+             "com.apple.Terminal": "터미널", "com.googlecode.iterm2": "iTerm", "com.mitchellh.ghostty": "Ghostty",
+             "com.microsoft.VSCode": "VS Code", "com.github.wez.wezterm": "WezTerm"}
+    # tmux 안에선 TERM_PROGRAM이 tmux라, 터미널 앱이 남긴 번들 id로도 찾는다
+    for k in ("TERM_PROGRAM", "__CFBundleIdentifier"):
+        if os.environ.get(k) in names:
+            return names[os.environ[k]]
+    return "이 명령을 실행한 터미널 앱"
+
+
+def _js_off(err):
+    # 한국어판 원문: "AppleScript를 통한 자바스크립트 실행 기능이 꺼져 있습니다 ... Apple Events의 자바스크립트 허용"
+    # 영어판도 메뉴 이름에 "Apple Events"와 "JavaScript"가 들어간다고 보고 맞췄다(영어판은 미검증).
+    s = str(err)
+    return "Apple Events" in s and ("자바스크립트" in s or "JavaScript" in s)
+
+
+# 메뉴 이름이 언어마다 달라서 메뉴바 > 메뉴 > 하위 메뉴를 돌며 "Apple Events"가 든 항목을 찾는다.
+# 체크(✓)돼 있으면 누르지 않는다 — 토글이라 누르면 꺼진다.
+ENABLE_JS = """
+tell application "System Events"
+  set p to first process whose unix id is %s
+  repeat with mb in menu bar items of menu bar 1 of p
+    try
+      repeat with mi in menu items of menu 1 of mb
+        try
+          set nms to name of every menu item of menu 1 of mi
+          repeat with i from 1 to count of nms
+            set n to item i of nms
+            if n is not missing value and n contains "Apple Events" then
+              set si to menu item i of menu 1 of mi
+              set mk to value of attribute "AXMenuItemMarkChar" of si
+              if mk is not missing value and mk is not "" then return "ALREADY"
+              click si
+              return "CLICKED"
+            end if
+          end repeat
+        end try
+      end repeat
+    end try
+  end repeat
+  return "NOTFOUND"
+end tell
+"""
+
+
+def enable_apple_events_js():
+    """Chrome 메뉴 'Apple Events의 자바스크립트 허용'을 켠다. CLICKED | ALREADY.
+    System Events 권한이 없으면 NeedsPermission. 이 권한 창은 아무도 안 누르고 두면 거부로 굳는다."""
+    pid = chrome_pid()
+    if not pid:
+        raise RuntimeError("Chrome 프로세스를 못 찾아 메뉴를 켤 수 없음")
+    how = (f"시스템 설정 > 개인정보 보호 및 보안 > 자동화(또는 손쉬운 사용)에서 {_terminal_app()}을 허용한 뒤 다시 실행"
+           " — 권한 창이 떠 있으면 '허용'을 누른다")
+    try:
+        r = osa(ENABLE_JS % pid, timeout=60)
+    except subprocess.TimeoutExpired:  # 권한 창이 떠서 대답을 기다리는 중
+        raise NeedsPermission(how)
+    except RuntimeError as e:
+        if any(k in str(e) for k in ("-1743", "-25211", "-1719", "assistive", "보조 접근", "Not authorized", "권한")):
+            raise NeedsPermission(how)
+        raise
+    if r == "NOTFOUND":
+        raise NeedsPermission(MANUAL_JS)
+    return r
+
+
+MANUAL_JS = ("Chrome이 자바스크립트 실행을 막고 있고 자동으로 켜지지 않음 — `chromectl.py setup`을 실행하거나, 그 탭이 있는 "
+             "Chrome 창에서 메뉴 '보기 > 개발자 정보 > Apple Events의 자바스크립트 허용'을 직접 한 번 켠다"
+             " (영어판: View > Developer > Allow JavaScript from Apple Events, 미검증)")
+
+SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_"
+
+# "Apple Events" 항목이 든 하위 메뉴의 (메뉴바 항목 번호, 메뉴 항목 번호)
+JS_MENU_IDX = """
+tell application "System Events"
+  set p to first process whose unix id is %s
+  set mbs to menu bar items of menu bar 1 of p
+  repeat with i from 1 to count of mbs
+    try
+      set mis to menu items of menu 1 of (item i of mbs)
+      repeat with j from 1 to count of mis
+        try
+          set nms to name of every menu item of menu 1 of (item j of mis)
+          repeat with n in nms
+            set n to contents of n
+            if n is not missing value and n contains "Apple Events" then return (i as text) & " " & (j as text)
+          end repeat
+        end try
+      end repeat
+    end try
+  end repeat
+  return ""
+end tell
+"""
+
+# 화면 좌표는 메뉴가 펼쳐져 있을 때만 맞다(닫혀 있으면 0,1080 같은 값) → 메뉴바를 연 다음에 읽는다
+MENU_CENTER = """
+tell application "System Events"
+  set e to %s of menu bar 1 of (first process whose unix id is %s)
+  set {x, y} to position of e
+  set {w, h} to size of e
+end tell
+return ((x + w / 2) as integer as text) & "," & ((y + h / 2) as integer as text)
+"""
+
+
+def open_js_menu():
+    """사람이 한 번만 누르면 되게, 진짜 마우스로 '보기 > 개발자 정보' 하위 메뉴를 펼쳐 둔다."""
+    pid = chrome_pid()
+    idx = osa(JS_MENU_IDX % pid, timeout=60).split()
+    if len(idx) != 2:
+        return False
+    bar = f"menu bar item {idx[0]}"
+    jxa("C.activate()")
+    time.sleep(0.5)
+    subprocess.run(["cliclick", "c:" + osa(MENU_CENTER % (bar, pid))], check=True, capture_output=True)
+    time.sleep(0.6)
+    sub = osa(MENU_CENTER % (f"menu item {idx[1]} of menu 1 of {bar}", pid))
+    subprocess.run(["cliclick", f"m:{sub}"], check=True, capture_output=True)
+    return True
+
+
+def _js_ok():
+    try:
+        return jxa("return String(C.windows[0].activeTab().execute({javascript: '1+1'}))", timeout=10) == "2"
+    except RuntimeError as e:
+        if _js_off(e):
+            return False
+        raise
+
+
+def setup():
+    """처음 설치한 맥에서 한 번: 필수 설정만 점검하고, 켤 수 있는 건 바로 켠다.
+    사람 손이 필요한 것은 그 설정 화면(또는 Chrome 메뉴)을 열어 두고 무엇을 누를지 한 줄로 말한다. 0 = 준비됨, 2 = 사람 몫 남음."""
+    import platform, shutil
+    app, todo = _terminal_app(), []
+    ok = lambda m: print(f"OK    {m}")
+    need = lambda m: (todo.append(m), print(f"TODO  {m}"))
+    if platform.system() != "Darwin" or not Path(CHROME_BIN).exists():
+        print("FAIL  macOS와 Google Chrome(/Applications)이 필요"); return 1
+    if not chrome_pid():
+        subprocess.run(["open", "-a", "Google Chrome"]); time.sleep(4)
+    if not shutil.which("cliclick"):
+        if shutil.which("brew"):
+            print("...   cliclick 설치 중 (brew install cliclick)")
+            subprocess.run(["brew", "install", "cliclick"], capture_output=True)
+        if not shutil.which("cliclick"):
+            need("cliclick 설치: Homebrew(https://brew.sh) 설치 후 `brew install cliclick`")
+    if shutil.which("cliclick"):
+        ok("cliclick")
+    # 1) Chrome 제어 권한(자동화). 처음이면 macOS 창이 뜬다 — 놔두면 거부로 굳으니 바로 누르라고 먼저 말한다.
+    print(f"...   macOS 권한 창이 뜨면 '허용'을 누른다 ({app})")
+    try:
+        jxa("return C.windows.length", timeout=60); ok("Chrome 제어(자동화)")
+    except (RuntimeError, subprocess.TimeoutExpired):
+        subprocess.run(["open", SETTINGS_URL + "Automation"])
+        need(f"방금 열린 '자동화' 화면에서 {app} 아래 'Google Chrome'·'System Events'를 켠다")
+    # 2) 손쉬운 사용(메뉴 읽기·cliclick)
+    try:
+        osa(f'tell application "System Events" to get name of menu bar item 1 of menu bar 1 of (first process whose unix id is {chrome_pid()})', timeout=60)
+        ok("손쉬운 사용")
+    except (RuntimeError, subprocess.TimeoutExpired):
+        subprocess.run(["open", SETTINGS_URL + "Accessibility"])
+        need(f"방금 열린 '손쉬운 사용' 화면에서 {app}을 켠다 (목록에 없으면 + 로 추가)")
+    # 3) Chrome 'Apple Events의 자바스크립트 허용'
+    if not todo:
+        if not _js_ok():
+            with contextlib.suppress(Exception):
+                enable_apple_events_js(); time.sleep(0.5)
+        if _js_ok():
+            ok("Chrome 'Apple Events의 자바스크립트 허용'")
+        else:
+            opened = open_js_menu()
+            print("TODO  " + ("지금 펼쳐진 Chrome 메뉴에서 'Apple Events의 자바스크립트 허용'을 누른다" if opened
+                              else "Chrome 메뉴 '보기 > 개발자 정보 > Apple Events의 자바스크립트 허용'을 누른다") + " (60초 기다림)")
+            end = time.time() + 60
+            while time.time() < end and not _js_ok():
+                time.sleep(2)
+            if _js_ok():
+                ok("Chrome 'Apple Events의 자바스크립트 허용'")
+            else:
+                todo.append("js")
+    print("READY" if not todo else "RESULT: BLOCKED 위 TODO를 끝낸 뒤 setup을 다시 실행")
+    return 0 if not todo else 2
+
 
 
 def osa(script, timeout=20):
@@ -147,9 +352,24 @@ def run_js(match, code, timeout=20):
         with os.fdopen(fd, "w") as f:
             f.write(code)
         os.chmod(path, 0o600)
-        out = jxa(f"var js = $.NSString.stringWithContentsOfFileEncodingError({q(path)}, $.NSUTF8StringEncoding, null).js;"
-                  f" var r = {tab}.execute({{javascript: js}}); return r === undefined || r === null ? 'missing value' : String(r);", timeout)
-        return out
+        body = (f"var js = $.NSString.stringWithContentsOfFileEncodingError({q(path)}, $.NSUTF8StringEncoding, null).js;"
+                f" var r = {tab}.execute({{javascript: js}}); return r === undefined || r === null ? 'missing value' : String(r);")
+        try:
+            return jxa(body, timeout)
+        except RuntimeError as e:
+            if not _js_off(e):
+                raise
+            # 처음 설치한 사람: 메뉴를 자동으로 켜고 한 번만 다시 시도. 설정은 프로필마다라 그 탭의 창을 앞으로 둔다.
+            jxa(f"{_w}.index = 1; C.activate()")
+            time.sleep(0.5)
+            enable_apple_events_js()
+            time.sleep(0.5)
+            try:
+                return jxa(body, timeout)
+            except RuntimeError as e2:
+                if _js_off(e2):  # 2026-10-22 실측: 이 항목만 System Events·cliclick 클릭을 Chrome이 무시했다
+                    raise NeedsPermission(MANUAL_JS)
+                raise
     finally:
         os.unlink(path)
 
@@ -221,7 +441,7 @@ def rclick(match, sel=None, text=None):
 
 def press(match, sel=None, text=None):
     """Synthetic pointer+mouse sequence (pointerdown..click) — for widgets that ignore a bare
-    .click() (Google Forms '다음'/radio/checkbox, Toss console buttons)."""
+    .click() (Google Forms '다음'/radio/checkbox)."""
     pick = f"__all(document, {q(sel)}).filter(__vis)[0]" if sel else f"__byText({q(text)})"
     r = run_js(match, FIND + f"(() => {{ const e = {pick}; if (!e) return 'NOTFOUND'; __press(e); return 'OK'; }})()")
     if r != "OK":
@@ -245,10 +465,13 @@ def shot(match, path):
     return path
 
 
-def google_relogin(match, email="remin1994@gmail.com", tries=3):
+def google_relogin(match, email=None, tries=3):
     """Google 계정이 '로그아웃됨'이면 다시 로그인한다(사용자 손 불필요). 이미 로그인 상태면 바로 True.
     계정 선택 → 페이지 '계속' → macOS 패스키 시트 '계속'(지문 없이 통과). 시트는 DOM·AX 밖이라 cliclick 좌표로 누른다:
     시트는 창 가운데에 뜨고 '계속'은 중심에서 (+197, +117)pt. 1분쯤 지나면 '요청 제한 시간 초과' 창이 따로 뜨는데 그 '닫기'는 창 좌상단 (+395, +262)pt."""
+    email = email or os.environ.get("CHROME_DIRECT_GOOGLE_ACCOUNT") or "remin1994@gmail.com"
+    if not email:
+        raise RuntimeError("google_relogin: email 인자 또는 CHROME_DIRECT_GOOGLE_ACCOUNT 필요")
     url = lambda: js_json(match, "return location.href")
     for _ in range(tries):
         if "accounts.google.com" not in url():
@@ -267,12 +490,40 @@ def google_relogin(match, email="remin1994@gmail.com", tries=3):
     return "accounts.google.com" not in url()
 
 
+# 입력 소스를 argv[0](없으면 ASCII 자판, 보통 ABC)로 바꾸고 바꾸기 전 id를 돌려준다
+INPUT_SRC = r"""ObjC.import("Carbon");
+function idOf(s) { return ObjC.castRefToObject($.TISGetInputSourceProperty(s, $.kTISPropertyInputSourceID)).js; }
+function run(argv) {
+  var cur = idOf($.TISCopyCurrentKeyboardInputSource());
+  var want = argv[0] || idOf($.TISCopyCurrentASCIICapableKeyboardLayoutInputSource());
+  if (want === cur) return cur;
+  var l = ObjC.castRefToObject($.TISCreateInputSourceList(null, false));
+  for (var i = 0; i < l.count; i++) if (idOf(l.objectAtIndex(i)) === want) { $.TISSelectInputSource(l.objectAtIndex(i)); delay(0.2); break; }
+  return cur;
+}"""
+
+
+def input_source(want=""):
+    """Select an input source (default: the ASCII layout) and return the previous id, or None."""
+    r = subprocess.run(["osascript", "-l", "JavaScript", "-e", INPUT_SRC] + ([want] if want else []),
+                       capture_output=True, text=True, timeout=10)
+    return r.stdout.strip() or None if r.returncode == 0 else None
+
+
 def rtype(env=None, value=None, enter=False):
-    """Type into whatever has focus with real keystrokes (fields that reject JS values)."""
+    """Type into whatever has focus with real keystrokes (fields that reject JS values).
+    The text goes to cliclick on stdin (-f -), so a secret never shows up in `ps` argv."""
     v = secret(env) if env else value
-    subprocess.run(["cliclick", "-w", "40", f"t:{v}"], check=True, capture_output=True)
-    if enter:
-        subprocess.run(["cliclick", "kp:return"], check=True, capture_output=True)
+    if v is None or "\n" in v:
+        raise RuntimeError("rtype: --value 또는 --env 가 필요하고, 줄바꿈은 넣을 수 없음")
+    cmds = f"t:{v}\n" + ("kp:return\n" if enter else "")
+    # 한글 입력기가 켜져 있으면 cliclick이 "hello"를 "ㅗ디ㅣㅐ"로 친다(2026-10-22 실측) → 잠깐 ASCII 자판으로
+    prev = input_source() if v.isascii() else None
+    try:
+        subprocess.run(["cliclick", "-w", "40", "-f", "-"], input=cmds, text=True, check=True, capture_output=True)
+    finally:
+        if prev:
+            input_source(prev)
 
 
 def wait(match, text=None, sel=None, timeout=20):
@@ -284,6 +535,8 @@ def wait(match, text=None, sel=None, timeout=20):
         try:
             if run_js(match, js) == "Y":
                 return
+        except NeedsPermission:
+            raise
         except RuntimeError:
             pass
         time.sleep(1)
@@ -305,7 +558,7 @@ def open_url(url, profile=None):
 def secret(name):
     v = os.environ.get(name)
     if v is None:
-        for f in (Path(".env"), Path.home() / ".claude/.env"):
+        for f in (Path(".env"), Path.home() / ".claude/.env", Path.home() / ".chrome-direct/.env"):
             if f.exists():
                 for line in f.read_text().splitlines():
                     if line.startswith(name + "="):
@@ -348,9 +601,12 @@ def main():
     ap.add_argument("arg", nargs="?")
     ap.add_argument("--match", default="")
     ap.add_argument("--sel"); ap.add_argument("--text"); ap.add_argument("--value"); ap.add_argument("--env")
+    ap.add_argument("--enter", action="store_true", help="rtype 뒤 Enter")
     ap.add_argument("--timeout", type=int, default=20); ap.add_argument("--profile")
     ap.add_argument("--codex-fallback"); ap.add_argument("--out")
     a = ap.parse_args()
+    if a.cmd == "setup":
+        sys.exit(setup())
     try:
         if a.cmd == "tabs":
             for row in tabs():
@@ -374,7 +630,7 @@ def main():
         elif a.cmd == "close":
             close_tab(a.match)
         elif a.cmd == "rtype":
-            rtype(a.env, a.value, enter=True)
+            rtype(a.env, a.value, enter=a.enter)
         elif a.cmd == "wait":
             wait(a.match, a.text, a.sel, a.timeout)
         elif a.cmd == "text":
@@ -387,7 +643,7 @@ def main():
                     print(f"STEP {i} {s['op']} OK")
                 except Exception as e:
                     print(f"STEP {i} {s['op']} FAIL: {e}")
-                    if a.codex_fallback:
+                    if a.codex_fallback and codex_available():
                         print("FALLBACK codex")
                         out = a.out or "/tmp/chromectl-codex.out"
                         prompt = f"{a.codex_fallback}\n(스크립트가 {i}번 단계 {json.dumps(s, ensure_ascii=False) if 'env' not in s else s['op']}에서 실패: {e}. 거기서부터 이어서 해라.)"
@@ -397,6 +653,9 @@ def main():
                     sys.exit(1)
         else:
             raise RuntimeError("unknown cmd")
+    except NeedsPermission as e:
+        print(f"BLOCKED: {e}", file=sys.stderr)
+        sys.exit(2)
     except Exception as e:
         print(f"FAIL: {e}", file=sys.stderr)
         sys.exit(1)

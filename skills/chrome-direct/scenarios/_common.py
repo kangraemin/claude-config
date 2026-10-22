@@ -68,6 +68,8 @@ def poll(tid, body, timeout=25, every=1.0):
             last = js(tid, body)
             if last:
                 return last
+        except c.NeedsPermission:
+            raise
         except Exception as e:  # page mid-navigation
             last = str(e)
         time.sleep(every)
@@ -128,7 +130,7 @@ def run(main, args, task, cwd=None):
     """Call main(); Blocked → exit 2, other errors → Codex fallback with `task`."""
     try:
         main()
-    except Blocked as e:
+    except (Blocked, c.NeedsPermission) as e:
         print(f"RESULT: BLOCKED {e}")
         sys.exit(2)
     except SystemExit:
