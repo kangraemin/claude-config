@@ -61,36 +61,49 @@ def _js_off(err):
 
 
 # 메뉴 이름이 언어마다 달라서 메뉴바 > 메뉴 > 하위 메뉴를 돌며 "Apple Events"가 든 항목을 찾는다.
-# 체크(✓)돼 있으면 누르지 않는다 — 토글이라 누르면 꺼진다.
-ENABLE_JS = """
+# 돌려주는 값: "메뉴바 항목<TAB>메뉴 항목<TAB>하위 항목<TAB>ON|OFF"(ON = 체크 ✓). 번호가 아니라 이름으로 돌려준다 —
+# 닫힌 메뉴는 숨은 대체 항목까지 세서 펼친 메뉴와 번호가 어긋날 수 있다(-1719).
+# 북마크·방문 기록 메뉴는 항목이 수백 개라 다 훑으면 60초를 넘긴다(2026-10-22) → 메뉴바 순서는 언어와 상관없이 같으니
+# '보기'(5번째)부터, 그 안에서는 맨 아래('개발자 정보')부터 본다.
+JS_MENU = """
 tell application "System Events"
   set p to first process whose unix id is %s
-  repeat with mb in menu bar items of menu bar 1 of p
-    try
-      repeat with mi in menu items of menu 1 of mb
-        try
-          set nms to name of every menu item of menu 1 of mi
-          repeat with i from 1 to count of nms
-            set n to item i of nms
-            if n is not missing value and n contains "Apple Events" then
-              set si to menu item i of menu 1 of mi
-              set mk to value of attribute "AXMenuItemMarkChar" of si
-              if mk is not missing value and mk is not "" then return "ALREADY"
-              click si
-              return "CLICKED"
-            end if
-          end repeat
-        end try
-      end repeat
-    end try
+  set mbs to menu bar items of menu bar 1 of p
+  set order to {5}
+  repeat with i from 1 to count of mbs
+    if i is not 5 then set end of order to i
   end repeat
-  return "NOTFOUND"
+  repeat with i in order
+    set i to contents of i
+    if i is less than or equal to (count of mbs) then
+      try
+        set mis to menu items of menu 1 of (item i of mbs)
+        repeat with j from (count of mis) to 1 by -1
+          try
+            set mi to item j of mis
+            set nms to name of every menu item of menu 1 of mi
+            repeat with k from 1 to count of nms
+              set n to item k of nms
+              if n is not missing value and n contains "Apple Events" then
+                set mk to value of attribute "AXMenuItemMarkChar" of menu item k of menu 1 of mi
+                set onoff to "OFF"
+                if mk is not missing value and mk is not "" then set onoff to "ON"
+                return (name of item i of mbs) & tab & (name of mi) & tab & n & tab & onoff
+              end if
+            end repeat
+          end try
+        end repeat
+      end try
+    end if
+  end repeat
+  return ""
 end tell
 """
 
 
 def enable_apple_events_js():
     """Chrome 메뉴 'Apple Events의 자바스크립트 허용'을 켠다. CLICKED | ALREADY.
+    체크돼 있으면 누르지 않는다 — 토글이라 누르면 꺼진다.
     System Events 권한이 없으면 NeedsPermission. 이 권한 창은 아무도 안 누르고 두면 거부로 굳는다."""
     pid = chrome_pid()
     if not pid:
@@ -98,16 +111,18 @@ def enable_apple_events_js():
     how = (f"시스템 설정 > 개인정보 보호 및 보안 > 자동화(또는 손쉬운 사용)에서 {_terminal_app()}을 허용한 뒤 다시 실행"
            " — 권한 창이 떠 있으면 '허용'을 누른다")
     try:
-        r = osa(ENABLE_JS % pid, timeout=60)
+        r = osa(JS_MENU % pid, timeout=60)
     except subprocess.TimeoutExpired:  # 권한 창이 떠서 대답을 기다리는 중
         raise NeedsPermission(how)
     except RuntimeError as e:
         if any(k in str(e) for k in ("-1743", "-25211", "-1719", "assistive", "보조 접근", "Not authorized", "권한")):
             raise NeedsPermission(how)
         raise
-    if r == "NOTFOUND":
+    if not r:
         raise NeedsPermission(MANUAL_JS)
-    return r
+    if r.endswith("\tON"):
+        return "ALREADY"
+    return open_js_menu(click=True, names=r.split("\t")[:3])
 
 
 MANUAL_JS = ("Chrome이 자바스크립트 실행을 막고 있고 자동으로 켜지지 않음 — `chromectl.py setup`을 실행하거나, 그 탭이 있는 "
@@ -115,30 +130,6 @@ MANUAL_JS = ("Chrome이 자바스크립트 실행을 막고 있고 자동으로 
              " (영어판: View > Developer > Allow JavaScript from Apple Events, 미검증)")
 
 SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_"
-
-# "Apple Events" 항목이 든 하위 메뉴의 "메뉴바 항목 이름<TAB>메뉴 항목 이름".
-# 번호로 돌려주면 안 된다: 닫힌 메뉴는 숨은 대체 항목까지 세서 펼친 메뉴와 번호가 어긋날 수 있다(-1719).
-JS_MENU_NAMES = """
-tell application "System Events"
-  set p to first process whose unix id is %s
-  set mbs to menu bar items of menu bar 1 of p
-  repeat with i from 1 to count of mbs
-    try
-      set mis to menu items of menu 1 of (item i of mbs)
-      repeat with j from 1 to count of mis
-        try
-          set nms to name of every menu item of menu 1 of (item j of mis)
-          repeat with n in nms
-            set n to contents of n
-            if n is not missing value and n contains "Apple Events" then return (name of item i of mbs) & tab & (name of item j of mis)
-          end repeat
-        end try
-      end repeat
-    end try
-  end repeat
-  return ""
-end tell
-"""
 
 # 화면 좌표는 메뉴가 펼쳐져 있을 때만 맞다(닫혀 있으면 0,1080 같은 값) → 메뉴바를 연 다음에 읽는다
 MENU_CENTER = """
@@ -151,34 +142,66 @@ return ((x + w / 2) as integer as text) & "," & ((y + h / 2) as integer as text)
 """
 
 
-def open_js_menu():
-    """사람이 한 번만 누르면 되게, 진짜 마우스로 '보기 > 개발자 정보' 하위 메뉴를 펼쳐 둔다."""
+def open_js_menu(click=False, names=None):
+    """진짜 마우스로 '보기 > 개발자 정보'를 펼치고 'Apple Events의 자바스크립트 허용' 위에 올려 둔다(선택 표시).
+    click=True면 그 자리에서 cliclick으로 누른다 — System Events click은 무시해도 이건 먹는다(2026-10-22 실측).
+    HOVER(펼쳐 둠) | CLICKED | ALREADY(이미 켜짐, 메뉴 닫음) | NOT_OPEN(메뉴가 안 펼쳐짐, 안 누름) | False(항목 못 찾음).
+    메뉴가 펼쳐진 동안 Chrome은 Apple Events에 답하지 않는다(그동안 jxa는 시간 초과)."""
     pid = chrome_pid()
-    names = osa(JS_MENU_NAMES % pid, timeout=60).split("\t")
-    if len(names) != 2:
+    names = names or osa(JS_MENU % pid, timeout=60).split("\t")[:3]
+    if len(names) != 3:
         return False
     bar = f"menu bar item {q(names[0])}"
+    sub = f"menu item {q(names[1])} of menu 1 of {bar}"
+    item = f"menu item {q(names[2])} of menu 1 of {sub}"
+    mouse = lambda op, xy: subprocess.run(["cliclick", f"{op}:{xy}"], check=True, capture_output=True)
     jxa("C.activate()")
     time.sleep(0.5)
-    subprocess.run(["cliclick", "c:" + osa(MENU_CENTER % (bar, pid))], check=True, capture_output=True)
+    mouse("c", osa(MENU_CENTER % (bar, pid)))
     time.sleep(0.6)
-    sub = osa(MENU_CENTER % (f"menu item {q(names[1])} of menu 1 of {bar}", pid))
-    subprocess.run(["cliclick", f"m:{sub}"], check=True, capture_output=True)
-    return True
+    mouse("m", osa(MENU_CENTER % (sub, pid)))
+    time.sleep(0.6)
+    x, y = map(int, osa(MENU_CENTER % (item, pid)).split(","))
+    mouse("m", f"{x - 60},{y}")  # 하위 메뉴 안쪽에서 들어가야 항목이 선택된다
+    mouse("m", f"{x},{y}")
+    time.sleep(0.4)
+    attr = lambda k: osa(f'tell application "System Events" to get value of attribute "{k}" of {item} of menu bar 1 of (first process whose unix id is {pid})')
+    if attr("AXMenuItemMarkChar") not in ("", "missing value"):
+        if x > 0:
+            close_menu()
+        return "ALREADY"
+    # 다른 창·시스템 대화상자가 포커스를 뺏으면 메뉴가 안 펼쳐지고 좌표가 0,1080 같은 값이 된다 → 엉뚱한 곳을 누르지 않는다
+    if x <= 0 or attr("AXSelected") != "true":
+        if x > 0:
+            close_menu()
+        return "NOT_OPEN"
+    if not click:
+        return "HOVER"
+    mouse("c", f"{x},{y}")
+    return "CLICKED"
+
+
+def close_menu():
+    osa('tell application "System Events"\nkey code 53\ndelay 0.1\nkey code 53\nend tell')
 
 
 def _js_ok():
+    """True/False. 메뉴가 펼쳐져 있으면 Chrome이 답하지 않아 시간 초과 → None(꺼짐으로 취급)."""
     try:
         return jxa("return String(C.windows[0].activeTab().execute({javascript: '1+1'}))", timeout=10) == "2"
+    except subprocess.TimeoutExpired:
+        return None
     except RuntimeError as e:
         if _js_off(e):
             return False
         raise
 
 
-def setup():
+def setup(wait_js=False):
     """처음 설치한 맥에서 한 번: 필수 설정만 점검하고, 켤 수 있는 건 바로 켠다.
-    사람 손이 필요한 것은 그 설정 화면(또는 Chrome 메뉴)을 열어 두고 무엇을 누를지 한 줄로 말한다. 0 = 준비됨, 2 = 사람 몫 남음."""
+    사람 손이 필요한 것은 그 설정 화면(또는 Chrome 메뉴)을 열어 두고 무엇을 누를지 한 줄로 말한다. 0 = 준비됨, 2 = 사람 몫 남음.
+    JS 메뉴를 사람이 눌러야 할 때: 터미널에서 직접 돌리면 메뉴를 펼쳐 두고 기다린다. Claude처럼 출력을 끝나야 보는 쪽(non-tty)은
+    기다려 봐야 안내가 늦게 닿으니 바로 `TODO js`로 끝낸다 → 사람에게 먼저 알리고 `setup --wait-js`(펼치고 최대 120초)."""
     import platform, shutil
     app, todo = _terminal_app(), []
     ok = lambda m: print(f"OK    {m}")
@@ -214,25 +237,43 @@ def setup():
     except (RuntimeError, subprocess.TimeoutExpired):
         subprocess.run(["open", SETTINGS_URL + "Accessibility"])
         need(f"방금 열린 '손쉬운 사용' 화면에서 {app}을 켠다 (목록에 없으면 + 로 추가)")
-    # 3) Chrome 'Apple Events의 자바스크립트 허용'
+    # 3) Chrome 'Apple Events의 자바스크립트 허용' — 진짜 마우스로 자동 클릭, 안 되면 사람 몫
     if not todo:
-        if not _js_ok():
-            with contextlib.suppress(Exception):
-                enable_apple_events_js(); time.sleep(0.5)
-        if _js_ok():
-            ok("Chrome 'Apple Events의 자바스크립트 허용'")
-        else:
+        js = _js_ok()
+        if not js:
             try:
-                opened = open_js_menu()
+                print(f"...   Chrome 메뉴를 자동으로 켜는 중: {enable_apple_events_js()}")
+            except (RuntimeError, subprocess.SubprocessError) as e:
+                print(f"...   자동으로 켜기 실패: {str(e)[-120:]}")
+            time.sleep(1)
+            js = _js_ok()
+            if js is None:  # 메뉴가 안 닫혀 Chrome이 멈춰 있음
+                close_menu(); time.sleep(0.5); js = _js_ok()
+        if js:
+            ok("Chrome 'Apple Events의 자바스크립트 허용'")
+        elif not (wait_js or sys.stdout.isatty()):
+            need("js Chrome 메뉴 '보기 > 개발자 정보 > Apple Events의 자바스크립트 허용'을 사람이 눌러야 함"
+                 " — 사용자에게 먼저 '곧 펼쳐지는 이 메뉴 항목을 반드시 누르라'고 알린 뒤 `setup --wait-js`")
+        else:
+            secs = 120 if wait_js else 60
+            try:
+                hover = open_js_menu() == "HOVER"
             except (RuntimeError, subprocess.SubprocessError) as e:
                 print(f"...   메뉴 자동 펼치기 실패: {str(e)[-120:]}")
-                opened = False
-            print("TODO  " + ("지금 펼쳐진 Chrome 메뉴에서 'Apple Events의 자바스크립트 허용'을 누른다" if opened
-                              else "Chrome 메뉴 '보기 > 개발자 정보 > Apple Events의 자바스크립트 허용'을 누른다") + " (60초 기다림)")
-            end = time.time() + 60
-            while time.time() < end and not _js_ok():
-                time.sleep(2)
-            if _js_ok():
+                hover = False
+            print("TODO  " + ("지금 펼쳐진 Chrome 메뉴에서 선택된 'Apple Events의 자바스크립트 허용'을 반드시 눌러야 한다" if hover
+                              else "Chrome 메뉴 '보기 > 개발자 정보 > Apple Events의 자바스크립트 허용'을 반드시 눌러야 한다")
+                  + f" ({secs}초 기다림)", flush=True)
+            end = time.time() + secs
+            while time.time() < end and not js:
+                js = _js_ok()
+                if not js:
+                    time.sleep(2)
+            if not js:
+                if js is None:
+                    close_menu(); time.sleep(0.5)
+                js = _js_ok()
+            if js:
                 ok("Chrome 'Apple Events의 자바스크립트 허용'")
             else:
                 todo.append("js")
@@ -377,7 +418,7 @@ def run_js(match, code, timeout=20):
             try:
                 return jxa(body, timeout)
             except RuntimeError as e2:
-                if _js_off(e2):  # 2026-10-22 실측: 이 항목만 System Events·cliclick 클릭을 Chrome이 무시했다
+                if _js_off(e2):  # 자동 클릭이 안 먹었거나(메뉴가 다른 창 때문에 닫힘 등) 다른 프로필 창
                     raise NeedsPermission(MANUAL_JS)
                 raise
     finally:
@@ -613,11 +654,12 @@ def main():
     ap.add_argument("--match", default="")
     ap.add_argument("--sel"); ap.add_argument("--text"); ap.add_argument("--value"); ap.add_argument("--env")
     ap.add_argument("--enter", action="store_true", help="rtype 뒤 Enter")
+    ap.add_argument("--wait-js", action="store_true", help="setup: JS 메뉴를 펼쳐 두고 사람이 누를 때까지 최대 120초")
     ap.add_argument("--timeout", type=int, default=20); ap.add_argument("--profile")
     ap.add_argument("--codex-fallback"); ap.add_argument("--out")
     a = ap.parse_args()
     if a.cmd == "setup":
-        sys.exit(setup())
+        sys.exit(setup(wait_js=a.wait_js))
     try:
         if a.cmd == "tabs":
             for row in tabs():
