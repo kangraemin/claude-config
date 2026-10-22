@@ -24,6 +24,8 @@
 - 왜 화면 조작인가: 콘솔 공개 API 없음.
 검증: list 됨. create: 2026-10-22 oneul-tarot-card '매일 오늘의 타로'(매일 12시) — 새로 만들기→임시저장→수정 화면 등록으로 '정기적으로 발송될 예정'까지 스크립트로 성공.
   재실행하면 EXISTS(멱등). finish_draft 를 한 번에 통과하는 경로는 이번 실행에서 손 디버그로 확인, 통합 실행은 다음 앱에서 확인.
+  2026-10-23 sinnyeon-unse '매일 오늘의 띠별 운세' 통합 실행 성공(마지막 줄 UNCONFIRMED였지만 list에 '승인됨' 128672).
+  출력 버퍼링 때문에 백그라운드 실행 시 아무것도 안 찍혀 멈춘 것처럼 보인다 → `python3 -u` 로 돌리고, 끝나면 list로 확인.
 """
 import argparse, json, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
