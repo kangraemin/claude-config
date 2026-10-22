@@ -15,8 +15,15 @@ def search_url(query, account):
 
 def check_account(tid, account, timeout=30):
     """Wait for Gmail to load; raise Blocked if logged out or another account."""
-    st = poll(tid, r"""if (/accounts\.google\.com/.test(location.host)) return {login: location.href};
-      if (!/@/.test(document.title) || !document.querySelector('div[role=main]')) return null; /* Workspace 계정은 제목에 'Gmail'이 없다 */ return {title: document.title};""", timeout)
+    try:
+        st = poll(tid, r"""if (/accounts\.google\.com/.test(location.host) || /workspace\.google\.com/.test(location.host)) return {login: location.href}; /* 로그아웃이면 Gmail 소개 페이지로 넘어간다 */
+          if (!/@/.test(document.title) || !document.querySelector('div[role=main]')) return null; /* Workspace 계정은 제목에 'Gmail'이 없다 */ return {title: document.title};""", timeout)
+    except RuntimeError as e:  # 왜 안 됐는지 남긴다(제목은 계정 주소가 있어 @ 유무만)
+        try:
+            d = js(tid, "return {url: location.host + location.pathname, ready: document.readyState, at: /@/.test(document.title), main: !!document.querySelector('div[role=main]')}", 10)
+        except Exception as e2:
+            d = f"상태 읽기 실패 {str(e2)[:120]}"
+        raise RuntimeError(f"Gmail 화면이 {timeout}초 안에 준비되지 않음: {d}") from e
     if "login" in st:
         raise Blocked(f"LOGIN_REQUIRED Gmail 로그아웃 상태 ({st['login'][:80]}) — Chrome에서 직접 로그인 필요")
     if account not in st["title"]:
