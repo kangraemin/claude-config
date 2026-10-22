@@ -18,7 +18,8 @@
     이 경로에선 시각이 00:00 으로 다시 읽히니 다시 넣는다. 등록 성공 토스트 "캠페인을 등록했어요", 상태 '승인됨'(즉시).
   * 신청서 문구의 회사명은 콘솔이 사업자명으로 자동으로 넣는다(바꿀 칸 없음).
 - 왜 화면 조작인가: 콘솔 공개 API 없음.
-검증: list 됨(2026-10-22). create 는 같은 순서를 손으로 성공(eodimeok Campaign 128436), 스크립트 create 경로는 미검증.
+검증: list 됨. create: 2026-10-22 oneul-tarot-card '매일 오늘의 타로'(매일 12시) — 새로 만들기→임시저장→수정 화면 등록으로 '정기적으로 발송될 예정'까지 스크립트로 성공.
+  재실행하면 EXISTS(멱등). finish_draft 를 한 번에 통과하는 경로는 이번 실행에서 손 디버그로 확인, 통합 실행은 다음 앱에서 확인.
 """
 import argparse, json, os, sys, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -34,9 +35,16 @@ KEYS = ("function __k(e,k){e.dispatchEvent(new KeyboardEvent('keydown',{key:k,bu
 
 
 def front(t):
-    w, ti = c.find_tab(t)
-    _t, win = c.ref(t)
-    c.jxa(f"{win}.activeTabIndex = {ti}; {win}.index = 1; C.activate()")
+    for i in range(4):  # 다른 세션이 탭을 여닫으면 탭 번호가 순간 어긋난다(-1728·잘못된 탭 색인)
+        try:
+            w, ti = c.find_tab(t)
+            _t, win = c.ref(t)
+            c.jxa(f"{win}.activeTabIndex = {ti}; {win}.index = 1; C.activate()")
+            break
+        except Exception:
+            if i == 3:
+                raise
+            time.sleep(1.5)
     time.sleep(1.2)
 
 
@@ -45,7 +53,7 @@ def js(t, code):
 
 
 def press_btn(t, text, scope='document', last=True):
-    r = js(t, PRESS + "var b=[...%s.querySelectorAll('button')].filter(b=>b.innerText.trim()==%s);b=b[%s];if(!b)'NOTFOUND';else{__p(b);'OK'}"
+    r = js(t, PRESS + "var b=[...%s.querySelectorAll('button')].filter(b=>b.innerText.trim()==%s);b=b[%s];if(!b)'NOTFOUND';else{b.click();'OK'}"
            % (scope, json.dumps(text), 'b.length-1' if last else '0'))
     if r != 'OK':
         raise RuntimeError(f'button {text}: {r}')
@@ -63,42 +71,119 @@ def alerts(t):
 def campaigns(t, app):
     c.goto(t, f'https://apps-in-toss.toss.im/workspace/{WS}/mini-app/{app}/smart-message?tab=FUNCTIONAL')
     time.sleep(7)
+    front(t)  # 백그라운드면 표가 안 그려져 0개로 읽힌다(10/22)
+    time.sleep(2)
     return json.loads(js(t, "JSON.stringify([...document.querySelectorAll('tbody tr')].map(r=>[...r.cells].map(x=>x.innerText.trim().replace(/\\n/g,' '))))") or '[]')
 
 
 def fill_schedule(t, a):
     front(t)
-    # 요일: 원하는 것만 남긴다
-    js(t, PRESS + "__p([...document.querySelectorAll('div[role=combobox]')].find(e=>/[월화수목금토일]/.test(e.innerText)));1")
-    time.sleep(1)
+    # 요일: div[role=combobox] 를 Enter 로 연다(pointer 이벤트로는 안 열림, 10/22). 항목은 [role=option] data-state=checked|unchecked.
+    # '+ 변수' 버튼의 '수'가 요일 정규식에 걸리니 div[role=combobox] 로만 찾는다.
+    DD = "var dd=document.querySelector('div[role=combobox][aria-haspopup=menu]');"
     want = set(a.days)
     for d in '월화수목금토일':
-        js(t, PRESS + "var o=[...document.querySelectorAll('[role=option]')].find(e=>e.innerText.trim()==%s);"
-                      "if(o&&(o.getAttribute('aria-selected')=='true')!=%s)__p(o);1" % (json.dumps(d), 'true' if d in want else 'false'))
-        time.sleep(0.3)
+        js(t, DD + "if(!document.querySelector('[role=listbox]')){dd.focus();dd.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))};1")
+        time.sleep(0.6)
+        js(t, "var o=[...document.querySelectorAll('[role=listbox] [role=option]')].find(e=>e.innerText.trim()==%s);"
+              "if(o&&(o.getAttribute('data-state')=='checked')!=%s)o.click();1" % (json.dumps(d), 'true' if d in want else 'false'))
+        time.sleep(0.4)
     js(t, "document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));1")
-    js(t, "var cb=document.querySelector('input[type=checkbox]');if(cb&&!cb.checked)cb.click();1")  # 종료일 없음
+    time.sleep(0.5)
+    js(t, "var cb=[...document.querySelectorAll('input[type=checkbox]')].find(e=>(e.closest('label')||e.parentElement).innerText.includes('종료일 없음'));if(cb&&!cb.checked)cb.click();1")
     time.sleep(0.5)
     y, m, d = a.start.split('-')
     hh, mm = a.time.split(':')
-    for i, v in enumerate([y, m, d, hh, mm]):
-        spin(t, i, v)
-    return js(t, "[...document.querySelectorAll('[role=spinbutton]')].map(e=>e.innerText).join(' ')+' | '+[...document.querySelectorAll('div[role=combobox]')].map(e=>e.innerText).join()")
+    # 칸: 시작 YYYY MM DD, (종료 YYYY MM DD), 시 분 — aria-label 로 고른다
+    for lab, nth, v in [('YYYY', 0, y), ('MM', 0, m), ('DD', 0, d), ('시', 0, hh), ('분', 0, mm)]:
+        js(t, KEYS + "var s=[...document.querySelectorAll('[role=spinbutton]')].filter(e=>e.getAttribute('aria-label')==%s)[%d];s.focus();%s.split('').forEach(ch=>__k(s,ch));1"
+           % (json.dumps(lab), nth, json.dumps(v)))
+        time.sleep(0.3)
+    # 포커스를 빼야 날짜가 폼 값으로 확정된다(안 하면 "발송 기간을 입력해주세요", 10/22)
+    js(t, "document.activeElement&&document.activeElement.blur();document.body.click();1")
+    time.sleep(0.8)
+    return js(t, "[...document.querySelectorAll('[role=spinbutton]')].map(e=>e.innerText).join(' ')+' | '+[...document.querySelectorAll('[aria-haspopup=menu]')].map(e=>e.innerText.replace(/\\n/g,' ')).join(' / ')")
+
+
+def _agr_tab(t, name):
+    js(t, PRESS + "var b=[...document.querySelectorAll('[role=dialog] [role=tab]')].find(b=>b.innerText.trim().startsWith(%s));"
+              "__p(b);b.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true}));1" % json.dumps(name))
+    time.sleep(2)
+
+
+def _agr_pick(t, a):
+    """목록 탭에서 같은 이름 동의문 li 를 누르고(그래야 '선택하기'가 켜진다) '선택하기'. 있으면 True."""
+    _agr_tab(t, '목록')
+    for _ in range(4):  # 목록은 늦게 뜬다
+        front(t)
+        if js(t, "var l=[...document.querySelectorAll('[role=dialog] li')].find(l=>l.innerText.includes(%s));l?(l.click(),'OK'):'NONE'" % json.dumps(a.agreement)) == 'OK':
+            break
+        time.sleep(1)
+    else:
+        return False
+    time.sleep(1)
+    return js(t, "var b=[...document.querySelectorAll('[role=dialog] button')].find(b=>b.innerText.trim()=='선택하기'&&!b.disabled);b?(b.click(),'PICKED'):'DISABLED'") == 'PICKED'
 
 
 def attach_agreement(t, a):
-    front(t)
-    press_btn(t, '변경' if js(t, "[...document.querySelectorAll('button')].some(b=>b.innerText.trim()=='변경')") == True else '등록하기', last=False)
-    time.sleep(2)
-    for k, v in {'agreementName': a.agreement, 'notificationTiming': a.timing, 'purpose': a.purpose}.items():
-        js(t, SETV + "var e=document.querySelector('[role=dialog] [name=%s]');__setv(e,%s);1" % (k, json.dumps(v)))
-    front(t)
-    press_btn(t, '등록하기', scope="document.querySelector('[role=dialog]')")
-    for _ in range(10):
+    """동의문 창: 목록에 같은 이름이 있으면 그걸 '선택하기'(멱등). 없으면 새로 만들기 → 등록하기 → 목록에서 선택하기.
+    등록하기만 누르면 창이 안 닫히고 목록 탭으로 바뀔 뿐이다(10/22)."""
+    for _ in range(4):  # 화면이 늦게 그려지거나 탭이 뒤로 가면 잠깐 안 보인다
+        front(t)
+        r = js(t, "var b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()=='변경')||[...document.querySelectorAll('button')].find(b=>b.innerText.includes('알림동의문 연결'));b?(b.click(),'OK'):'NOTFOUND'")
+        if r == 'OK':
+            break
+        time.sleep(2)
+    if r != 'OK':
+        raise RuntimeError(f'알림동의문 버튼: {r}')
+    time.sleep(2.5)
+    if not _agr_pick(t, a):
+        _agr_tab(t, '새로 만들기')
+        for k, v in {'agreementName': a.agreement, 'notificationTiming': a.timing, 'purpose': a.purpose}.items():
+            js(t, SETV + "var e=document.querySelector('[role=dialog] [name=%s]');__setv(e,%s);1" % (k, json.dumps(v)))
+        front(t)
+        press_btn(t, '등록하기', scope="document.querySelector('[role=dialog]')")
+        time.sleep(4)
+        print('agreement-msg', alerts(t))
+        if not _agr_pick(t, a):
+            raise RuntimeError('만든 알림동의문이 목록에 없음: ' + alerts(t))
+    for _ in range(6):
         time.sleep(1)
-        if js(t, "document.querySelectorAll('[role=dialog]').length") == 0:
+        front(t)  # 백그라운드면 창이 닫힌 게 반영되지 않는다
+        if js(t, "document.querySelectorAll('[role=dialog]').length") in (0, '0'):
             return
     raise RuntimeError('알림동의문 대화창이 안 닫힘')
+
+
+def detail(t, title):
+    """목록에서 캠페인 행을 눌러 옆 패널 글자를 돌려준다(주소에 templateSetGroupNo 가 붙는다)."""
+    front(t)
+    js(t, "var r=[...document.querySelectorAll('tbody tr')].find(r=>r.innerText.includes(%s));r&&r.click();1" % json.dumps(title))
+    time.sleep(4)
+    front(t)
+    return js(t, "[...document.querySelectorAll('[role=dialog]')].map(d=>d.innerText).join(' ')") or ''
+
+
+def finish_draft(t, a):
+    """임시저장 캠페인: 상세 패널 '수정' → /functional-smart-message/<groupNo>/edit 에서 발송 코드·일정을 다시 넣고 등록하기.
+    첫 등록이 임시저장으로만 남을 때 이 경로로 성공(10/22 oneul-tarot-card Campaign 128444)."""
+    info = detail(t, a.title)
+    if '정기적으로 발송될 예정' in info or '승인' in info:
+        return info
+    js(t, "var b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()=='수정');b&&b.click();1")
+    time.sleep(7)
+    front(t)
+    js(t, SETV + "__setv(document.querySelector('[name=\"messageContent.0.code\"]'),%s);1" % json.dumps(a.code))
+    print('schedule', fill_schedule(t, a))
+    if '상세' not in (js(t, "document.querySelector('main').innerText") or ''):
+        attach_agreement(t, a)
+        print('schedule', fill_schedule(t, a))
+    front(t)
+    press_btn(t, '등록하기')
+    time.sleep(6)
+    c.goto(t, f'https://apps-in-toss.toss.im/workspace/{WS}/mini-app/{a.app}/smart-message?tab=FUNCTIONAL')
+    time.sleep(7)
+    return detail(t, a.title)
 
 
 def main():
@@ -117,24 +202,36 @@ def main():
         if a.cmd == 'list':
             print(f'RESULT: OK {len(rows)}개')
             return
-        if any(a.title in ' '.join(r) for r in rows):
+        row = next((r for r in rows if a.title in ' '.join(r)), None)
+        if row and '임시저장' not in ' '.join(row):
             print(f'RESULT: EXISTS {a.title}')
             return
+        if row:
+            if not a.submit:
+                print(f'RESULT: DRY_RUN 임시저장 {a.title} — --submit 이면 수정 화면에서 등록')
+                return
+            info = finish_draft(t, a)
+            ok = '정기적으로 발송될 예정' in info or '승인' in info
+            print(f"RESULT: {'REGISTERED' if ok else 'UNCONFIRMED'} {a.title} — {info[:200]}")
+            sys.exit(0 if ok else 2)
         c.goto(t, f'https://apps-in-toss.toss.im/workspace/{WS}/mini-app/{a.app}/functional-smart-message/create')
         time.sleep(7)
         front(t)
         for name, v in {'campaignTitle': a.title, 'messageContent.0.pushTemplate.title': a.push_title,
                         'messageContent.0.pushTemplate.content': a.body, 'messageContent.0.code': a.code}.items():
             js(t, SETV + "var e=document.querySelector('[name=\"%s\"]');__setv(e,%s);1" % (name, json.dumps(v)))
-        js(t, PRESS + "var b=[...document.querySelectorAll('button,label')].find(e=>e.innerText.includes('토스에게 발송 요청하기'));b&&__p(b);1")
-        js(t, PRESS + "__p(document.querySelector('button[value=RECURRING]'));1")
+        # 발송 방법 카드는 div[role=button] — 평범한 click() 이라야 골라진다(PointerEvent 로는 안 바뀜, 10/22)
+        js(t, "[...document.querySelectorAll('div[role=button]')].find(e=>e.innerText.trim().startsWith('토스에게 발송 요청하기')).click();1")
         time.sleep(1)
-        print('schedule', fill_schedule(t, a))
-        attach_agreement(t, a)
+        js(t, "document.querySelector('button[value=RECURRING]').click();1")
+        time.sleep(1.5)
         print('schedule', fill_schedule(t, a))
         if not a.submit:
-            print('RESULT: DRY_RUN 채움(등록 안 누름)')
+            print('main', js(t, "document.querySelector('main').innerText.slice(0,1500)"))
+            print('RESULT: DRY_RUN 채움(동의문 만들기·등록 안 누름)')
             return
+        attach_agreement(t, a)
+        print('schedule', fill_schedule(t, a))
         front(t)
         press_btn(t, '등록하기')
         for _ in range(12):
@@ -147,8 +244,11 @@ def main():
             if '실패' in al or '명시' in al or '입력해주세요' in al:
                 print(f'RESULT: REJECTED {al}')
                 sys.exit(1)
-        print(f'RESULT: UNCONFIRMED {alerts(t)} — 목록에서 임시저장 여부 확인, 다시 누르지 말 것')
-        sys.exit(2)
+        # 첫 등록은 토스트 없이 임시저장으로만 남을 때가 있다 → 수정 화면에서 한 번 더 등록
+        info = finish_draft(t, a)
+        ok = '정기적으로 발송될 예정' in info or '승인' in info
+        print(f"RESULT: {'REGISTERED' if ok else 'UNCONFIRMED'} {a.title} — {info[:200]}")
+        sys.exit(0 if ok else 2)
     finally:
         c.close_tab(t)
 
