@@ -44,6 +44,13 @@ python3 naver_register.py rss     https://site   # RSS 피드(feed.xml) 제출
 - 네이버 로그아웃이면 `chrome-direct/scenarios/naver_login.py --qr --notify`.
 - 사이트맵 칸은 전체 URL을 넣어야 확인 버튼이 켜진다.
 
+## 2-1. 구글 색인 생성 요청 (서치콘솔 버튼, 하루 약 10건)
+```
+python3 gsc_request_index.py https://host/ URL [URL ...]   # URL마다 RESULT 요청됨/이미 등록됨/할당량 초과
+```
+- API에 색인 요청이 없어서 Chrome 'Profile 1'로 'URL 검사 → 색인 생성 요청'을 누른다. 새 사이트에서 sitemap이 며칠째 pending일 때 허브 페이지부터 넣는다.
+- 하위 경로 속성(https://host/path/)은 inspect 화면이 404 → 루트 속성으로 연다. 8건쯤에서 응답이 느려지며 '시간 초과'가 나면 할당량으로 보고 다음 날 이어 한다(2026-10-22 검증, kangraemin.github.io).
+
 ## 4. IndexNow (네이버·빙 즉시 알림)
 ```
 python3 indexnow.py <host> <key> <sitemap 경로|URL>
