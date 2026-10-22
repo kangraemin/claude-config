@@ -32,6 +32,9 @@ def row(tid):
 def main():
     with tab(url(a.workspace, a.app, "app-build"), a) as tid:
         wait_page(tid, "버전 내역")
+        from chromectl import shot
+        shot(tid, "/tmp/ait_release_front.png")  # 백그라운드 탭은 버전 표·확인 창이 늦게/안 그려진다(10/22)
+        time.sleep(2)
         if js(tid, CUR) == a.version:
             emit({"app": a.app, "version": a.version}, "ALREADY", f"{a.version} 이미 출시됨")
             return
@@ -44,7 +47,9 @@ def main():
         if not a.submit:
             emit(info, "DRY_RUN", "출시 가능 — --submit 으로 출시")
             return
-        if js(tid, ROW + "const b = [...tr.querySelectorAll('button')].find(b => b.innerText.trim() === '출시하기'); __press(b); return 1") != 1:
+        # 백그라운드 탭에선 확인 창이 안 그려지고, __press 로는 창이 안 뜰 때가 있다(10/22 세 앱 모두 시간 초과).
+        # 탭을 앞으로 띄우고 평범한 click() 으로 누르면 바로 뜬다.
+        if js(tid, ROW + "const b = [...tr.querySelectorAll('button')].find(b => b.innerText.trim() === '출시하기'); b.click(); return 1") != 1:
             raise RuntimeError("버튼 누르기 실패")
         dtext = poll(tid, DLG + "return d ? d.innerText : null", 15)
         info["dialog"] = dtext[:800]
@@ -52,7 +57,7 @@ def main():
             raise Blocked("NEEDS_OWNER 출시 창에 약관/동의 — " + dtext[:200].replace("\n", " "))
         ok = js(tid, DLG + """const bs = [...d.querySelectorAll('button')].filter(b => __vis(b) && !b.disabled && !/취소|닫기/.test(b.innerText));
           const b = bs.find(b => /출시/.test(b.innerText)) || bs.find(b => /확인/.test(b.innerText)); if (!b) return 'NOBUTTON:' + bs.map(b => b.innerText).join('|');
-          __press(b); return 'OK';""")
+          b.click(); return 'OK';""")
         if ok != "OK":
             raise RuntimeError(f"창 출시 버튼: {ok}")
         for _ in range(20):
