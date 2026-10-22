@@ -25,3 +25,8 @@ else
   npx --yes qrcode -w 600 -o "$QR" "$URL" >/dev/null
 fi
 echo "QR $QR"
+# 배포하면 바로 테스터 푸시를 보낸다(사용자 결정: 링크 대신 푸시). NO_PUSH=1이면 건너뜀.
+if [ "${NO_PUSH:-0}" != 1 ]; then
+  APPN=$(echo "$URL" | sed -E 's#intoss-private://([^?]+)\?.*#\1#'); DID=$(echo "$URL" | sed -E 's/.*_deploymentId=([^&]+).*/\1/')
+  (cd ~/.claude/skills/chrome-direct && timeout 300 python3 scenarios/ait_app_register.py push "$APPN" --deployment "$DID" --submit 2>&1 | grep -E "^RESULT" | tail -1)
+fi
