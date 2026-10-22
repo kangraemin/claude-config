@@ -25,6 +25,7 @@ import argparse
 import base64
 import io
 import json
+import re
 import os
 import sys
 import time
@@ -61,10 +62,21 @@ def jj(t, code):
 
 
 def click_ok(t, text):
-    """text 가 보이는 확인창의 OK 를 누른다."""
-    return js(t, """(()=>{const m=[...document.querySelectorAll('*')].find(e=>e.children.length==0&&e.textContent.includes(%s)&&e.getClientRects().length);
-      if(!m)return 0;let d=m;while(d.parentElement&&![...d.querySelectorAll('button')].some(b=>b.innerText.trim()=='OK'))d=d.parentElement;
-      const b=[...d.querySelectorAll('button')].find(b=>b.innerText.trim()=='OK');setTimeout(()=>b.click(),10);return 1})()""" % json.dumps(text))
+    """text 가 보이는 확인창의 OK 를 누른다. 숨은 OK(크기 0)가 같은 상자에 여럿 있어 화면 맨 위에 실제로 보이는 것만 누른다.
+    확인창이 늦게 뜰 때가 있어 10초까지 다시 본다. 뒤에 있는 탭에선 확인창이 안 그려져 OK 가 안 먹으므로 먼저 앞으로 띄운다."""
+    c.shot(t, "/tmp/line_upload_front.png")
+    for _ in range(10):
+        if _click_ok(t, text) == 1:
+            return 1
+        time.sleep(1)
+    return 0
+
+
+def _click_ok(t, text):
+    return jj(t, "return " + """(()=>{if(![...document.querySelectorAll('*')].some(e=>e.children.length==0&&e.textContent.includes(%s)&&e.getClientRects().length))return 0;
+      const b=[...document.querySelectorAll('button')].find(b=>{if(b.innerText.trim()!='OK')return false;const q=b.getBoundingClientRect();if(!q.width)return false;
+        const top=document.elementFromPoint(q.x+q.width/2,q.y+q.height/2);return top===b||b.contains(top)});
+      if(!b)return 0;setTimeout(()=>b.click(),10);return 1})()""" % json.dumps(text))
 
 
 def set_values(t, vals):
@@ -183,20 +195,31 @@ def fix_areas(t, root, sid, areas):
         raise SystemExit(f"RESULT: BLOCKED 지역 선택 불일치 {got}")
     js(t, "setTimeout(()=>document.querySelector('[data-test=btn-save]').click(),300);1")
     time.sleep(3)
-    click_ok(t, "Save this form")
-    time.sleep(6)
-    if js(t, "location.href").endswith("/update"):
-        raise SystemExit("RESULT: BLOCKED 지역 저장 안 됨(수정 화면에 머묾)")
+    ok = click_ok(t, "Save this form")
+    for _ in range(10):  # 저장 후 상세 화면으로 넘어가는 데 6초 넘게 걸릴 때가 있다
+        time.sleep(2)
+        if not js(t, "location.href").endswith("/update"):
+            return
+    raise SystemExit(f"RESULT: BLOCKED 지역 저장 안 됨(수정 화면에 머묾, OK={ok})")
 
 
 def upload(t, root, sid, files):
     c.goto(t, f"{BASE}{root}/sticker/{sid}/image")
     time.sleep(5)
-    js(t, """(()=>{const s=document.querySelector('[data-test=select-image-amount]');const o=[...s.options].find(o=>o.text.trim()=='24');
-      if(s.value==o.value)return 0;s.value=o.value;s.dispatchEvent(new Event('change',{bubbles:true}));return 1})()""")
-    time.sleep(2)
-    click_ok(t, "number of stickers")
-    time.sleep(4)
+    c.shot(t, "/tmp/line_upload_front.png")  # 뒤 탭에선 개수 칸·확인창이 안 그려진다
+    close_notices(t)
+    # 개수 칸은 한 번도 심사 요청 안 한 항목에만 있다. 8개로 요청되면 고칠 수 없어 항목을 지우고 새로 만들어야 한다
+    n = jj(t, """const s=document.querySelector('[data-test=select-image-amount]');if(!s)return null;const o=[...s.options].find(o=>o.text.trim()=='24');
+      if(s.value==o.value)return 'same';s.value=o.value;s.dispatchEvent(new Event('change',{bubbles:true}));return 'set'""")
+    if n is None:
+        raise SystemExit(f"RESULT: BLOCKED 개수 선택 칸 없음(이미 심사 요청된 적 있는 항목) {sid}")
+    if n == "set":
+        time.sleep(2)
+        click_ok(t, "number of stickers")
+        time.sleep(4)
+    got = jj(t, "const s=document.querySelector('[data-test=select-image-amount]');return s?s.selectedOptions[0].text.trim():null")
+    if got != "24":
+        raise SystemExit(f"RESULT: BLOCKED 개수 24 설정 실패({got}) {sid}")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
         for p in files:
@@ -214,10 +237,14 @@ def upload(t, root, sid, files):
 
 def status(t, root, sid):
     c.goto(t, f"{BASE}{root}/sticker/{sid}")
-    time.sleep(5)
-    body = js(t, "document.body.innerText")
-    i = body.find("Status")
-    return body[i:i + 60].split("\n")[1:3], body
+    for _ in range(10):  # 늦게 그려지면 빈 상태를 '이미 끝남'으로 오판한다
+        time.sleep(3)
+        body = js(t, "document.body.innerText")
+        i = body.find("Status")
+        st = [x for x in body[i:i + 80].split("\n")[1:4] if x.strip()][:2] if i >= 0 else []
+        if st:
+            return st, body
+    return st, body
 
 
 def main():
@@ -272,6 +299,10 @@ def main():
         if "required images have not been uploaded" in body:
             print("RESULT: BLOCKED 이미지 업로드 미완료", sid)
             return
+        m = re.search(r"No\. of Stickers per Set\s*(\d+)", body)
+        if not m or m.group(1) != "24":
+            print("RESULT: BLOCKED 세트 개수가 24가 아님", m and m.group(1), sid)
+            return
         if not a.submit:
             print("RESULT: FILLED", sid, "(--submit 없음, Request 안 누름)")
             return
@@ -282,8 +313,8 @@ def main():
           if(!cb.checked)cb.click();let d=cb;while(d.parentElement&&!d.querySelector('button'))d=d.parentElement;
           const b=[...d.querySelectorAll('button')].find(b=>b.innerText.trim()=='OK');setTimeout(()=>b.click(),10);return 1})()""")
         time.sleep(6)
-        body = js(t, "document.body.innerText")
-        print("RESULT:", "SUBMITTED " + sid if "Review request sent" in body or "Waiting for Review" in body else "UNKNOWN " + sid)
+        st, body = status(t, root, sid)
+        print("RESULT:", "SUBMITTED " + sid if "Waiting for Review" in " ".join(st) else f"UNKNOWN {sid} {st}")
     finally:
         if not a.keep:
             c.close_tab(t)
