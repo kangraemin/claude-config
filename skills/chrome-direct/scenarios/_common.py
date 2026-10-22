@@ -214,7 +214,7 @@ def personal_info():
 def expand(value, info):
     """Replace {name} {phone} ... placeholders. Unknown braces are left as-is."""
     if isinstance(value, str):
-        return re.sub(r"\{(\w+)\}", lambda m: info.get(m.group(1), m.group(0)), value)
+        return re.sub(r"\{(\w+)\}", lambda m: str(info[m.group(1)]) if m.group(1) in info else m.group(0), value)
     if isinstance(value, list):
         return [expand(v, info) for v in value]
     return value

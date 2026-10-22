@@ -116,8 +116,9 @@ MANUAL_JS = ("Chrome이 자바스크립트 실행을 막고 있고 자동으로 
 
 SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_"
 
-# "Apple Events" 항목이 든 하위 메뉴의 (메뉴바 항목 번호, 메뉴 항목 번호)
-JS_MENU_IDX = """
+# "Apple Events" 항목이 든 하위 메뉴의 "메뉴바 항목 이름<TAB>메뉴 항목 이름".
+# 번호로 돌려주면 안 된다: 닫힌 메뉴는 숨은 대체 항목까지 세서 펼친 메뉴와 번호가 어긋날 수 있다(-1719).
+JS_MENU_NAMES = """
 tell application "System Events"
   set p to first process whose unix id is %s
   set mbs to menu bar items of menu bar 1 of p
@@ -129,7 +130,7 @@ tell application "System Events"
           set nms to name of every menu item of menu 1 of (item j of mis)
           repeat with n in nms
             set n to contents of n
-            if n is not missing value and n contains "Apple Events" then return (i as text) & " " & (j as text)
+            if n is not missing value and n contains "Apple Events" then return (name of item i of mbs) & tab & (name of item j of mis)
           end repeat
         end try
       end repeat
@@ -153,15 +154,15 @@ return ((x + w / 2) as integer as text) & "," & ((y + h / 2) as integer as text)
 def open_js_menu():
     """사람이 한 번만 누르면 되게, 진짜 마우스로 '보기 > 개발자 정보' 하위 메뉴를 펼쳐 둔다."""
     pid = chrome_pid()
-    idx = osa(JS_MENU_IDX % pid, timeout=60).split()
-    if len(idx) != 2:
+    names = osa(JS_MENU_NAMES % pid, timeout=60).split("\t")
+    if len(names) != 2:
         return False
-    bar = f"menu bar item {idx[0]}"
+    bar = f"menu bar item {q(names[0])}"
     jxa("C.activate()")
     time.sleep(0.5)
     subprocess.run(["cliclick", "c:" + osa(MENU_CENTER % (bar, pid))], check=True, capture_output=True)
     time.sleep(0.6)
-    sub = osa(MENU_CENTER % (f"menu item {idx[1]} of menu 1 of {bar}", pid))
+    sub = osa(MENU_CENTER % (f"menu item {q(names[1])} of menu 1 of {bar}", pid))
     subprocess.run(["cliclick", f"m:{sub}"], check=True, capture_output=True)
     return True
 
@@ -185,7 +186,12 @@ def setup():
     if platform.system() != "Darwin" or not Path(CHROME_BIN).exists():
         print("FAIL  macOS와 Google Chrome(/Applications)이 필요"); return 1
     if not chrome_pid():
-        subprocess.run(["open", "-a", "Google Chrome"]); time.sleep(4)
+        subprocess.run(["open", "-a", "Google Chrome"])
+        end = time.time() + 30
+        while not chrome_pid() and time.time() < end:
+            time.sleep(1)
+        if not chrome_pid():
+            print("FAIL  Google Chrome이 30초 안에 뜨지 않음 — Chrome을 켠 뒤 setup을 다시 실행"); return 1
     if not shutil.which("cliclick"):
         if shutil.which("brew"):
             print("...   cliclick 설치 중 (brew install cliclick)")
@@ -216,7 +222,11 @@ def setup():
         if _js_ok():
             ok("Chrome 'Apple Events의 자바스크립트 허용'")
         else:
-            opened = open_js_menu()
+            try:
+                opened = open_js_menu()
+            except (RuntimeError, subprocess.SubprocessError) as e:
+                print(f"...   메뉴 자동 펼치기 실패: {str(e)[-120:]}")
+                opened = False
             print("TODO  " + ("지금 펼쳐진 Chrome 메뉴에서 'Apple Events의 자바스크립트 허용'을 누른다" if opened
                               else "Chrome 메뉴 '보기 > 개발자 정보 > Apple Events의 자바스크립트 허용'을 누른다") + " (60초 기다림)")
             end = time.time() + 60
@@ -398,18 +408,19 @@ var __press = e => { e.scrollIntoView({block: 'center'}); const b = e.getBoundin
   const o = {bubbles: true, cancelable: true, view: window, clientX: b.left + b.width / 2, clientY: b.top + b.height / 2, button: 0};
   for (const k of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'])
     e.dispatchEvent(new (k.startsWith('pointer') ? PointerEvent : MouseEvent)(k, o)); };
-var __setv = (e, v) => { e.focus(); const p = e.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(p, 'value').set.call(e, v);
-  e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true})); e.blur(); return e.value === v; };
+var __proto = e => ({TEXTAREA: HTMLTextAreaElement, SELECT: HTMLSelectElement}[e.tagName] || HTMLInputElement).prototype;
+var __val = e => e.isContentEditable ? e.textContent : e.value;
+var __put = (e, v) => { e.focus();
+  if (e.isContentEditable) e.textContent = v; else Object.getOwnPropertyDescriptor(__proto(e), 'value').set.call(e, v);
+  e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true})); };
+var __setv = (e, v) => { __put(e, v); e.blur(); return __val(e) === v; };
 """
 
 
 def fill(match, sel, value):
     js = FIND + f"""(() => {{ const e = __all(document, {q(sel)}).filter(__vis)[0]; if (!e) return 'NOTFOUND';
-  e.focus(); const proto = e.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, 'value').set.call(e, {q(value)});
-  e.dispatchEvent(new Event('input', {{bubbles: true}})); e.dispatchEvent(new Event('change', {{bubbles: true}}));
-  return e.value.length === {len(value)} ? 'OK' : 'MISMATCH'; }})()"""
+  const v = {q(value)}; __put(e, v);
+  return __val(e).length === v.length ? 'OK' : 'MISMATCH'; }})()"""
     r = run_js(match, js)
     if r != "OK":
         raise RuntimeError(f"fill {sel}: {r}")
