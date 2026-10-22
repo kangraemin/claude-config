@@ -52,6 +52,14 @@ python3 ~/.claude/scripts/sns_tg.py check --account oguriworks   # 오늘 이 �
 - 출시 소식은 큐(`my-sns/drafts/oguri-release-queue.md`)를 따른다. 간격은 2일이다.
   - 새 출시는 `my-sns/drafts/src/release_watch.py`가 매일 잡는다.
 
+## 2-1. 카드 글은 영상판도 만든다 (사용자 10/22 "인스타·스레드에 올리는 것들 쇼츠나 릴스 만들기로 했잖아")
+- 인스타·스레드에 올리는 카드(캐러셀) 글은 영상판을 같이 만들어 **인스타 릴스 + 유튜브 쇼츠**로도 올린다. 어디썼·어디먹·먹맵·글마감 모두.
+- 만드는 법: `python3 my-sns/drafts/src/cards_to_reel.py 01.png 02.png ... --out reel.mp4` → 1080×1920, 장당 3.2초, 배경음악. 마지막 줄 `CREDIT:`을 캡션·설명 끝에 꼭 붙인다(CC BY).
+  - 목소리 넣은 설명형 영상이 따로 있으면(어디먹 `eodimeok_reel.py`, 어디썼 Remotion) 그걸 쓴다.
+- 인스타는 하루 1개라 캐러셀과 릴스를 같은 날 올리지 않는다(10/21 연달아 올렸다가 보안문자). 릴스는 그 계정의 다음 빈 날에 올린다.
+- 유튜브 쇼츠는 다른 채널이라 캐러셀 날 같이 올려도 된다. 하루 1개.
+- 예약은 `my-sns/drafts/queue.json`에 항목을 넣으면 `drafts/src/sns_queue.py`(tmux `sns-queue`, 10분마다)가 시각이 지난 것을 하나씩 올린다. `--list`로 상태, `--id X --dry`로 점검.
+
 ## 3. 글을 점검한다
 - 숫자는 원본 데이터에 있는 것만 쓴다. 지어내지 않는다.
 - 사람 이름과 직책은 쓰지 않는다.
