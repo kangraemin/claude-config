@@ -80,6 +80,7 @@ python3 adsense_add.py https://site [--dry-run]    # 마지막 줄 RESULT: <host
 - 공고 모음·짧은 글 사이트는 "가치가 별로 없는 콘텐츠"로 거절된 전례(티스토리 3개)가 있다.
 
 - 수입 확인(읽기 전용): `python3 adsense_earnings.py` → 오늘·어제·7일·이번 달 예상 수입, 잔고, 지급 단계 경고(은행 세부정보 미등록 등), 사이트별 7일. 검증 2026-10-22.
+- 한 도메인에 여러 사이트가 섞이면(예: kangraemin.github.io 개인 블로그 + /oneul-kkum/) 경로별 수입은 URL 채널로 나눈다: `python3 adsense_url_channel.py <host/경로> [--dry-run]`(이미 있으면 EXISTS). 만든 시점부터 집계되고 소급되지 않는다. 화면: 보고서 > 설정(톱니) > URL 채널 관리 = `reporting/?rt=d&ol=url_channels`. 검증 2026-10-23(kangraemin.github.io/oneul-kkum 생성·재실행 EXISTS).
 
 ## 한글 도메인(IDN)
 - 스크립트·DNS·Vercel·GSC에는 punycode(`xn--…`)를 쓴다. 네이버 서치어드바이저는 목록에 한글(`https://글쓰기공모전.kr`)로 저장한다 → naver_register.py가 xn--를 한글로 바꿔 찾는다.
