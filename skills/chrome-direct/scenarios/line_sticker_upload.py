@@ -17,6 +17,7 @@
   - 새 항목 폼에서 area_group=customized 를 골라도 '모든 지역'으로 저장됐다 → 저장 후 /update 에서 지역을 고친다.
     customized 를 누르면 197개국이 전부 체크된 채 나온다. 대륙 체크(name 없는 checkbox)를 꺼서 0으로 만든 뒤 국가만 켠다.
   - 저장·요청 버튼은 확인창(OK)이 뜬다. setTimeout 으로 누르고 창의 OK를 다시 누른다.
+  - 저장이 400 이어도 화면엔 오류가 없다. 원인은 /api/v2/sticker/validate 로 본다(예: 일본어 제목이 남의 스티커와 같으면 DUPLICATED).
   - 「Requests Remaining Today: 0/30」은 '0개 사용'이다(남은 수 아님).
   - 정산 계좌 미등록 경고가 떠도 심사 요청은 된다.
   - 로그인 버튼(input[name=tid]/tpasswd 옆 「로그인」)은 값을 넣어도 disabled 로 남는다 → disabled=false 후 click.
@@ -127,9 +128,9 @@ def login(t):
         body = js(t, "document.body.innerText")
         m = re.search(r"(?<!\d)(\d{4,6})(?!\d)", body)
         if m and not sent:
-            subprocess.run(["curl", "-s", "-d", f"chat_id={os.environ.get('CONTEST_TG_CHAT_ID', '')}", "--data-urlencode",
+            subprocess.run(["curl", "-s", "-d", f"chat_id={os.environ.get('RAM_NOTI_TG_CHAT_ID', '')}", "--data-urlencode",
                             f"text=[LINE 로그인] 폰 LINE 앱에 인증번호 {m.group(1)} 입력해주세요(3분)",
-                            f"https://api.telegram.org/bot{os.environ.get('CONTEST_TG_TOKEN', '')}/sendMessage"], capture_output=True)
+                            f"https://api.telegram.org/bot{os.environ.get('RAM_NOTI_TG_TOKEN', '')}/sendMessage"], capture_output=True)
             print("PIN sent to telegram")
             sent = True
         js(t, "(()=>{const b=[...document.querySelectorAll('button')].find(b=>/^(허용|Allow)$/.test(b.innerText.trim()));if(b)b.click();return 1})()")
@@ -150,6 +151,16 @@ def create(t, root, a):
     c.goto(t, f"{BASE}{root}/sticker/create")
     time.sleep(5)
     close_notices(t)
+    # 저장은 /api/v2/sticker 가 400 을 내도 화면에 오류를 안 띄운다. 제목 중복(DUPLICATED) 등을 먼저 검사한다
+    checks = [(f, l, v) for l, ti, de in (("en", a.en_title, a.en_desc), ("ja", a.ja_title, a.ja_desc), ("zh-Hant", a.zh_title, a.zh_desc))
+              if ti for f, v in (("title", ti), ("description", de))]
+    js(t, """(()=>{window.__val=[];const base=location.pathname.split('/sticker')[0]+'/api/v2/sticker/validate';
+      for(const [f,l,v] of %s)fetch(base+'?field='+f+'&language='+l+'&value='+encodeURIComponent(v),{credentials:'include'})
+        .then(r=>r.json()).then(j=>__val.push([l,f,j.success,j.errors]));return 1})()""" % json.dumps(checks))
+    time.sleep(4)
+    bad = [v for v in (jj(t, "return window.__val") or []) if not v[2]]
+    if bad:
+        raise SystemExit(f"RESULT: BLOCKED 제목·설명 검사 실패 {bad}")
     vals = {"meta[en][title]": a.en_title, "meta[en][description]": a.en_desc, "copyright": a.creator}
     for lang, ti, de in (("ja", a.ja_title, a.ja_desc), ("zh-Hant", a.zh_title, a.zh_desc)):
         if not ti:
