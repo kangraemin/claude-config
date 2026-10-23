@@ -25,27 +25,33 @@ def text(t):
 def tg_env():
     env = {}
     for l in open(os.path.expanduser('~/.claude/.env')):
-        m = re.match(r'(?:export )?(CONTEST_TG_TOKEN|CONTEST_TG_CHAT_ID)=["\']?([^"\'\n]+)', l)
+        m = re.match(r'(?:export )?(RAM_NOTI_TG_TOKEN|RAM_NOTI_TG_CHAT_ID)=["\']?([^"\'\n]+)', l)
         if m: env[m[1]] = m[2]
-    return env['CONTEST_TG_TOKEN'], env['CONTEST_TG_CHAT_ID']
+    return env['RAM_NOTI_TG_TOKEN'], env['RAM_NOTI_TG_CHAT_ID']
 
 def captcha(t):
-    """보안문자 창이 있으면 텔레그램으로 묻고 입력. 없으면 False."""
+    """보안문자 창이 있으면 cap.png로 저장하고 answer.txt(Claude가 읽고 씀)를 기다려 입력. 없으면 False."""
     src = c.js_json(t, "const e=document.querySelector('.v-dialog--active .v-image__image');return e?e.style.backgroundImage.slice(5,-2):''")
     if not src: return False
     gif = f'{TMP}/cap.gif'; urllib.request.urlretrieve(src, gif)
     from PIL import Image
     im = Image.open(gif).convert('RGB'); im.resize((im.width * 3, im.height * 3)).save(f'{TMP}/cap.png')
-    tok, chat = tg_env()
-    sent = json.loads(subprocess.check_output(['curl', '-s', '-F', f'chat_id={chat}', '-F', f'photo=@{TMP}/cap.png', '-F',
-        f'caption={site} 네이버 서치어드바이저 보안문자 — 보이는 글자를 답장해 주세요', f'https://api.telegram.org/bot{tok}/sendPhoto']))
-    t0 = sent['result']['date']
-    print(f'CAPTCHA sent to telegram, waiting reply (or write it to {TMP}/answer.txt)', flush=True)
+    # Claude reads cap.png and writes answer.txt itself (user: "니가 알아서 읽어", 2026-10-23); Telegram only with NAVER_CAPTCHA_TG=1
+    tg = os.environ.get('NAVER_CAPTCHA_TG') == '1'
+    t0 = time.time()
+    if tg:
+        tok, chat = tg_env()
+        sent = json.loads(subprocess.check_output(['curl', '-s', '-F', f'chat_id={chat}', '-F', f'photo=@{TMP}/cap.png', '-F',
+            f'caption={site} 네이버 서치어드바이저 보안문자 — 보이는 글자를 답장해 주세요', f'https://api.telegram.org/bot{tok}/sendPhoto']))
+        t0 = sent['result']['date']
+    print(f'CAPTCHA_READY {TMP}/cap.png — read it and write the text to {TMP}/answer.txt', flush=True)
     for _ in range(180):
         # python urllib은 텔레그램 TLS가 가끔 Connection reset → curl로 읽고 실패하면 다음 회차
-        try: ups = json.loads(subprocess.check_output(['curl', '-s', '-m', '15', f'https://api.telegram.org/bot{tok}/getUpdates?offset=-10']))['result']
-        except Exception: time.sleep(5); continue
-        rep = [u['message']['text'] for u in ups if u.get('message', {}).get('date', 0) > t0 and u['message'].get('text')]
+        rep = []
+        if tg:
+            try: ups = json.loads(subprocess.check_output(['curl', '-s', '-m', '15', f'https://api.telegram.org/bot{tok}/getUpdates?offset=-10']))['result']
+            except Exception: time.sleep(5); continue
+            rep = [u['message']['text'] for u in ups if u.get('message', {}).get('date', 0) > t0 and u['message'].get('text')]
         # 텔레그램 채널 플러그인을 켠 다른 Claude 세션이 답장을 먼저 가져가면 여기로 안 온다 → 채팅으로 받은 답을 이 파일에 쓴다
         af = f'{TMP}/answer.txt'
         if not rep and os.path.exists(af) and os.path.getmtime(af) > t0: rep = [open(af).read().strip()]

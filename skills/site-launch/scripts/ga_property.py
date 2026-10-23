@@ -8,7 +8,7 @@ import chromectl as c
 from _sa import sess, GA_ACCOUNT
 name, site = sys.argv[1], sys.argv[2].rstrip('/')
 dry = '--dry-run' in sys.argv
-s = sess('https://www.googleapis.com/auth/analytics.edit'); B = 'https://analyticsadmin.googleapis.com/v1beta'
+s = sess('https://www.googleapis.com/auth/analytics.readonly'); B = 'https://analyticsadmin.googleapis.com/v1beta'
 
 def find():
     for a in s.get(B + '/accountSummaries').json()['accountSummaries']:

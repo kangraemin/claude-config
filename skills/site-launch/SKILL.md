@@ -1,6 +1,6 @@
 ---
 name: site-launch
-description: 새 웹사이트를 GA4·구글 서치콘솔·네이버 서치어드바이저·빙 웹마스터·IndexNow·애드센스에 사용자 손 안 대고 등록한다(서비스 계정 + 실제 Chrome 조작 + 보안문자만 텔레그램). "GA 붙여", "GA 속성 만들어", "서치콘솔 등록", "네이버 서치어드바이저", "빙 등록", "Bing Webmaster", "검색 등록", "SEO 등록", "사이트맵 제출", "색인 요청", "광고 붙여", "애드센스", "광고 달아", "ads.txt", "애드센스 심사" 등에 반드시 사용. 사용자에게 gcloud 로그인이나 직접 등록을 시키지 않는다.
+description: 새 웹사이트를 GA4·구글 서치콘솔·네이버 서치어드바이저·빙 웹마스터·IndexNow·애드센스에 사용자 손 안 대고 등록한다(서비스 계정 + 실제 Chrome 조작 + 보안문자는 Claude가 그림을 읽어 직접 입력). "GA 붙여", "GA 속성 만들어", "서치콘솔 등록", "네이버 서치어드바이저", "빙 등록", "Bing Webmaster", "검색 등록", "SEO 등록", "사이트맵 제출", "색인 요청", "광고 붙여", "애드센스", "광고 달아", "ads.txt", "애드센스 심사" 등에 반드시 사용. 사용자에게 gcloud 로그인이나 직접 등록을 시키지 않는다.
 ---
 
 # site-launch
@@ -33,7 +33,7 @@ python3 gsc_register.py verify https://site/ [sitemap.xml]
 ## 3. 네이버 서치어드바이저
 ```
 python3 naver_register.py add     https://site   # FILE/FILE_CONTENT/META 출력 → 둘 다 사이트에 넣고 배포
-python3 naver_register.py verify  https://site   # 소유확인 → 보안문자 그림을 텔레그램 전송 → 답장 대기(15분) → 입력
+python3 naver_register.py verify  https://site   # 소유확인 → 보안문자 cap.png 저장 → Claude가 Read로 읽고 answer.txt에 씀 → 입력
 python3 naver_register.py sitemap https://site
 python3 naver_register.py rss     https://site   # RSS 피드(feed.xml) 제출
 python3 naver_register.py crawl   https://site URL [URL ...]   # '웹 페이지 수집' 요청. 보안문자 없음(2026-10-22 kangraemin.github.io 39건 연속 성공). 목록 파일은 `xargs`로 넘긴다(zsh는 $var 줄바꿈을 안 쪼갬)
@@ -41,7 +41,7 @@ python3 naver_register.py crawl   https://site URL [URL ...]   # '웹 페이지 
 # 네이버 RSS는 RSS 2.0만 받는다(Jekyll atom.xml은 "형식이 올바르지 않습니다"). 제출마다 보안문자를 사용자에게 물으니 재시도 루프 금지, 한 번에 몰아서.
 ```
 - 사이트 단위만 받는다(경로 붙은 주소 불가). 확인 파일 내용은 `naver-site-verification: naverXXXX.html`.
-- 보안문자는 Claude가 푼다: verify를 백그라운드로 돌리고 `/tmp/site-launch/cap.png`가 새로 바뀌면 Read로 보고 글자를 `/tmp/site-launch/answer.txt`에 쓴다. 한 번만 제출(재시도 루프 금지). 틀려서 실패하면 한 번 더 돌릴 수 있고, 그래도 안 되면 그때만 사용자에게 그림을 보낸다. 텔레그램 전송은 스크립트가 그대로 하지만 사용자 답을 기다리지 않는다.
+- 보안문자는 Claude가 푼다: verify를 백그라운드로 돌리고 `/tmp/site-launch/cap.png`가 새로 바뀌면 Read로 보고 글자를 `/tmp/site-launch/answer.txt`에 쓴다. 한 번만 제출(재시도 루프 금지). 틀려서 실패하면 한 번 더 돌릴 수 있고, 그래도 안 되면 그때만 사용자에게 그림을 보낸다. 텔레그램 전송은 하지 않는다(NAVER_CAPTCHA_TG=1일 때만). 사용자에게 보안문자를 묻지 않는다(2026-10-23 사용자 지시).
 - 네이버 로그아웃이면 `chrome-direct/scenarios/naver_login.py --qr --notify`.
 - 사이트맵 칸은 전체 URL을 넣어야 확인 버튼이 켜진다.
 - 검색어·페이지별 노출 리포트: `https://searchadvisor.naver.com/console/site/report/expose?site=<urlencoded 사이트>`(요약 화면 '콘텐츠 노출/클릭 → 자세히 보기'와 같음). 검색 키워드·웹문서 TOP 30. 하루 늦게 갱신.
