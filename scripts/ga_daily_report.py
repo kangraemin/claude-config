@@ -9,6 +9,8 @@
 - 텔레그램: ~/.claude/.env GA_TG_TOKEN(@ram_ga_bot) / GA_TG_CHAT_ID(없으면 getUpdates → 없으면 DAILY_TG_CHAT_ID로 시도 후 저장).
 - 서비스 계정: ~/.claude/ai-paper-analytics-sa.json (GA 뷰어).
 - launchd com.ram.ga-daily 09:00.
+- 사람에 가까운 수: GA4는 알려진 봇만 자동으로 뺀다. 그래서 '실제로 머문 방문'(참여 세션)과 1인 평균 참여 초를 같이 쓴다.
+- 프로젝트마다 '🤖 분석' 2~3줄(claude -p 구독 로그인, API 키 아님, claude-p.sh가 한도 걸린 계정 건너뜀). 실패하면 숫자만. --no-ai로 끔.
 - 끝에 SNS 조회수(쇼츠·릴스·스레드)를 전날 대비 증감으로 붙인다. 수집은 my-sns sns_stats.py(th-notify tmux 루프) → ~/.cache/sns-stats/<날짜>.json.
 
 출력 마지막 줄: RESULT: OK <속성 수> | FAIL <이유>
@@ -16,6 +18,8 @@
 import argparse
 import datetime as dt
 import json
+import os
+import subprocess
 import sys
 import urllib.parse
 import urllib.request
@@ -79,13 +83,16 @@ def section(cl, pid, name, day, path=None, skip=()):
             return None
         rt = cl.run_realtime_report(RunRealtimeReportRequest(property=f'properties/{pid}', metrics=[Metric(name='activeUsers')]))
         now = sum(float(x.metric_values[0].value) for x in rt.rows)
-        return (f'📊 {name}\n일별 집계 아직 없음(새 속성) · 지금 30분 실시간 {now:.0f}명', now) if now else None
-    m = ['activeUsers', 'sessions', 'screenPageViews']
-    cur = (run(cl, pid, y, y, m, path=path, skip=skip) or [([], [0, 0, 0])])[0][1]
-    prev = (run(cl, pid, y2, y2, m, path=path, skip=skip) or [([], [0, 0, 0])])[0][1]
+        return (f'📊 {name}\n일별 집계 아직 없음(새 속성) · 지금 30분 실시간 {now:.0f}명', now, None) if now else None
+    m = ['activeUsers', 'sessions', 'screenPageViews', 'engagedSessions', 'userEngagementDuration']
+    cur = (run(cl, pid, y, y, m, path=path, skip=skip) or [([], [0] * 5)])[0][1]
+    prev = (run(cl, pid, y2, y2, m, path=path, skip=skip) or [([], [0] * 5)])[0][1]
     week = (run(cl, pid, w, y, ['activeUsers'], path=path, skip=skip) or [([], [0])])[0][1][0]
+    # GA4는 알려진 봇만 자동으로 뺀다. 우리 e2e·모르는 봇은 남는다 → '참여 세션'(10초+ 머묾·2페이지+·전환)을 사람에 가까운 수로 따로 보인다
+    per = cur[4] / cur[0] if cur[0] else 0
     lines = [f'📊 {name}',
              f'어제 사용자 {cur[0]:.0f}{delta(cur[0], prev[0])} · 세션 {cur[1]:.0f} · 페이지뷰 {cur[2]:.0f}{delta(cur[2], prev[2])}',
+             f'실제로 머문 방문 {cur[3]:.0f}{delta(cur[3], prev[3])}/{cur[1]:.0f}세션 · 1인 평균 {per:.0f}초',
              f'7일 사용자 {week:.0f}']
     hosts = run(cl, pid, y, y, ['activeUsers'], ['hostName'], 5, 'activeUsers', path=path, skip=skip)
     if len(hosts) > 1:
@@ -96,7 +103,11 @@ def section(cl, pid, name, day, path=None, skip=()):
     pages = run(cl, pid, y, y, ['screenPageViews'], ['pagePath'], 3, 'screenPageViews', path=path, skip=skip)
     if pages:
         lines.append('페이지: ' + ', '.join(f'{d[0][:40]} {v[0]:.0f}' for d, v in pages))
-    return '\n'.join(lines), cur[0]
+    days = run(cl, pid, w, y, ['activeUsers', 'engagedSessions', 'userEngagementDuration'], ['date'], path=path, skip=skip)
+    src7 = run(cl, pid, w, y, ['sessions', 'engagedSessions'], ['sessionSource'], 6, 'sessions', path=path, skip=skip)
+    data = {'7일 날짜별 [사용자, 참여세션, 총참여초]': {d[0]: v for d, v in sorted(days)},
+            '7일 유입별 [세션, 참여세션]': {d[0]: v for d, v in src7}}
+    return '\n'.join(lines), cur[0], data
 
 
 SNS = HOME / '.cache/sns-stats'
@@ -130,6 +141,37 @@ def sns_section():
     if cur.get('errors'):
         lines.append('⚠️ 못 읽음: ' + '; '.join(cur['errors']))
     return '\n'.join(lines)
+
+
+AI_PROMPT = """아래는 웹사이트(프로젝트)별 어제 GA4 숫자와 지난 7일 자료다. 프로젝트마다 분석을 써라.
+
+규칙
+- 프로젝트마다 2~3줄, 줄마다 '- '로 시작, 한 줄에 한 가지만. 쉬운 한국어, 숫자는 자료에 있는 것만.
+- 1줄: 어제가 평소(7일)보다 어땠는지와 그 이유로 보이는 것(유입 경로·페이지).
+- 사람이 아닐 가능성이 크면 꼭 짚는다: (direct)·(not set) 유입이 대부분이고 참여 세션이 거의 없거나 1인 평균 몇 초면 봇·자동 테스트 의심.
+- 마지막 줄: 오늘 해 볼 일 하나(구체적으로, 예: '스레드 유입이 참여율 높으니 스레드 글을 하나 더').
+- 숫자가 너무 작아 판단할 게 없으면 1줄로 '아직 판단할 만큼 방문이 없음'.
+- 출력은 JSON 하나만: {"<프로젝트 이름 그대로>": "- ...\\n- ..."}. 다른 말 금지.
+
+자료:
+"""
+
+
+def ai_notes(secs):
+    """claude -p(구독 로그인, API 키 아님)로 프로젝트별 분석. 실패하면 {} → 숫자만 보낸다."""
+    src = {s[0].split('\n', 1)[0][2:]: {'어제 요약': s[0].split('\n', 1)[1], **(s[2] or {})} for s in secs}
+    env = {k: v for k, v in os.environ.items() if k not in ('ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL')}
+    env['PATH'] = env.get('PATH', '') + ':/opt/homebrew/bin:/usr/local/bin:' + str(HOME / '.local/bin')
+    try:
+        r = subprocess.run([str(HOME / '.claude/scripts/claude-p.sh'), '-p', AI_PROMPT + json.dumps(src, ensure_ascii=False),
+                            '--system-prompt', '너는 웹사이트 방문 통계를 짧게 분석하는 도구다. JSON만 출력한다.', '--tools', '',
+                            '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence', '--model', 'sonnet'],
+                           capture_output=True, text=True, timeout=900, env=env, cwd='/tmp')
+        out = r.stdout.strip()
+        return json.loads(out[out.find('{'):out.rfind('}') + 1])
+    except Exception as e:
+        print(f'AI 분석 실패: {str(e)[:120]}', file=sys.stderr)
+        return {}
 
 
 def chat_id(token):
@@ -167,6 +209,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--day')
     ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--no-ai', action='store_true', help='프로젝트별 AI 분석(claude -p) 없이')
     a = ap.parse_args()
     day = dt.date.fromisoformat(a.day) if a.day else dt.date.today() - dt.timedelta(days=1)
     cred = service_account.Credentials.from_service_account_file(str(SA), scopes=['https://www.googleapis.com/auth/analytics.readonly'])
@@ -181,7 +224,9 @@ def main():
         except Exception as e:
             errs.append(f'{name}: {str(e)[:80]}')
     secs.sort(key=lambda s: -s[1])  # 어제 사용자 많은 순
-    text = f'📈 GA {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 리포트\n\n' + '\n\n'.join(s[0] for s in secs)
+    notes = {} if a.no_ai else ai_notes(secs)
+    body = [s[0] + (f'\n🤖 분석\n{notes[nm]}' if (nm := s[0].split('\n', 1)[0][2:]) in notes else '') for s in secs]
+    text = f'📈 GA {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 리포트\n\n' + '\n\n'.join(body)
     try:
         sns = sns_section()
     except Exception as e:
