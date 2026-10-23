@@ -1,6 +1,6 @@
 ---
 name: site-launch
-description: 새 웹사이트를 GA4·구글 서치콘솔·네이버 서치어드바이저·빙 웹마스터·IndexNow·애드센스에 사용자 손 안 대고 등록한다(서비스 계정 + 실제 Chrome 조작 + 보안문자는 Claude가 그림을 읽어 직접 입력). "GA 붙여", "GA 속성 만들어", "서치콘솔 등록", "네이버 서치어드바이저", "빙 등록", "Bing Webmaster", "검색 등록", "SEO 등록", "사이트맵 제출", "색인 요청", "광고 붙여", "애드센스", "광고 달아", "ads.txt", "애드센스 심사" 등에 반드시 사용. 사용자에게 gcloud 로그인이나 직접 등록을 시키지 않는다.
+description: 새 웹사이트를 GA4·구글 서치콘솔·네이버 서치어드바이저·빙 웹마스터·다음 웹마스터도구·IndexNow·애드센스에 사용자 손 안 대고 등록한다(서비스 계정 + 실제 Chrome 조작 + 보안문자는 Claude가 그림을 읽어 직접 입력). "GA 붙여", "GA 속성 만들어", "서치콘솔 등록", "네이버 서치어드바이저", "빙 등록", "Bing Webmaster", "다음 검색 등록", "Daum 웹마스터", "검색 등록", "SEO 등록", "사이트맵 제출", "색인 요청", "광고 붙여", "애드센스", "광고 달아", "ads.txt", "애드센스 심사" 등에 반드시 사용. 사용자에게 gcloud 로그인이나 직접 등록을 시키지 않는다.
 ---
 
 # site-launch
@@ -69,7 +69,17 @@ python3 bing_register.py https://site --public web/public   # BingSiteAuth.xml �
 - URL 직접 제출: `POST /webmaster/api.svc/json/SubmitUrlBatch?apikey=` `{siteUrl, urlList(≤500)}`. 할당량은 `GetUrlSubmissionQuota`(2026-10-22 kangraemin.github.io 하루 10,000). 새 사이트는 sitemap 전체를 500개씩 한 번에 낸다.
 - 사이트맵 제출만으론 빙이 크롤링을 안 할 수 있다 → `python3 bing_register.py https://site/path/ --submit-urls`로 sitemap 주소를 전부 직접 제출(하루 10,000건, 2026-10-23 oneul-kkum 2,836건).
 - sitemap은 `SubmitFeed`로 낸다. `SubmitSitemap`은 null만 주고 목록에 안 남는다.
+- 새 사이트는 sitemap만 내면 빙이 몇 주씩 안 가져간다(mukmap.kr 10/23: 홈도 미수집). `bing_daily_submit.py https://site/ --first <홈>`을 매일 크론으로 돌려 하루 한도(100)씩 직접 넣는다. 낸 주소는 `~/.cache/bing-submit/<host>.json`.
 - GSC에 URL-prefix로 등록된 사이트는 웹 'Import from GSC'로 한 번에 가져올 수 있다. "Site addition unsuccessful"이 떠도 실제론 들어간다. GSC 도메인 속성(sc-domain)은 목록에 안 나와 이 스크립트로 넣는다.
+
+## 4-2. 다음(Daum) 웹마스터도구 (카카오 로그인 불필요)
+```
+python3 daum_register.py pin    https://site      # PIN 발급 → '#DaumWebMasterTool:…' 줄 출력 → robots.txt 하단에 넣고 배포
+python3 daum_register.py verify https://site sitemap.xml [URL ...]   # 인증 → 사이트맵 Seed 등록 → 문서 수집 요청
+```
+- PIN은 `~/.claude/.env`의 `DAUM_PIN_<HOST>`에 저장(출력 안 함). 루트 robots.txt를 못 고치는 하위 경로 사이트(github.io/repo)는 불가.
+- 이용동의 체크박스는 /agree로 이동했다 돌아오는 구조라 `label.choice_agree`에 checked 클래스를 직접 붙인다.
+- 검증: 2026-10-23 oguriworks.com pin·verify·수집요청 성공, verify 재실행(이미 인증 세션) 멱등 확인.
 
 ## 5. 애드센스 (계정 pub-4785237655148075, remin1994)
 - 코드: 모든 정적 페이지 head에 `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4785237655148075" crossorigin="anonymous"></script>`(자동 광고). 앱인토스 등 다른 빌드엔 넣지 않는다. `ads.txt`: `google.com, pub-4785237655148075, DIRECT, f08c47fec0942fa0`.
