@@ -5,7 +5,7 @@
 GSC에 URL-prefix로 있는 사이트는 웹 화면 'Import from GSC'로 한 번에 들어간다('Site addition unsuccessful'이 떠도 실제로는 들어감).
 멱등: 이미 추가·확인·제출된 건 건너뛴다. 마지막 줄: RESULT <상태>
   python3 bing_register.py https://site/path/ --submit-urls   # 그 사이트의 sitemap.xml 주소를 SubmitUrlBatch로 전부 제출
-sitemap 제출(Success·UrlCount)만으로는 빙이 크롤링을 안 할 수 있다(oneul-kkum: 923개 받고 열흘 가까이 홈도 미크롤).
+sitemap 제출(Success·UrlCount)만으로는 빙이 크롤링을 안 할 수 있다(oneul-kkum: Success 923개인데 다음 날까지 홈도 미크롤). 경로 붙은 사이트는 AddSite·VerifySite를 먼저 해야 한다.
 URL 제출 할당량은 GetUrlSubmissionQuota로 본다(github.io 하위 경로: 하루 10,000·월 90,000, 2026-10-23)."""
 import json, os, re, sys, urllib.parse, urllib.request
 from pathlib import Path
