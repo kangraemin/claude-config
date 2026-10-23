@@ -7,7 +7,7 @@ description: 새 웹사이트를 GA4·구글 서치콘솔·네이버 서치어�
 
 등록이 끝나면 `seo-geo-audit` 스킬로 점검한다(FAIL 0까지).
 
-사용자에게 시키지 말고 끝까지 직접 한다. 사람이 하는 건 네이버 보안문자 답장(텔레그램) 하나뿐.
+사용자에게 시키지 말고 끝까지 직접 한다. 보안문자도 Claude가 직접 푼다(사용자 10/23 "너가 풀 수 있잖아, 왜 내가 풀어줘야 해").
 
 스크립트: `~/.config/claude-accounts/personal/skills/site-launch/scripts/`
 
@@ -41,9 +41,10 @@ python3 naver_register.py crawl   https://site URL [URL ...]   # '웹 페이지 
 # 네이버 RSS는 RSS 2.0만 받는다(Jekyll atom.xml은 "형식이 올바르지 않습니다"). 제출마다 보안문자를 사용자에게 물으니 재시도 루프 금지, 한 번에 몰아서.
 ```
 - 사이트 단위만 받는다(경로 붙은 주소 불가). 확인 파일 내용은 `naver-site-verification: naverXXXX.html`.
-- 보안문자는 직접 풀지 않는다. 텔레그램(`CONTEST_TG_TOKEN/CHAT_ID`, ~/.claude/.env)으로 그림을 보내고, 사용자 답장을 getUpdates로 읽는다. 채팅으로 답이 오면 그 값을 쓴다.
+- 보안문자는 Claude가 푼다: verify를 백그라운드로 돌리고 `/tmp/site-launch/cap.png`가 새로 바뀌면 Read로 보고 글자를 `/tmp/site-launch/answer.txt`에 쓴다. 한 번만 제출(재시도 루프 금지). 틀려서 실패하면 한 번 더 돌릴 수 있고, 그래도 안 되면 그때만 사용자에게 그림을 보낸다. 텔레그램 전송은 스크립트가 그대로 하지만 사용자 답을 기다리지 않는다.
 - 네이버 로그아웃이면 `chrome-direct/scenarios/naver_login.py --qr --notify`.
 - 사이트맵 칸은 전체 URL을 넣어야 확인 버튼이 켜진다.
+- 검색어·페이지별 노출 리포트: `https://searchadvisor.naver.com/console/site/report/expose?site=<urlencoded 사이트>`(요약 화면 '콘텐츠 노출/클릭 → 자세히 보기'와 같음). 검색 키워드·웹문서 TOP 30. 하루 늦게 갱신.
 
 ## 2-1. 구글 색인 생성 요청 (서치콘솔 버튼, 하루 약 10건)
 ```
