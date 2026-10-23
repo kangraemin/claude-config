@@ -9,7 +9,7 @@
   naver_login.py --profile "Profile 5" --pw BIZ   # ~/.claude/sns.env <BIZ>_NAVER_ID/_PW를 실제 키 입력(cliclick)으로 넣어 로그인
 
 - --pw 없이는 비밀번호를 쓰지 않는다. --pw는 sns.env 값만 쓰고 출력하지 않는다(10/23 오구리웍스: 보안문자·새 기기 확인 없이 됨).
-  JS로 value를 넣으면 네이버가 키 입력 흔적이 없어 보안문자를 띄우므로, 탭을 앞으로 띄우고 cliclick으로 친다. '로그인 상태 유지'를 켜서 다음 로그아웃을 줄인다.
+  value만 넣으면 키 입력 흔적이 없어 보안문자로 막히므로 한 글자씩 키 이벤트를 보내 친다(cliclick은 앞 창이 바뀌면 샘). '로그인 상태 유지'를 켜서 다음 로그아웃을 줄인다.
 - QR: 네이버 앱 검색창 옆 렌즈 → QR 스캔 → 앱에 뜬 숫자 중 출력된 숫자 선택. QR은 3분마다 바뀌어 --rounds번 새로 띄운다.
   사용자가 맥 앞에 없으면 png를 폰으로 보내 다른 화면에 띄워 스캔하게 하거나 --otp를 쓴다.
 - 일회용 번호 로그인은 네이버가 '종료 예정'이라 공지(10/19 화면 문구). 막히면 QR로.
@@ -97,19 +97,25 @@ def env_val(key):
     raise Blocked(f"NO_ENV {key}")
 
 
-def type_keys(text, enter=False):
-    import subprocess
-    subprocess.run(["cliclick", "-w", "120", "t:" + text] + (["kp:return"] if enter else []), check=True, capture_output=True)
+def type_js(tid, sel, text):
+    # 한 글자씩 keydown/keypress/input/keyup을 보낸다. value만 넣으면 키 입력 흔적이 없어 보안문자 오답 처리되고,
+    # cliclick 실제 키는 다른 세션이 앞 창을 바꾸면 엉뚱한 창으로 샌다(10/23 둘 다 겪음).
+    js(tid, r"""const i=document.querySelector(%s), v=%s, set=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set;
+      i.focus(); set.call(i,'');
+      for (const ch of v) { const o={key:ch,keyCode:ch.charCodeAt(0),which:ch.charCodeAt(0),bubbles:true};
+        i.dispatchEvent(new KeyboardEvent('keydown',o)); i.dispatchEvent(new KeyboardEvent('keypress',o)); set.call(i,i.value+ch);
+        i.dispatchEvent(new InputEvent('input',{data:ch,inputType:'insertText',bubbles:true})); i.dispatchEvent(new KeyboardEvent('keyup',o)); }
+      i.dispatchEvent(new Event('change',{bubbles:true})); i.blur(); return 1""" % (json.dumps(sel), json.dumps(text)))
 
 
 def pw_login(tid):
     uid, pw = env_val(f"{a.pw}_NAVER_ID"), env_val(f"{a.pw}_NAVER_PW")
-    c.shot(tid, "/tmp/naver-login-front.png")  # 탭을 앞으로
     for sel, val in (("#id", uid), ("#pw", pw)):
-        js(tid, "const i=document.querySelector(%r); i.focus(); i.click(); return 1" % sel)
-        time.sleep(0.5)
-        type_keys(val, enter=(sel == "#pw"))  # Enter를 같은 호출로 쳐야 사이에 다른 창이 끼지 않는다
-        time.sleep(0.5)
+        type_js(tid, sel, val)
+        time.sleep(0.3)
+    # 버튼 .click()은 안 먹고 requestSubmit은 onsubmit 처리까지 탄다
+    js(tid, r"""const f=document.querySelector('#frmNIDLogin')||document.querySelector('#pw').form;
+      setTimeout(()=>f.requestSubmit(),10); return !!f""")
     seen = []
     for _ in range(12):
         time.sleep(1)
@@ -126,10 +132,6 @@ def pw_login(tid):
         print("PAGE", js(tid, "return document.body.innerText.replace(/\\s+/g,' ').slice(0,500)"), flush=True)
         emit({"profile": a.profile}, "ID_PROTECTED", "네이버 아이디 보호조치 화면 — 본인확인 필요, /tmp/naver-pw-fail.png")
         raise Blocked("ID_PROTECTED")
-    if js(tid, "const p=document.querySelector('#pw'); return !!(p && p.value.length)"):
-        # Enter가 다른 창으로 갔으면 폼을 제출한다(.click()은 안 먹음, requestSubmit은 onsubmit 처리까지 탐)
-        js(tid, r"""const f=document.querySelector('#frmNIDLogin')||document.querySelector('#pw').form;
-          setTimeout(()=>f.requestSubmit(),10); return !!f""")
     left = logged_in_after(tid, 20)
     if not left:
         c.shot(tid, "/tmp/naver-pw-fail.png")
