@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """[지식iN] 검색 목록 한 쪽에서 답할 만한 질문을 고른다(질문은 열지 않는다 — 목록만 읽는다).
 
-  kin_search.py --query "서울 맛집 추천" [--query "..."] [--days 14] [--max-answers 2] [--must "맛집|점심"]
+  kin_search.py --query "서울 맛집 추천" [--query "..."] [--days 14] [--hours 6] [--max-answers 2] [--must "맛집|점심"]
 
 - 목록 주소 https://kin.naver.com/search/list.naver?query=…&section=qna&sort=date (최신순).
 - 질문마다 제목·링크·날짜·답변 수·미리보기를 뽑고, --days 안·답변 --max-answers 이하만 남긴다.
@@ -16,6 +16,7 @@ from _common import Blocked, emit, js, parser, poll, run, tab
 ap = parser(__doc__)
 ap.add_argument("--query", action="append", required=True)
 ap.add_argument("--days", type=int, default=14)
+ap.add_argument("--hours", type=int, default=0, help="0보다 크면 'N분/시간 전'으로 올라온 지 이 시간 안인 것만(늦게 붙지 않게)")
 ap.add_argument("--max-answers", type=int, default=2)
 ap.add_argument("--must", action="append", default=[], help="제목에 이 중 하나는 있어야 함(정규식)")
 a = ap.parse_args()
@@ -47,6 +48,14 @@ def age_days(s):
     return 0 if s else 99
 
 
+def age_hours(s):
+    if m := re.match(r"(\d+)분 전", s):
+        return int(m.group(1)) / 60
+    if m := re.match(r"(\d+)시간 전", s):
+        return int(m.group(1))
+    return 999
+
+
 def main():
     out = []
     for q in a.query:
@@ -58,6 +67,8 @@ def main():
                 raise Blocked(f"지식iN 목록에 '{r['warn']}' — 멈춤")
             for it in r["items"]:
                 if not it["title"] or (a.must and not any(re.search(m, it["title"]) for m in a.must)):
+                    continue
+                if a.hours and age_hours(it["date"]) > a.hours:
                     continue
                 if age_days(it["date"]) <= a.days and it["answers"] <= a.max_answers:
                     out.append({"query": q, **it})
