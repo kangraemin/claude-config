@@ -21,6 +21,7 @@ python3 ~/.claude/skills/seo-geo-audit/scripts/audit.py https://site [--max 300]
 python3 ~/.claude/skills/seo-geo-audit/scripts/inspect_index.py https://site/ [URL ...]
 ```
 - 서치콘솔 URL 검사 API. "검색에 안 나와"면 추측하지 말고 이것부터 돌린다(서비스 계정이 소유자가 아니면 site-launch의 `gsc_register.py verify`로 먼저 등록).
+- 첫 URL로 서치콘솔 속성을 고른다. 하위 경로 URL(예: `/oneul-kkum/d/pig/`)만 넣으면 `403 You do not own this site`가 난다 → 속성 루트 URL(`https://site/oneul-kkum/`)을 맨 앞에 넣는다(2026-10-23 확인).
 - `Discovered - currently not indexed`: 새 도메인 초기엔 정상. `Crawled - currently not indexed`: 품질·중복 문제 의심. `URL is unknown`: sitemap 제출·내부 링크 확인.
 
 ## 보고 규칙
