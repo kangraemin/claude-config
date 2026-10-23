@@ -1,4 +1,4 @@
-"""Usage: admob_gdpr_message.py [--name 오늘의\ 눈썰미\ GDPR] [--app "오늘의 눈썰미"] [--privacy-url URL] [--submit]
+"""Usage: admob_gdpr_message.py [--name N] [--app "오늘의 눈썰미"] [--privacy-url URL] [--submit]
 
 AdMob(remin1994, pub-4785237655148075) 개인 정보 보호 및 메시지 > 유럽 규정(GDPR) 메시지를 만들어 게시한다.
 멱등: 같은 이름의 메시지가 목록에 있으면 만들지 않고 상태만 출력(EXISTS). --submit 없으면 목록만 읽음(DRY_RUN).
