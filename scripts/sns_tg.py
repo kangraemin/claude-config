@@ -58,11 +58,12 @@ def send(msg, texts=(), media=()):
         return False
 
 
-def log(service, account, url, what=''):
+def log(service, account, url, what='', body=''):
     os.makedirs(os.path.dirname(LEDGER), exist_ok=True)
     with open(LEDGER, 'a', encoding='utf-8') as f:
         f.write(json.dumps({'at': datetime.datetime.now().isoformat(timespec='minutes'), 'service': service,
-                            'account': account.lstrip('@'), 'url': url, 'what': what[:80]}, ensure_ascii=False) + '\n')
+                            'account': account.lstrip('@'), 'url': url, 'what': what[:80],
+                            **({'body': body[:600]} if body else {})}, ensure_ascii=False) + '\n')
 
 
 def today(account):
@@ -75,7 +76,8 @@ def today(account):
 
 
 def uploaded(service, account, url, texts=(), media=()):
-    log(service, account, url, next((t.strip().splitlines()[0] for _, t in texts if t and t.strip()), ''))
+    first = next((t.strip() for _, t in texts if t and t.strip()), '')
+    log(service, account, url, first.splitlines()[0] if first else '', first)  # body: SNS 달력 폰 목록에 본문 줄로 쓴다
     return send(f'[업로드 완료] {service} {account}\n{url}', texts, media)
 
 
