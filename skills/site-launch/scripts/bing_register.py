@@ -3,8 +3,11 @@
 순서: 1회차에 --public으로 BingSiteAuth.xml 생성 → 배포 → 다시 실행하면 VerifySite·SubmitFeed까지 끝남.
 키: ~/.claude/.env BING_WEBMASTER_API_KEY (bing.com/webmasters → 설정 → API access → Generate API Key, remin1994 구글 로그인).
 GSC에 URL-prefix로 있는 사이트는 웹 화면 'Import from GSC'로 한 번에 들어간다('Site addition unsuccessful'이 떠도 실제로는 들어감).
-멱등: 이미 추가·확인·제출된 건 건너뛴다. 마지막 줄: RESULT <상태>"""
-import json, os, sys, urllib.parse, urllib.request
+멱등: 이미 추가·확인·제출된 건 건너뛴다. 마지막 줄: RESULT <상태>
+  python3 bing_register.py https://site/path/ --submit-urls   # 그 사이트의 sitemap.xml 주소를 SubmitUrlBatch로 전부 제출
+sitemap 제출(Success·UrlCount)만으로는 빙이 크롤링을 안 할 수 있다(oneul-kkum: 923개 받고 열흘 가까이 홈도 미크롤).
+URL 제출 할당량은 GetUrlSubmissionQuota로 본다(github.io 하위 경로: 하루 10,000·월 90,000, 2026-10-23)."""
+import json, os, re, sys, urllib.parse, urllib.request
 from pathlib import Path
 
 for l in (Path.home() / '.claude/.env').read_text().splitlines():
@@ -22,6 +25,14 @@ def call(m, **kw):
         req = urllib.request.Request(q, json.dumps(kw).encode(), {'Content-Type': 'application/json; charset=utf-8'})
     return json.load(urllib.request.urlopen(req, timeout=30))['d']
 
+
+if '--submit-urls' in sys.argv:
+    su = sys.argv[1].rstrip('/') + '/'  # 경로 붙은 사이트는 그 주소 그대로 등록돼 있다
+    urls = re.findall(r'<loc>([^<]+)</loc>', urllib.request.urlopen(su + 'sitemap.xml', timeout=30).read().decode())
+    q = call('GetUrlSubmissionQuota', siteUrl=su)['DailyQuota']
+    for i in range(0, min(len(urls), q), 500):
+        call('SubmitUrlBatch', siteUrl=su, urlList=urls[i:min(i + 500, q)])
+    print(f'RESULT: SUBMITTED {min(len(urls), q)}/{len(urls)} (하루 할당량 {q})'); sys.exit(0)
 
 site = lambda: next((s for s in call('GetUserSites') if s['Url'] == U), None)
 s = site()
