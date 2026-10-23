@@ -6,7 +6,8 @@
   naver_login.py --qr --notify        # QR을 텔레그램으로 바로 보냄(사용자 폰). 로그인되면 확인 메시지
   naver_login.py --qr [--out q.png]   # QR 로그인 띄우고 QR png + 앱에서 고를 숫자 출력, 로그인될 때까지 대기
   naver_login.py --otp 12345678       # 일회용 번호(네이버 앱 설정 > 로그인 아이디 관리 > 더보기)로 로그인
-  naver_login.py --profile "Profile 5" --pw BIZ   # ~/.claude/sns.env <BIZ>_NAVER_ID/_PW를 실제 키 입력(cliclick)으로 넣어 로그인
+  naver_login.py --profile "Profile 5" --pw BIZ   # ~/.claude/sns.env <BIZ>_NAVER_ID/_PW를 한 글자씩 키 이벤트로 넣어 로그인
+  naver_login.py --profile "Profile 5" --pw BIZ --tab <id> --captcha 300   # CAPTCHA로 멈췄을 때: /tmp/naver-captcha.jpg(영수증 질문)를 읽고 답 1회
 
 - --pw 없이는 비밀번호를 쓰지 않는다. --pw는 sns.env 값만 쓰고 출력하지 않는다(10/23 오구리웍스: 보안문자·새 기기 확인 없이 됨).
   value만 넣으면 키 입력 흔적이 없어 보안문자로 막히므로 한 글자씩 키 이벤트를 보내 친다(cliclick은 앞 창이 바뀌면 샘). '로그인 상태 유지'를 켜서 다음 로그아웃을 줄인다.
@@ -25,6 +26,8 @@ ap = parser(__doc__)
 ap.add_argument("--qr", action="store_true")
 ap.add_argument("--otp")
 ap.add_argument("--pw", metavar="PERSONA", help="sns.env의 <PERSONA>_NAVER_ID/_PW로 로그인")
+ap.add_argument("--captcha", metavar="ANSWER", help="--tab의 보안문자 화면에 답을 넣고 로그인을 마저 한다(--pw와 함께)")
+ap.add_argument("--tab", help="보안문자에서 멈춘 탭 id(CAPTCHA 결과에 출력됨, /tmp/naver-login-tab)")
 ap.add_argument("--out", default="/tmp/naver-qr.png")
 ap.add_argument("--notify", action="store_true", help="QR·숫자·결과를 텔레그램(RAM_NOTI_TG_*)으로 바로 보냄")
 ap.add_argument("--rounds", type=int, default=3, help="QR 새로 띄우는 횟수(1회 약 3분)")
@@ -108,6 +111,42 @@ def type_js(tid, sel, text):
       i.dispatchEvent(new Event('change',{bubbles:true})); i.blur(); return 1""" % (json.dumps(sel), json.dumps(text)))
 
 
+CAPTCHA_IMG = "/tmp/naver-captcha.jpg"
+
+
+def captcha_stop(tid):
+    """영수증 질문형 보안문자면 그림·질문을 남기고 탭을 열어 둔 채 멈춘다. 답은 그림을 읽고 --captcha로 한 번만 넣는다."""
+    q = js(tid, r"""if(!document.getElementById('captcha')) return null;
+      const i=[...document.querySelectorAll('img')].sort((a,b)=>b.width*b.height-a.width*a.height)[0];
+      const t=document.body.innerText.replace(/\s+/g,' '); const m=t.match(/아니에요\.\s*(.+?)\s*확인/);
+      return {src:i?i.src:'', q:m?m[1]:t.slice(0,200), wrong:/잘못 입력/.test(t)}""")
+    if not q:
+        return
+    if q["src"].startswith("data:"):
+        Path(CAPTCHA_IMG).write_bytes(base64.b64decode(q["src"].split(",", 1)[1]))
+    a.keep_tab = True
+    Path("/tmp/naver-login-tab").write_text(tid)
+    print(f"CAPTCHA_Q {q['q']}", flush=True)
+    emit({"profile": a.profile, "tab": tid, "image": CAPTCHA_IMG, "question": q["q"], "previous_wrong": q["wrong"]}, "CAPTCHA",
+         f"그림 {CAPTCHA_IMG}을 읽고 --pw {a.pw} --tab {tid} --captcha <답> 으로 한 번만(재시도 루프 금지)")
+    raise Blocked("CAPTCHA")
+
+
+def captcha_answer(tid):
+    type_js(tid, "#captcha", a.captcha.strip())
+    js(tid, r"""const b=[...document.querySelectorAll('button,a,input[type=submit]')].find(e=>(e.innerText||e.value||'').trim()=='확인');
+      setTimeout(()=>b.click(),10); return !!b""")
+    time.sleep(6)
+    captcha_stop(tid)  # 틀리면 새 질문으로 다시 멈춘다
+    if "nid.naver.com/nidlogin" in js(tid, "return location.href") and js(tid, "return !!document.querySelector('#pw')"):
+        pw_login(tid)  # 통과하면 네이버가 '다시 로그인해 주세요'로 돌려보낸다
+    else:
+        ok = status(tid)["state"] == "IN"
+        emit({"profile": a.profile}, "OK" if ok else "PW_FAIL", "")
+        if not ok:
+            raise Blocked("PW_FAIL")
+
+
 def pw_login(tid):
     uid, pw = env_val(f"{a.pw}_NAVER_ID"), env_val(f"{a.pw}_NAVER_PW")
     for sel, val in (("#id", uid), ("#pw", pw)):
@@ -126,6 +165,7 @@ def pw_login(tid):
         if not seen or seen[-1] != u:
             seen.append(u)
     print("URLS", " > ".join(seen), flush=True)
+    captcha_stop(tid)
     if seen and "idSafetyRelease" in seen[-1]:
         # 아이디 보호조치: 네이버가 이상 로그인으로 막음 → 본인확인(사람 몫)
         c.shot(tid, "/tmp/naver-pw-fail.png")
@@ -143,6 +183,17 @@ def pw_login(tid):
 
 
 def main():
+    if a.captcha:
+        if not (a.pw and a.tab):
+            raise Blocked("--captcha는 --pw, --tab과 함께")
+        tid = a.tab if a.tab.startswith("id:") else "id:" + a.tab
+        try:
+            captcha_answer(tid)
+        finally:
+            if not getattr(a, "keep_tab", False):
+                with __import__("contextlib").suppress(Exception):
+                    c.close_tab(tid)
+        return
     with tab("https://nid.naver.com/user2/help/myInfo?lang=ko_KR", a) as tid:
         time.sleep(2)
         st = poll(tid, STATE, 25)
