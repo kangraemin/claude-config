@@ -13,12 +13,14 @@ import os
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 HOOKS = Path(__file__).resolve().parent
 COUNTERS = HOOKS / '.counters'
 SKIP = ('.worklogs/', '.claude/ai-bouncer/', '.ai-bouncer/', '.update-check')
 MAX_BLOCKS = 3
+SLACK = 120  # 편집 도구 기록과 실제 파일 저장 사이 차이(초)
 
 
 def git(cwd, *args):
@@ -33,6 +35,48 @@ def policy():
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def last_edits(pc, files, paths):
+    # 파일마다 이 세션이 마지막으로 고친 시각(epoch). transcript 줄의 timestamp 로 센다
+    wanted = {p: pc.needles(Path(p)) for p in paths}
+    last = {}
+    for file in files:
+        try:
+            with open(file, 'rb') as stream:
+                for line in stream:
+                    if b'"tool_use"' not in line:
+                        continue
+                    hits = [p for p, forms in wanted.items() if any(f in line for f in forms)]
+                    if not hits:
+                        continue
+                    texts = [t.encode() for t in pc.edited(line)]
+                    try:
+                        ts = datetime.fromisoformat(json.loads(line)['timestamp'].replace('Z', '+00:00')).timestamp()
+                    except (ValueError, KeyError, TypeError, AttributeError):
+                        continue
+                    for p in hits:
+                        if any(f in t for t in texts for f in wanted[p]):
+                            last[p] = max(last.get(p, 0), ts)
+        except OSError:
+            continue
+    return last
+
+
+def still_mine(pc, files, paths):
+    # 이 세션이 고친 뒤 다른 세션이 다시 바꾼 파일은 뺀다(2026-10-24: 하루 전 만든 블로그 파일을
+    # 남의 세션이 고친 걸로 '커밋해라'가 6회 반복됨). 마지막 수정 시각이 이 세션의 마지막 편집보다 SLACK 넘게 늦으면 남의 것이다
+    last = last_edits(pc, files, paths)
+    out = []
+    for p in paths:
+        try:
+            mtime = os.path.getmtime(p)
+        except OSError:
+            continue
+        if p in last and mtime > last[p] + SLACK:
+            continue
+        out.append(p)
+    return out
 
 
 def main():
@@ -68,7 +112,7 @@ def main():
     files = pc.transcripts(data)
     if files is None:
         return
-    mine = sorted(pc.mine(files, dirty))
+    mine = sorted(still_mine(pc, files, pc.mine(files, dirty)))
     sid = str(data.get('session_id', 'unknown'))
     counter = COUNTERS / f'.stop-commit-{sid}'
     if not mine:
