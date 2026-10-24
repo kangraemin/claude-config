@@ -6,6 +6,8 @@
   kin_answer.py --url <질문 URL> --check                      # 상태만(마감·채택·내 답변 있음)
   --image shot.png                                             # 본문 뒤에 사진 1장 첨부(에디터에 <img>가 들어간 걸 확인한 뒤에만 등록)
   --shot evidence.png                                          # 등록 후 화면 캡처
+  --image shot.png --capture <사이트 URL> [--capture-height 555] # 그 URL을 지금 headless로 새로 찍어 shot.png에 덮어쓴 뒤 첨부
+                                                                 # (재사용 캡처에 지난 마감일이 남는 걸 막는다. 광고 도메인은 막고 찍는다)
 
 - SmartEditor ONE은 JS 값 넣기·가짜 paste 이벤트를 무시한다 → 실제 클릭(cliclick) + pbcopy + ⌘V.
   (가짜 paste 이벤트는 버퍼에 남았다가 다음 진짜 붙여넣기 때 같이 들어가니 쓰지 않는다.)
@@ -26,7 +28,38 @@ ap.add_argument("--submit", action="store_true")
 ap.add_argument("--check", action="store_true")
 ap.add_argument("--shot")
 ap.add_argument("--image")
+ap.add_argument("--capture")
+ap.add_argument("--capture-height", type=int, default=555)
 a = ap.parse_args()
+if a.capture and not a.image:
+    ap.error("--capture needs --image (저장할 경로)")
+
+AD_HOSTS = ("googlesyndication", "doubleclick", "adservice", "googletagservices", "googleadservices", "adsbygoogle")
+
+
+def capture(url, path, height):
+    """폭 450(2배율 → 900px) 첫 화면을 새로 찍는다. 광고 요청은 막는다. 예전 첨부(900×N)와 같은 크기."""
+    from urllib.parse import urlsplit, urlunsplit
+    from playwright.sync_api import sync_playwright
+    u = urlsplit(url)  # 한글 도메인은 punycode로(손으로 옮겨 적다 틀리면 KISA 오류 화면이 찍힌다)
+    url = urlunsplit(u._replace(netloc=u.netloc.encode("idna").decode()))
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": 450, "height": height}, device_scale_factor=2, locale="ko-KR")
+        pg.route("**/*", lambda r: r.abort() if any(h in r.request.url for h in AD_HOSTS) else r.continue_())
+        r = pg.goto(url, wait_until="networkidle", timeout=60000)
+        body = pg.inner_text("body")
+        if not r or r.status >= 400 or "KISA" in body or "페이지를 찾을 수" in body:
+            b.close()
+            raise SystemExit(f"capture FAIL: {url} status={r and r.status} — 오류 화면은 첨부하지 않는다")
+        pg.add_style_tag(content="ins.adsbygoogle,.adsbygoogle,[id^=google_ads],iframe[src*=ads]{display:none!important}")
+        pg.wait_for_timeout(800)
+        pg.screenshot(path=str(Path(path).expanduser()))
+        b.close()
+
+
+if a.capture:
+    capture(a.capture, a.image, a.capture_height)
 a.no_fallback = True  # 답변 등록은 Codex로 넘기지 않는다(중복 등록 위험)
 
 STATE = r"""if (document.readyState !== 'complete') return null;
