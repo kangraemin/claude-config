@@ -29,6 +29,9 @@ SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // "unknown"')
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // ""')
 COUNTER_DIR="$HOME/.claude/hooks/.counters"
 mkdir -p "$COUNTER_DIR" 2>/dev/null || exit 0
+# 끝난 세션의 카운터·마커·발췌는 지울 주체가 없다. 7일 넘은 것은 여기서 치운다(2026-10-24: 카운터 2,582개·발췌 수십 개 쌓임)
+find "$HOME/.claude/hooks" "$COUNTER_DIR" -maxdepth 1 -type f \( -name '.library-check-counter-*' -o -name '.library-check-marker-*' \
+  -o -name '.library-review-excerpt-*' -o -name '.library-review-pending-*' -o -name '.stop-commit-*' \) -mtime +7 -delete 2>/dev/null
 COUNTER_FILE="$COUNTER_DIR/.library-check-counter-$SESSION_ID"
 MARKER_FILE="$HOME/.claude/hooks/.library-check-marker-$SESSION_ID"
 PENDING_FILE="$HOME/.claude/hooks/.library-review-pending-$SESSION_ID.txt"
@@ -56,14 +59,17 @@ MARKER=0
 TOTAL=$(wc -l < "$TRANSCRIPT" | tr -d ' ')
 # 압축으로 transcript가 짧아졌으면 새 파일의 처음부터 읽는다.
 [ "$MARKER" -gt "$TOTAL" ] && MARKER=0
-EXCERPT_FILE=$(mktemp "$HOME/.claude/hooks/.library-review-excerpt-$SESSION_ID-XXXXXX") || exit 0
+# 이름만 정하고 파일은 파이썬이 내용이 있을 때만 만든다. 300MB transcript를 읽다 10초 제한에 끊기면 빈 발췌가 남았다(2026-10-24, 49개)
+EXCERPT_FILE=$(mktemp -u "$HOME/.claude/hooks/.library-review-excerpt-$SESSION_ID-XXXXXX") || exit 0
 
 python3 - "$TRANSCRIPT" "$MARKER" "$TOTAL" "$EXCERPT_FILE" <<'PYEOF'
 import json, sys
 path, marker, total, out = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
-lines = open(path, encoding='utf-8', errors='replace').read().splitlines()
+import itertools
 parts = []
-for l in lines[marker:total]:
+# 지난 리뷰 위치부터만 줄 단위로 읽는다. 전체를 메모리에 올리면 큰 transcript에서 시간 제한을 넘긴다
+stream = open(path, encoding='utf-8', errors='replace')
+for l in itertools.islice(stream, marker, total):
     try: o = json.loads(l)
     except: continue
     if o.get('type') not in ('user', 'assistant'): continue
@@ -96,7 +102,10 @@ signal = ('[메모리/규칙 파일 쓰기]' in joined
           or re.search(r'아니|말고|하지\s*마|안\s*된다|틀렸|잘못|왜\s|앞으로|항상|하기로|기억해|규칙|금지|그게 아니', said)
           or re.search(r'원인은|원인:|근본 원인|root cause|알고 보니|문서에 없|삽질|우회했|교정', told, re.I))
 if joined.strip() and human >= 40 and signal:
-    open(out, 'w', encoding='utf-8').write(joined)
+    tmp = out + '.part'
+    open(tmp, 'w', encoding='utf-8').write(joined)
+    import os
+    os.replace(tmp, out)
 PYEOF
 if [ "$?" -ne 0 ]; then
   rm -f "$EXCERPT_FILE"
