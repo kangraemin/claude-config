@@ -4,7 +4,7 @@
   python3 ga_daily_report.py [--day YYYY-MM-DD] [--dry-run]
 
 - 속성 목록은 Admin API accountSummaries로 매번 새로 읽는다. 새 사이트를 GA에 붙이면 따로 손댈 필요 없다.
-- 텔레그램엔 아주 짧게: 5명 넘은 서비스 숫자 한 줄 → 두 배 넘게 바뀐 곳·봇 → 오늘 할 일 2개(AI 한 문장) → SNS는 하루 50회 넘게 는 계정만.
+- 텔레그램엔 한 줄에 한 가지만(사용자 10/24 "한 줄당 한 의미, 한 줄 주루룩 하지 마", "너무 줄였어"): 서비스마다 'N명' 한 줄 → 크게 바뀐 곳 → 봇 → 오늘 할 일 4개 → SNS 계정마다 '+N회' 한 줄 → 많이 본 글 3개.
   사용자 10/24 "읽기 힘들어", "sns 조회수 도저히 못 보겠음", 두 번째 판도 "지금도 보기 불편해" → 유입·페이지 상위 같은 상세는 ~/.cache/ga-daily/<날짜>-detail.txt에만 쓴다.
 - 경로로만 나뉜 프로젝트(블로그 속성의 /jeju-stay)는 SPLITS에 적어 따로 칸을 만든다.
 - 텔레그램: ~/.claude/.env GA_TG_TOKEN(@ram_ga_bot) / GA_TG_CHAT_ID(없으면 getUpdates → 없으면 DAILY_TG_CHAT_ID로 시도 후 저장).
@@ -134,19 +134,24 @@ def sns_section():
     for x in cur['items']:
         if x['views'] is not None:
             groups.setdefault((x['site'], x['handle']), []).append(x)
-    up = []
+    up, tops = [], []
     for (site, handle), xs in groups.items():
         gain = {x['id']: max(0, x['views'] - (prev.get((site, x['id'])) or 0)) for x in xs}
         tot = sum(gain.values())
-        if tot < SNS_MIN:
+        if tot <= 0:
             continue
+        up.append((tot, f'- {SNS_NAME[site]} {WHO.get(handle, handle)}: +{tot:,}회'))
         best = max(xs, key=lambda x: gain[x['id']])
-        title = best['title'].replace('#shorts', '').split('\n')[0].strip()
-        title = title[:14] + '…' if len(title) > 14 else title
-        up.append((tot, f'- {SNS_NAME[site]} {WHO.get(handle, handle)} +{tot:,}회, 대부분 \'{title}\' 글'))
-    lines = ['SNS'] + [t for _, t in sorted(up, key=lambda u: -u[0])] + ['- 나머지 계정은 거의 그대로' if up else '- 모든 계정이 거의 그대로']
+        if gain[best['id']] >= SNS_MIN:
+            title = best['title'].replace('#shorts', '').split('\n')[0].strip()
+            tops.append((gain[best['id']], f'- {title[:20] + "…" if len(title) > 20 else title} (+{gain[best["id"]]:,}회)'))
+    lines = ['SNS 어제 늘어난 조회수'] + [t for _, t in sorted(up, key=lambda u: -u[0])]
+    if not up:
+        lines.append('- 늘어난 계정 없음')
+    if tops:
+        lines += ['', '많이 본 글'] + [t for _, t in sorted(tops, key=lambda u: -u[0])[:3]]
     if cur.get('errors'):
-        lines.append('- 못 읽은 곳: ' + ', '.join(e.split(':')[0] for e in cur['errors']))
+        lines += ['', 'SNS 못 읽은 곳'] + [f'- {e.split(":")[0]}' for e in cur['errors']]
     return '\n'.join(lines)
 
 
@@ -250,15 +255,17 @@ def main():
         if '할 일 없음' in notes.get(x['name'], ''):
             x['ai_bot'] = notes.pop(x['name'])
     bots = [x for x in live if bot(x) or x.get('ai_bot')]
-    main = [x for x in real if x['users'] >= 5 and not x.get('ai_bot')]
-    out = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 온 사람', ' · '.join(f'{short(x["name"])} {x["users"]:.0f}' for x in main) or '5명 넘은 곳 없음']
-    moved = [f'- {short(x["name"])} {x["prev"]:.0f}명 → {x["users"]:.0f}명' for x in main + [y for y in real if y['users'] < 5]
+    people = [x for x in real if not x.get('ai_bot')]
+    out = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 온 사람'] + [f'- {short(x["name"])} {x["users"]:.0f}명' for x in people]
+    if dead:
+        out.append(f'- 0명인 곳 {len(dead)}개')
+    moved = [f'- {short(x["name"])}: {x["prev"]:.0f}명 → {x["users"]:.0f}명' for x in people
              if x['prev'] is not None and max(x['users'], x['prev']) >= 8 and (x['users'] >= x['prev'] * 2 or x['users'] * 2 <= x['prev'])]
-    if bots:
-        moved.append(f'- {"·".join(short(x["name"]) for x in bots)}는 봇으로 보여 뺐어요')
     if moved:
-        out += ['', '눈에 띄는 것'] + moved
-    todo = [f'- {short(x["name"])}: {notes[x["name"]]}' for x in main if x['name'] in notes][:2]
+        out += ['', '전날보다 크게 바뀐 곳'] + moved
+    if bots:
+        out += ['', '봇으로 보이는 곳 (위 숫자에서 뺌)'] + [f'- {short(x["name"])} {x["users"]:.0f}명' for x in bots]
+    todo = [f'- {short(x["name"])}: {notes[x["name"]]}' for x in people if x['name'] in notes][:4]
     if todo:
         out += ['', '오늘 할 일'] + todo
     text = '\n'.join(out)
