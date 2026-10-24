@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
-"""ga_daily_report.py — 서비스 계정이 볼 수 있는 GA4 속성 중 최근 30일 방문이 있는 것(=활성)을 골라 어제 숫자를 텔레그램으로 보낸다. LLM 없음.
+"""ga_daily_report.py — 서비스 계정이 볼 수 있는 GA4 속성 중 최근 30일 방문이 있는 것(=활성)을 골라 어제 숫자를 텔레그램으로 보낸다.
 
   python3 ga_daily_report.py [--day YYYY-MM-DD] [--dry-run]
 
 - 속성 목록은 Admin API accountSummaries로 매번 새로 읽는다. 새 사이트를 GA에 붙이면 따로 손댈 필요 없다.
-- 속성마다: 어제 사용자·세션·페이지뷰(그제 대비), 7일 사용자, 유입 상위 3, 페이지 상위 3. 한 속성에 사이트가 여럿이면 호스트별 사용자도.
+- 텔레그램엔 짧게: 서비스마다 '어제 N명, 전날 M명' 한 줄(봇이면 표시) → 오늘 해 볼 일(AI 한 문장, 많아야 5개) → SNS 계정별 어제 늘어난 조회수.
+  사용자 10/24 "읽기 힘들어", "sns 조회수 도저히 못 보겠음" → 유입·페이지 상위 같은 상세는 ~/.cache/ga-daily/<날짜>-detail.txt에만 쓴다.
 - 경로로만 나뉜 프로젝트(블로그 속성의 /jeju-stay)는 SPLITS에 적어 따로 칸을 만든다.
 - 텔레그램: ~/.claude/.env GA_TG_TOKEN(@ram_ga_bot) / GA_TG_CHAT_ID(없으면 getUpdates → 없으면 DAILY_TG_CHAT_ID로 시도 후 저장).
 - 서비스 계정: ~/.claude/ai-paper-analytics-sa.json (GA 뷰어).
 - launchd com.ram.ga-daily 09:00.
 - 사람에 가까운 수: GA4는 알려진 봇만 자동으로 뺀다. 그래서 '실제로 머문 방문'(참여 세션)과 1인 평균 참여 초를 같이 쓴다.
-- 프로젝트마다 '🤖 분석' 2~3줄(claude -p 구독 로그인, API 키 아님, claude-p.sh가 한도 걸린 계정 건너뜀). 실패하면 숫자만. --no-ai로 끔.
-- 끝에 SNS 조회수(쇼츠·릴스·스레드)를 전날 대비 증감으로 붙인다. 수집은 my-sns sns_stats.py(th-notify tmux 루프) → ~/.cache/sns-stats/<날짜>.json.
+- 할 일 한 문장(claude -p 구독 로그인, API 키 아님, claude-p.sh가 한도 걸린 계정 건너뜀). 실패하면 숫자만. --no-ai로 끔.
+- 끝에 SNS 조회수(쇼츠·릴스·스레드) 계정별 늘어난 수와 가장 많이 늘어난 글 하나. 수집은 my-sns sns_stats.py(th-notify tmux 루프) → ~/.cache/sns-stats/<날짜>.json.
 
 출력 마지막 줄: RESULT: OK <속성 수> | FAIL <이유>
 """
@@ -19,6 +20,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.parse
@@ -83,7 +85,8 @@ def section(cl, pid, name, day, path=None, skip=()):
             return None
         rt = cl.run_realtime_report(RunRealtimeReportRequest(property=f'properties/{pid}', metrics=[Metric(name='activeUsers')]))
         now = sum(float(x.metric_values[0].value) for x in rt.rows)
-        return (f'📊 {name}\n일별 집계 아직 없음(새 속성) · 지금 30분 실시간 {now:.0f}명', now, None) if now else None
+        return {'name': name, 'users': now, 'prev': None, 'engaged': None, 'per': 0, 'new': True,
+                'detail': f'📊 {name}\n일별 집계 아직 없음(새 속성) · 지금 30분 실시간 {now:.0f}명', 'data': None} if now else None
     m = ['activeUsers', 'sessions', 'screenPageViews', 'engagedSessions', 'userEngagementDuration']
     cur = (run(cl, pid, y, y, m, path=path, skip=skip) or [([], [0] * 5)])[0][1]
     prev = (run(cl, pid, y2, y2, m, path=path, skip=skip) or [([], [0] * 5)])[0][1]
@@ -107,7 +110,8 @@ def section(cl, pid, name, day, path=None, skip=()):
     src7 = run(cl, pid, w, y, ['sessions', 'engagedSessions'], ['sessionSource'], 6, 'sessions', path=path, skip=skip)
     data = {'7일 날짜별 [사용자, 참여세션, 총참여초]': {d[0]: v for d, v in sorted(days)},
             '7일 유입별 [세션, 참여세션]': {d[0]: v for d, v in src7}}
-    return '\n'.join(lines), cur[0], data
+    return {'name': name, 'users': cur[0], 'prev': prev[0], 'engaged': cur[3], 'per': per, 'new': False,
+            'detail': '\n'.join(lines), 'data': data}
 
 
 SNS = HOME / '.cache/sns-stats'
@@ -115,43 +119,48 @@ SNS_NAME = {'yt': '유튜브 쇼츠', 'ig': '인스타 릴스', 'th': '스레드
 
 
 def sns_section():
-    """가장 최근 수집 파일과 그 전날 파일을 비교해 계정별 합계·글별 조회수 증감을 쓴다."""
+    """가장 최근 수집 파일과 그 전날 파일을 비교해 계정마다 '어제 늘어난 조회수' 한 줄. 늘어난 계정만 가장 많이 늘어난 글 하나를 붙인다."""
     files = sorted(SNS.glob('*.json'))
     if not files:
         return None
     cur = json.loads(files[-1].read_text())
     prev_f = SNS / f'{dt.date.fromisoformat(files[-1].stem) - dt.timedelta(days=1)}.json'
-    prev = {(x['site'], x['id']): x['views'] for x in json.loads(prev_f.read_text())['items']} if prev_f.exists() else {}
-    def d(n, key):
-        if not prev:
-            return ''
-        p = prev.get(key)
-        return ' (새 글)' if p is None else f' ({"+" if n - p >= 0 else ""}{n - p:,})'
-    lines = [f'🎬 SNS 조회수 ({cur["at"][5:10].replace("-", "/")} {cur["at"][11:]} 기준' + (', 전날 대비)' if prev else ', 비교할 전날 기록 없음)')]
+    if not prev_f.exists():
+        return 'SNS 조회수\n- 비교할 전날 기록이 없어요.'
+    prev = {(x['site'], x['id']): x['views'] for x in json.loads(prev_f.read_text())['items']}
     groups = {}
     for x in cur['items']:
         if x['views'] is not None:
             groups.setdefault((x['site'], x['handle']), []).append(x)
+    up, flat = [], []
     for (site, handle), xs in groups.items():
-        tot = sum(x['views'] for x in xs)
-        ptot = sum(prev.get((site, x['id']), 0) or 0 for x in xs)
-        lines.append(f'{SNS_NAME[site]} @{handle} 합계 {tot:,}' + (f' ({"+" if tot - ptot >= 0 else ""}{tot - ptot:,})' if prev else ''))
-        for x in sorted(xs, key=lambda x: -x['views'])[:5]:
-            lines.append(f'  · {x["title"][:24]} {x["views"]:,}{d(x["views"], (site, x["id"]))}')
+        gain = {x['id']: max(0, x['views'] - (prev.get((site, x['id'])) or 0)) for x in xs}
+        tot = sum(gain.values())
+        who = f'{SNS_NAME[site]} {handle}'
+        if tot <= 0:
+            flat.append(who)
+            continue
+        best = max(xs, key=lambda x: gain[x['id']])
+        title = best['title'].replace('#shorts', '').split('\n')[0].strip()
+        title = title[:22] + '…' if len(title) > 22 else title
+        up.append((tot, f'- {who} {tot:,}회 늘었어요.\n  가장 많이 본 글: {title} ({gain[best["id"]]:,}회)'))
+    lines = ['SNS 어제 늘어난 조회수'] + [t for _, t in sorted(up, key=lambda u: -u[0])]
+    if not up:
+        lines.append('- 늘어난 곳이 없어요.')
+    if flat:
+        lines.append('- 그대로: ' + ', '.join(flat))
     if cur.get('errors'):
-        lines.append('⚠️ 못 읽음: ' + '; '.join(cur['errors']))
+        lines.append('- 못 읽은 곳: ' + ', '.join(e.split(':')[0] for e in cur['errors']))
     return '\n'.join(lines)
 
 
-AI_PROMPT = """아래는 웹사이트(프로젝트)별 어제 GA4 숫자와 지난 7일 자료다. 프로젝트마다 분석을 써라.
+AI_PROMPT = """아래는 웹사이트(프로젝트)별 어제 GA4 숫자와 지난 7일 자료다. 프로젝트마다 '오늘 해 볼 일' 한 문장을 써라.
 
 규칙
-- 프로젝트마다 2~3줄, 줄마다 '- '로 시작, 한 줄에 한 가지만. 쉬운 한국어, 숫자는 자료에 있는 것만.
-- 1줄: 어제가 평소(7일)보다 어땠는지와 그 이유로 보이는 것(유입 경로·페이지).
-- 사람이 아닐 가능성이 크면 꼭 짚는다: (direct)·(not set) 유입이 대부분이고 참여 세션이 거의 없거나 1인 평균 몇 초면 봇·자동 테스트 의심.
-- 마지막 줄: 오늘 해 볼 일 하나(구체적으로, 예: '스레드 유입이 참여율 높으니 스레드 글을 하나 더').
-- 숫자가 너무 작아 판단할 게 없으면 1줄로 '아직 판단할 만큼 방문이 없음'.
-- 출력은 JSON 하나만: {"<프로젝트 이름 그대로>": "- ...\\n- ..."}. 다른 말 금지.
+- 한 문장, 40자 안팎. 쉬운 한국어. 숫자는 자료에 있는 것만, 많아야 하나.
+- 자료에서 보이는 근거(어디서 많이 왔는지, 어느 페이지를 많이 봤는지)를 짧게 넣고 할 일을 구체적으로. 예: '스레드에서 온 사람이 오래 머무니 구좌읍 글을 하나 더 올리기'.
+- (direct)·(not set) 유입이 대부분이고 1인 평균 몇 초면 '봇으로 보여 할 일 없음'이라고 쓴다.
+- 출력은 JSON 하나만: {"<프로젝트 이름 그대로>": "문장"}. 다른 말 금지.
 
 자료:
 """
@@ -159,7 +168,7 @@ AI_PROMPT = """아래는 웹사이트(프로젝트)별 어제 GA4 숫자와 지�
 
 def ai_notes(secs):
     """claude -p(구독 로그인, API 키 아님)로 프로젝트별 분석. 실패하면 {} → 숫자만 보낸다."""
-    src = {s[0].split('\n', 1)[0][2:]: {'어제 요약': s[0].split('\n', 1)[1], **(s[2] or {})} for s in secs}
+    src = {s['name']: {'어제 요약': s['detail'].split('\n', 1)[1], **(s['data'] or {})} for s in secs}
     env = {k: v for k, v in os.environ.items() if k not in ('ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL')}
     env['PATH'] = env.get('PATH', '') + ':/opt/homebrew/bin:/usr/local/bin:' + str(HOME / '.local/bin')
     try:
@@ -168,7 +177,8 @@ def ai_notes(secs):
                             '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence', '--model', 'sonnet'],
                            capture_output=True, text=True, timeout=900, env=env, cwd='/tmp')
         out = r.stdout.strip()
-        return json.loads(out[out.find('{'):out.rfind('}') + 1])
+        notes = json.loads(out[out.find('{'):out.rfind('}') + 1])
+        return {k: v.strip().lstrip('- ') for k, v in notes.items() if isinstance(v, str) and v.strip()}
     except Exception as e:
         print(f'AI 분석 실패: {str(e)[:120]}', file=sys.stderr)
         return {}
@@ -205,6 +215,16 @@ def send(text):
             fp.write(f'GA_TG_CHAT_ID={cid}\n')
 
 
+def short(name):
+    """'제주 숙소 (jeju-stay)'·'Ram's tech blog - GA4' 같은 꼬리를 뗀다."""
+    return re.sub(r'\s*(\([^)]*\)|- GA4)$', '', name) or name
+
+
+def bot(x):
+    """5명 이상 왔는데 머문 방문이 1할도 안 되고 1인 평균 5초 미만이면 봇·자동 테스트로 본다."""
+    return x['engaged'] is not None and x['users'] >= 5 and x['engaged'] < x['users'] * 0.1 and x['per'] < 5
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--day')
@@ -223,20 +243,35 @@ def main():
                     secs.append(s)
         except Exception as e:
             errs.append(f'{name}: {str(e)[:80]}')
-    secs.sort(key=lambda s: -s[1])  # 어제 사용자 많은 순
-    notes = {} if a.no_ai else ai_notes(secs)
-    body = [s[0] + (f'\n🤖 분석\n{notes[nm]}' if (nm := s[0].split('\n', 1)[0][2:]) in notes else '') for s in secs]
-    text = f'📈 GA {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 리포트\n\n' + '\n\n'.join(body)
+    secs.sort(key=lambda s: -s['users'])  # 어제 사용자 많은 순
+    live = [x for x in secs if x['users'] >= 1]
+    dead = [x['name'] for x in secs if x['users'] < 1]
+    real = [x for x in live if not bot(x)]
+    notes = {} if a.no_ai else ai_notes([x for x in real if x['users'] >= 3])
+    for x in real:  # AI가 봇이라고 본 곳은 할 일에서 빼고 목록에 표시
+        if '할 일 없음' in notes.get(x['name'], ''):
+            x['ai_bot'] = notes.pop(x['name'])
+    out = [f'{day:%m/%d}({"월화수목금토일"[day.weekday()]}) 어제 온 사람', '']
+    for x in live:
+        out.append(f'- {short(x["name"])} {x["users"]:.0f}명' + (f', 전날 {x["prev"]:.0f}명' if x['prev'] is not None else ', 새로 붙인 곳') +
+                   (' (거의 바로 나감, 봇으로 보임)' if bot(x) or x.get('ai_bot') else ''))
+    if dead:
+        out.append('- 0명: ' + ', '.join(map(short, dead)))
+    todo = [f'- {short(x["name"])}: {notes[x["name"]]}' for x in real if x['name'] in notes]
+    if todo:
+        out += ['', '오늘 해 볼 일'] + todo[:5]
+    text = '\n'.join(out)
     try:
         sns = sns_section()
     except Exception as e:
-        sns = f'🎬 SNS 조회수 못 읽음: {str(e)[:80]}'
+        sns = f'SNS 조회수\n- 못 읽었어요: {str(e)[:80]}'
     if sns:
         text += '\n\n' + sns
     if errs:
-        text += '\n\n⚠️ 못 읽음: ' + '; '.join(errs)
+        text += '\n\nGA 못 읽은 곳\n' + '\n'.join(f'- {e}' for e in errs)
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f'{day}.txt').write_text(text + '\n')
+    (OUT / f'{day}-detail.txt').write_text('\n\n'.join(x['detail'] for x in secs) + '\n')  # 유입·페이지 상세는 파일로만
     print(text)
     if not a.dry_run:
         send(text)
