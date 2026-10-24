@@ -54,6 +54,13 @@ def tab(url, args):
         if not getattr(args, "keep_tab", False):
             with contextlib.suppress(Exception):
                 c.close_tab(tid)
+            with contextlib.suppress(Exception):  # 그래도 '나가시겠습니까?' 창이 남으면 바로 '나가기'(Enter)로 닫는다(10/24 사용자 "제깍제깍 닫아")
+                time.sleep(1)
+                c.ref(tid)  # 탭이 이미 닫혔으면 여기서 예외 → 아무것도 안 함
+                if True:
+                    c.osa('tell application "Google Chrome" to activate')
+                    time.sleep(0.4)
+                    c.osa('tell application "System Events" to key code 36')
 
 
 def js(tid, body, timeout=20):
