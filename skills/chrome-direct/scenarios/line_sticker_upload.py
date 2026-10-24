@@ -224,7 +224,7 @@ def fix_areas(t, root, sid, areas):
     raise SystemExit(f"RESULT: BLOCKED 지역 저장 안 됨(수정 화면에 머묾, OK={ok})")
 
 
-def upload(t, root, sid, files):
+def upload(t, root, sid, files, replace=False):
     c.goto(t, f"{BASE}{root}/sticker/{sid}/image")
     time.sleep(5)
     c.shot(t, "/tmp/line_upload_front.png")  # 뒤 탭에선 개수 칸·확인창이 안 그려진다
@@ -232,6 +232,8 @@ def upload(t, root, sid, files):
     # 개수 칸은 한 번도 심사 요청 안 한 항목에만 있다. 8개로 요청되면 고칠 수 없어 항목을 지우고 새로 만들어야 한다
     n = jj(t, """const s=document.querySelector('[data-test=select-image-amount]');if(!s)return null;const o=[...s.options].find(o=>o.text.trim()=='24');
       if(s.value==o.value)return 'same';s.value=o.value;s.dispatchEvent(new Event('change',{bubbles:true}));return 'set'""")
+    if n is None and replace:  # 이미 요청된 적 있는 항목: 개수는 고정(24)이고 그림만 바꾼다. 개수는 호출한 쪽이 상세 화면에서 확인
+        n = "locked"
     if n is None:
         raise SystemExit(f"RESULT: BLOCKED 개수 선택 칸 없음(이미 심사 요청된 적 있는 항목) {sid}")
     if n == "set":
@@ -239,7 +241,7 @@ def upload(t, root, sid, files):
         click_ok(t, "number of stickers")
         time.sleep(4)
     got = jj(t, "const s=document.querySelector('[data-test=select-image-amount]');return s?s.selectedOptions[0].text.trim():null")
-    if got != "24":
+    if got != "24" and n != "locked":
         raise SystemExit(f"RESULT: BLOCKED 개수 24 설정 실패({got}) {sid}")
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as z:
