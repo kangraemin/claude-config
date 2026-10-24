@@ -2,7 +2,7 @@
 """[제출] 앱인토스 콘솔 — 새 미니앱 만들기 / 테스트 푸시 / 첫 등록 정보 채우고 검토 요청. 출시는 절대 안 누름.
 
   ait_app_register.py create <appName> <표시이름> [--game] [--submit]
-  ait_app_register.py push   <appName> [--submit]                  # 버전 내역 첫 행 '테스트' → '푸시 보내기'
+  ait_app_register.py push   <appName> [--to 손유정,서민구] [--submit]                 # 버전 내역 첫 행 '테스트' → '푸시 보내기'
   ait_app_register.py meta   <appName> --deployment <id> --store <store-text.md> --icon <600png> --shots a.png,b.png,c.png[,d.png]
                              --category 생활/콘텐츠/운세 [--dark-icon png] [--submit]
   ait_app_register.py review <appName> --version 20261022-3 --notes "출시 노트" [--submit]   # 업데이트 버전 검토 요청
@@ -116,15 +116,42 @@ def cmd_create(a):
 def cmd_push(a):
     t = console_tab(f'https://apps-in-toss.toss.im/workspace/{a.ws}/mini-app/{a.app}/app-build')
     try:
-        click_text(t, '테스트')
+        for _ in range(15):
+            try:
+                click_text(t, '테스트')
+                break
+            except RuntimeError:
+                time.sleep(1)
+        else:
+            click_text(t, '테스트')
         time.sleep(3)
-        dlg = c.js_json(t, "var d=[...document.querySelectorAll('[role=dialog]')].pop();return d?d.innerText:''")
+        dlg = c.js_json(t, "var d=[...document.querySelectorAll('[role=dialog]')].filter(x=>x.innerText.includes('푸시 보내기')).pop();return d?d.innerText:''")
         link = re.search(r'intoss-private://\S+', dlg)
         print('LINK', link.group(0) if link else '')
+        # 기본 받는 사람은 본인(강래민)뿐이다. 다른 멤버는 칸을 눌러 뜨는 목록(cmdk)에서 고른다
+        if a.to:
+            c.shot(t, '/tmp/ait_push_front.png')  # 뒤에 깔린 탭은 목록(cmdk)이 안 그려진다. 앞으로 띄운다
+        for name in [n.strip() for n in (a.to or '').split(',') if n.strip()]:
+            r = 'NOTFOUND'
+            for _ in range(8):  # 목록이 늦게 뜨거나 안 열릴 때가 있어 칸을 다시 누른다
+                c.js_json(t, "var d=[...document.querySelectorAll('[role=dialog]')].filter(x=>x.innerText.includes('푸시 보내기')).pop();var i=d.querySelector('input[role=combobox]');i.focus();"
+                             "['pointerdown','mousedown','pointerup','mouseup','click'].forEach(k=>i.dispatchEvent(new MouseEvent(k,{bubbles:true})));"
+                             # 이름을 쳐 넣어 목록을 띄운다(누르기만으론 가끔 안 열린다)
+                             "Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i,%s);i.dispatchEvent(new Event('input',{bubbles:true}));return 1" % json.dumps(name))
+                time.sleep(1.5)
+                r = c.js_json(t, "var o=[...document.querySelectorAll('[role=option]')].find(o=>o.innerText.trim()==%s);if(!o)return 'NOTFOUND';"
+                                 "['pointerdown','mousedown','pointerup','mouseup','click'].forEach(k=>o.dispatchEvent(new MouseEvent(k,{bubbles:true})));return 'ok'" % json.dumps(name))
+                if r == 'ok':
+                    break
+            time.sleep(1)
+            if r != 'ok':
+                raise RuntimeError(f'멤버 {name}: {r}')
+        if a.to:
+            print('TO', c.js_json(t, "var d=[...document.querySelectorAll('[role=dialog]')].filter(x=>x.innerText.includes('푸시 보내기')).pop();return [...d.querySelectorAll('[role=combobox]')].map(i=>i.closest('[cmdk-root]').innerText).join('').trim().split(/\s+/).join(',')"))
         if not a.submit:
             print('RESULT: DRY_RUN 푸시 안 보냄')
             return
-        c.js_json(t, "var d=[...document.querySelectorAll('[role=dialog]')].pop();[...d.querySelectorAll('button')].find(b=>b.innerText.trim()=='푸시 보내기').click();return 1")
+        c.js_json(t, "var d=[...document.querySelectorAll('[role=dialog]')].filter(x=>x.innerText.includes('푸시 보내기')).pop();[...d.querySelectorAll('button')].find(b=>b.innerText.trim()=='푸시 보내기').click();return 1")
         time.sleep(3)
         sent = c.js_json(t, "return performance.getEntriesByType('resource').some(e=>/bundles\\/test-push/.test(e.name))")
         print('RESULT:', 'PUSHED' if sent else 'PUSH_NOT_SEEN')
@@ -285,5 +312,6 @@ ap.add_argument('--category', default='생활/콘텐츠/운세')
 ap.add_argument('--cs-from', default='oneul-kkum')
 ap.add_argument('--version')
 ap.add_argument('--notes')
+ap.add_argument('--to', help='push: 본인 말고 더 보낼 멤버 이름, 쉼표로(예: 손유정,서민구)')
 a = ap.parse_args()
 {'create': cmd_create, 'push': cmd_push, 'meta': cmd_meta, 'review': cmd_review}[a.cmd](a)
