@@ -66,6 +66,13 @@ python3 ~/.claude/scripts/sns_tg.py check --account oguriworks   # 오늘 이 �
 - 출시 소식은 큐(`my-sns/drafts/oguri-release-queue.md`)를 따른다. 간격은 2일이다.
   - 새 출시는 `my-sns/drafts/src/release_watch.py`가 매일 잡는다.
 
+## 2-0. 짝 규칙 (사용자 10/24 "릴스 올리면 쇼츠 올려야 하고 인스타 게시물 있으면 스레드 게시물도 있어야")
+- 모든 계정에 해당한다.
+- 릴스를 올리면 같은 영상을 유튜브 쇼츠로도 올린다.
+- 인스타 게시물(카드·릴스)이 있으면 스레드 게시물도 있어야 한다.
+- 큐에 넣은 뒤 `python3 my-sns/drafts/src/set_check.py`를 돌린다. `MISSING`이 남으면 짝을 채운다.
+- 유튜브 채널이 없는 계정(`NO_CHANNEL`)은 채널부터 만든다.
+
 ## 2-1. 카드 글은 영상판도 만든다 (사용자 10/22 "인스타·스레드에 올리는 것들 쇼츠나 릴스 만들기로 했잖아")
 - 인스타·스레드에 올리는 카드(캐러셀) 글은 영상판을 같이 만들어 **인스타 릴스 + 유튜브 쇼츠**로도 올린다. 어디썼·어디먹·먹맵·글마감 모두.
 - 만드는 법: `python3 my-sns/drafts/src/cards_to_reel.py 01.png 02.png ... --out reel.mp4` → 1080×1920, 장당 3.2초, 배경음악. 마지막 줄 `CREDIT:`을 캡션·설명 끝에 꼭 붙인다(CC BY).
