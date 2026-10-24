@@ -1,6 +1,6 @@
 ---
 name: sns-post
-description: 광고·홍보·마케팅(지식iN·카페·커뮤니티·SNS) 작업을 어느 세션에서 하든, 그리고 사용자 SNS 계정(개인 dev_ram_kang·@dev_ram_, 오구리웍스 oguriworks, 어디썼 eodi_sseot, 글마감 geulmagam, 먹맵 mukmap.kr, 썸판독기 ssum.pandok)에 무엇이든 올리기 전에 반드시 거치는 공통 규칙. 어느 세션·어느 레포에서든 인스타·스레드·X·유튜브 쇼츠·링크드인·블로그에 게시·예약·댓글·답글을 하려 하면, 또는 "올려", "게시해", "홍보 글", "출시 소식 올려", "인스타에 카드", "스레드에 써" 같은 말이 나오면 이 스킬부터 연다. 앱 출시 홍보를 앱 레포 세션에서 하려 할 때도 해당한다.
+description: 광고·홍보·마케팅(지식iN·카페·커뮤니티·SNS) 작업을 어느 세션에서 하든, 그리고 사용자 SNS 계정(개인 dev_ram_kang·@dev_ram_, 오구리웍스 oguriworks, 어디썼 eodi_sseot, 글마감 geulmagam, 먹맵 mukmap_kr, 썸판독기 ssum.pandok)에 무엇이든 올리기 전에 반드시 거치는 공통 규칙. 어느 세션·어느 레포에서든 인스타·스레드·X·유튜브 쇼츠·링크드인·블로그에 게시·예약·댓글·답글을 하려 하면, 또는 "올려", "게시해", "홍보 글", "출시 소식 올려", "인스타에 카드", "스레드에 써" 같은 말이 나오면 이 스킬부터 연다. 앱 출시 홍보를 앱 레포 세션에서 하려 할 때도 해당한다.
 ---
 
 # SNS 게시 공통 규칙
@@ -43,7 +43,7 @@ description: 광고·홍보·마케팅(지식iN·카페·커뮤니티·SNS) 작�
 | 어디썼(동업자 공용) | eodi_sseot (인스타·스레드·X·유튜브) | Profile 4 |
 | 오구리웍스(사업자) | oguriworks (인스타·스레드) | Profile 5 |
 | 글마감 | geulmagam | Profile 6 |
-| 먹맵 | mukmap.kr | Profile 7 |
+| 먹맵 | mukmap_kr (10/24 mukmap.kr에서 바꿈) | Profile 7 |
 | 썸 판독기 | ssum.pandok (인스타·스레드) | Profile 8 |
 - 다른 프로필로 로그인하거나 게시하지 않는다. 페르소나가 섞인다.
 - 탭은 `--match id:`로 잡는다. URL로 잡으면 다른 프로필의 같은 사이트 탭을 잡는다.
