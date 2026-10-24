@@ -4,8 +4,8 @@
   python3 ga_daily_report.py [--day YYYY-MM-DD] [--dry-run]
 
 - 속성 목록은 Admin API accountSummaries로 매번 새로 읽는다. 새 사이트를 GA에 붙이면 따로 손댈 필요 없다.
-- 텔레그램엔 짧게: 서비스마다 '어제 N명, 전날 M명' 한 줄(봇이면 표시) → 오늘 해 볼 일(AI 한 문장, 많아야 5개) → SNS 계정별 어제 늘어난 조회수.
-  사용자 10/24 "읽기 힘들어", "sns 조회수 도저히 못 보겠음" → 유입·페이지 상위 같은 상세는 ~/.cache/ga-daily/<날짜>-detail.txt에만 쓴다.
+- 텔레그램엔 아주 짧게: 5명 넘은 서비스 숫자 한 줄 → 두 배 넘게 바뀐 곳·봇 → 오늘 할 일 2개(AI 한 문장) → SNS는 하루 50회 넘게 는 계정만.
+  사용자 10/24 "읽기 힘들어", "sns 조회수 도저히 못 보겠음", 두 번째 판도 "지금도 보기 불편해" → 유입·페이지 상위 같은 상세는 ~/.cache/ga-daily/<날짜>-detail.txt에만 쓴다.
 - 경로로만 나뉜 프로젝트(블로그 속성의 /jeju-stay)는 SPLITS에 적어 따로 칸을 만든다.
 - 텔레그램: ~/.claude/.env GA_TG_TOKEN(@ram_ga_bot) / GA_TG_CHAT_ID(없으면 getUpdates → 없으면 DAILY_TG_CHAT_ID로 시도 후 저장).
 - 서비스 계정: ~/.claude/ai-paper-analytics-sa.json (GA 뷰어).
@@ -115,7 +115,9 @@ def section(cl, pid, name, day, path=None, skip=()):
 
 
 SNS = HOME / '.cache/sns-stats'
-SNS_NAME = {'yt': '유튜브 쇼츠', 'ig': '인스타 릴스', 'th': '스레드'}
+SNS_NAME = {'yt': '유튜브', 'ig': '인스타', 'th': '스레드'}
+WHO = {'dev_ram_kang': '개인', 'eodi_sseot': '어디썼', 'oguriworks': '오구리웍스', 'geulmagam': '글마감', 'mukmap.kr': '먹맵', 'ssum.pandok': '썸판독기'}
+SNS_MIN = 50  # 하루에 이만큼 안 늘면 안 적는다
 
 
 def sns_section():
@@ -132,23 +134,17 @@ def sns_section():
     for x in cur['items']:
         if x['views'] is not None:
             groups.setdefault((x['site'], x['handle']), []).append(x)
-    up, flat = [], []
+    up = []
     for (site, handle), xs in groups.items():
         gain = {x['id']: max(0, x['views'] - (prev.get((site, x['id'])) or 0)) for x in xs}
         tot = sum(gain.values())
-        who = f'{SNS_NAME[site]} {handle}'
-        if tot <= 0:
-            flat.append(who)
+        if tot < SNS_MIN:
             continue
         best = max(xs, key=lambda x: gain[x['id']])
         title = best['title'].replace('#shorts', '').split('\n')[0].strip()
-        title = title[:22] + '…' if len(title) > 22 else title
-        up.append((tot, f'- {who} {tot:,}회 늘었어요.\n  가장 많이 본 글: {title} ({gain[best["id"]]:,}회)'))
-    lines = ['SNS 어제 늘어난 조회수'] + [t for _, t in sorted(up, key=lambda u: -u[0])]
-    if not up:
-        lines.append('- 늘어난 곳이 없어요.')
-    if flat:
-        lines.append('- 그대로: ' + ', '.join(flat))
+        title = title[:14] + '…' if len(title) > 14 else title
+        up.append((tot, f'- {SNS_NAME[site]} {WHO.get(handle, handle)} +{tot:,}회, 대부분 \'{title}\' 글'))
+    lines = ['SNS'] + [t for _, t in sorted(up, key=lambda u: -u[0])] + ['- 나머지 계정은 거의 그대로' if up else '- 모든 계정이 거의 그대로']
     if cur.get('errors'):
         lines.append('- 못 읽은 곳: ' + ', '.join(e.split(':')[0] for e in cur['errors']))
     return '\n'.join(lines)
@@ -157,8 +153,8 @@ def sns_section():
 AI_PROMPT = """아래는 웹사이트(프로젝트)별 어제 GA4 숫자와 지난 7일 자료다. 프로젝트마다 '오늘 해 볼 일' 한 문장을 써라.
 
 규칙
-- 한 문장, 40자 안팎. 쉬운 한국어. 숫자는 자료에 있는 것만, 많아야 하나.
-- 자료에서 보이는 근거(어디서 많이 왔는지, 어느 페이지를 많이 봤는지)를 짧게 넣고 할 일을 구체적으로. 예: '스레드에서 온 사람이 오래 머무니 구좌읍 글을 하나 더 올리기'.
+- 한 문장, 25자 안팎. 쉬운 한국어. 숫자 쓰지 말 것. '~하기'로 끝낸다.
+- 할 일만 구체적으로. 페이지 주소(/g/life/ 등)의 뜻을 짐작해 바꿔 쓰지 말고 주소를 그대로 쓴다. 예: '스레드에 구좌읍 글 하나 더 올리기'.
 - (direct)·(not set) 유입이 대부분이고 1인 평균 몇 초면 '봇으로 보여 할 일 없음'이라고 쓴다.
 - 출력은 JSON 하나만: {"<프로젝트 이름 그대로>": "문장"}. 다른 말 금지.
 
@@ -217,7 +213,9 @@ def send(text):
 
 def short(name):
     """'제주 숙소 (jeju-stay)'·'Ram's tech blog - GA4' 같은 꼬리를 뗀다."""
-    return re.sub(r'\s*(\([^)]*\)|- GA4)$', '', name) or name
+    n = re.sub(r'\s*(\([^)]*\)|- GA4)$', '', name) or name
+    n = re.sub(r'(?<=[가-힣])\s+[A-Za-z][\w-]*$', '', n)
+    return {'MukMap': '먹맵', "Ram's tech blog": '블로그', '오늘꿈해몽': '꿈해몽'}.get(n, n)
 
 
 def bot(x):
@@ -251,15 +249,18 @@ def main():
     for x in real:  # AI가 봇이라고 본 곳은 할 일에서 빼고 목록에 표시
         if '할 일 없음' in notes.get(x['name'], ''):
             x['ai_bot'] = notes.pop(x['name'])
-    out = [f'{day:%m/%d}({"월화수목금토일"[day.weekday()]}) 어제 온 사람', '']
-    for x in live:
-        out.append(f'- {short(x["name"])} {x["users"]:.0f}명' + (f', 전날 {x["prev"]:.0f}명' if x['prev'] is not None else ', 새로 붙인 곳') +
-                   (' (거의 바로 나감, 봇으로 보임)' if bot(x) or x.get('ai_bot') else ''))
-    if dead:
-        out.append('- 0명: ' + ', '.join(map(short, dead)))
-    todo = [f'- {short(x["name"])}: {notes[x["name"]]}' for x in real if x['name'] in notes]
+    bots = [x for x in live if bot(x) or x.get('ai_bot')]
+    main = [x for x in real if x['users'] >= 5 and not x.get('ai_bot')]
+    out = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 온 사람', ' · '.join(f'{short(x["name"])} {x["users"]:.0f}' for x in main) or '5명 넘은 곳 없음']
+    moved = [f'- {short(x["name"])} {x["prev"]:.0f}명 → {x["users"]:.0f}명' for x in main + [y for y in real if y['users'] < 5]
+             if x['prev'] is not None and max(x['users'], x['prev']) >= 8 and (x['users'] >= x['prev'] * 2 or x['users'] * 2 <= x['prev'])]
+    if bots:
+        moved.append(f'- {"·".join(short(x["name"]) for x in bots)}는 봇으로 보여 뺐어요')
+    if moved:
+        out += ['', '눈에 띄는 것'] + moved
+    todo = [f'- {short(x["name"])}: {notes[x["name"]]}' for x in main if x['name'] in notes][:2]
     if todo:
-        out += ['', '오늘 해 볼 일'] + todo[:5]
+        out += ['', '오늘 할 일'] + todo
     text = '\n'.join(out)
     try:
         sns = sns_section()
