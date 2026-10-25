@@ -5,6 +5,7 @@
 CLI: sns_tg.py done|ask --msg "요약/링크" [--text-file f ...] [사진·영상 ...]
      sns_tg.py check --account oguriworks   # 오늘 이미 올렸나(ALREADY_TODAY n | FREE)
      sns_tg.py log --service 인스타 --account oguriworks --url URL   # 손으로 올린 것 기록
+     sns_tg.py replies --since <unix초>   # 그 뒤 사용자가 이 봇에 보낸 답장(허락 '다 보내' 등)을 한 줄씩
 키: ~/.claude/.env SNS_UPLOAD_TG_TOKEN / SNS_UPLOAD_TG_CHAT_ID
 """
 import argparse, datetime, json, os, subprocess
@@ -81,17 +82,31 @@ def uploaded(service, account, url, texts=(), media=()):
     return send(f'[업로드 완료] {service} {account}\n{url}', texts, media)
 
 
+def replies(since):
+    """since(unix초) 뒤에 사용자가 이 봇 채팅에 보낸 글. 답글 게시 허락('다 보내', '1,3 보내')을 읽는 데 쓴다."""
+    tok, chat = _env()
+    out = subprocess.run(['curl', '-s', f'https://api.telegram.org/bot{tok}/getUpdates?limit=100'],
+                         capture_output=True, text=True).stdout
+    msgs = []
+    for u in json.loads(out).get('result', []):
+        m = u.get('message') or {}
+        if str(m.get('chat', {}).get('id')) == str(chat) and m.get('date', 0) > since and m.get('text'):
+            msgs.append((m['date'], m['text']))
+    return msgs
+
+
 def ask(title, texts=(), media=()):
     return send(f'[게시 확인 요청] {title}', texts, media)
 
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('kind', choices=['done', 'ask', 'check', 'log'])
+    ap.add_argument('kind', choices=['done', 'ask', 'check', 'log', 'replies'])
     ap.add_argument('--msg', default='')
     ap.add_argument('--service', default='')
     ap.add_argument('--account', default='')
     ap.add_argument('--url', default='')
+    ap.add_argument('--since', type=int, default=0)
     ap.add_argument('--what', default='', help='무엇을 올렸나(앱·주제 한 줄)')
     ap.add_argument('--text-file', action='append', default=[])
     ap.add_argument('media', nargs='*')
@@ -105,6 +120,12 @@ if __name__ == '__main__':
     if a.kind == 'log':  # 스크립트 밖에서 손으로 올린 게시를 기록
         log(a.service, a.account, a.url, a.what)
         print('RESULT: LOGGED')
+        raise SystemExit(0)
+    if a.kind == 'replies':
+        rs = replies(a.since)
+        for d, t in rs:
+            print(datetime.datetime.fromtimestamp(d).strftime('%m-%d %H:%M'), t.replace('\n', ' '))
+        print('RESULT:', f'REPLIES {len(rs)}' if rs else 'NONE')
         raise SystemExit(0)
     texts = [(os.path.basename(f), open(f, encoding='utf-8').read()) for f in a.text_file]
     head = '[업로드 완료] ' if a.kind == 'done' else '[게시 확인 요청] '
