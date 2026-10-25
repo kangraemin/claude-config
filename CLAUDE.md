@@ -119,3 +119,14 @@
 - 저장 후 `CATALOG.md`에 한 줄 추가 → `git -C ~/claude-library add -A && git -C ~/claude-library commit -m "feat: [주제] 추가" && git -C ~/claude-library push` → `📚 library에 추가: [경로]` 한 줄로 알린다.
 - 미결 상태는 기록하지 않는다.
 <!-- learnings-for-claude:rules end -->
+<!-- learnings-for-claude:rules end -->
+
+
+# --- ai-bouncer-rule start ---
+## ai-bouncer 필수 규칙 <!-- why: decisions/_global/process/dev-bounce-before-development.md -->
+
+**절대 금지**: `/dev-bounce` 스킬 호출 없이 Edit / Write / Bash로 소스 파일을 수정하는 것.
+
+- 코드 수정 / 기능 구현 / 버그 수정 / 파일 변경 등 **모든 개발 작업** 전에 반드시 `Skill("dev-bounce")`를 호출한다.
+- 사용자 메시지에 `/dev-bounce`가 포함되어 있으면 **가장 먼저** Skill 도구로 실행한다. 다른 어떤 행동보다 우선.
+# --- ai-bouncer-rule end ---
