@@ -146,6 +146,7 @@ def transcripts(data):
     return files
 
 
+COMMENT = re.compile(r'\s*(?:#|//)')
 EDITORS = {'Write', 'Edit', 'MultiEdit', 'NotebookEdit'}
 # 셸에서 파일을 바꾸는 흔적. 2>&1 같은 리다이렉트는 쓰기가 아니다.
 WRITES = re.compile(r'(?<![0-9&])>|sed -i|perl -i|\btee\b|\bmv\b|\bcp\b|\brm\b|write|git (?:checkout|restore|apply)|\bpatch\b|truncate')
@@ -170,7 +171,8 @@ def edited(line):
             command = str(inp.get('command', ''))
             if '<<' in command:  # heredoc 스크립트는 경로와 쓰기가 다른 줄에 있을 수 있어 통째로 본다
                 if WRITES.search(command):
-                    out.append(command)
+                    # 주석 줄에 적힌 경로는 고친 대상이 아니다(2026-10-25: 테스트·훅 주석에 남의 파일 경로를 적어 다시 잡혔다)
+                    out.append('\n'.join(l for l in command.split('\n') if not COMMENT.match(l)))
                 continue
             for segment in re.split(r'&&|\|\||;|\|(?!\|)|\n', command):
                 hit = WRITES.search(segment)

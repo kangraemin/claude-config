@@ -37,10 +37,10 @@ def policy():
     return module
 
 
-def last_edits(pc, files, paths):
-    # 파일마다 이 세션이 마지막으로 고친 시각(epoch). transcript 줄의 timestamp 로 센다
+def edit_times(pc, files, paths):
+    # 파일마다 이 세션이 고친 시각들(epoch). transcript 줄의 timestamp 로 센다
     wanted = {p: pc.needles(Path(p)) for p in paths}
-    last = {}
+    times = {}
     for file in files:
         try:
             with open(file, 'rb') as stream:
@@ -57,23 +57,25 @@ def last_edits(pc, files, paths):
                         continue
                     for p in hits:
                         if any(f in t for t in texts for f in wanted[p]):
-                            last[p] = max(last.get(p, 0), ts)
+                            times.setdefault(p, []).append(ts)
         except OSError:
             continue
-    return last
+    return times
 
 
 def still_mine(pc, files, paths):
     # 이 세션이 고친 뒤 다른 세션이 다시 바꾼 파일은 뺀다(2026-10-24: 하루 전 만든 블로그 파일을
-    # 남의 세션이 고친 걸로 '커밋해라'가 6회 반복됨). 마지막 수정 시각이 이 세션의 마지막 편집보다 SLACK 넘게 늦으면 남의 것이다
-    last = last_edits(pc, files, paths)
+    # 남의 세션이 고친 걸로 '커밋해라'가 6회 반복됨). 파일의 마지막 수정 시각이 이 세션 편집 시각 어느 것과도
+    # 맞지 않으면 남의 것이다. 나중에 경로를 언급만 한 명령(디버그 스크립트·테스트 주석)으로는 다시 잡히지 않는다
+    # (2026-10-25: 10/23 남이 고친 파일로 '커밋해라' 10회).
+    times = edit_times(pc, files, paths)
     out = []
     for p in paths:
         try:
             mtime = os.path.getmtime(p)
         except OSError:
             continue
-        if p in last and mtime > last[p] + SLACK:
+        if p in times and not any(ts - 5 <= mtime <= ts + SLACK for ts in times[p]):
             continue
         out.append(p)
     return out

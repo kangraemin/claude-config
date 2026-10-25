@@ -13,7 +13,9 @@ def use(name, inp):
     return json.dumps({'type': 'assistant', 'timestamp': '2026-10-25T01:00:00Z',
                        'message': {'content': [{'type': 'tool_use', 'name': name, 'input': inp}]}})
 lines = [use('Edit', {'file_path': f'{t}/repo/app/lang/page.tsx', 'old_string': 'a', 'new_string': 'b'}),
-         use('Bash', {'command': 'sed -i "" s/a/b/ hooks_x.py'})]
+         use('Bash', {'command': 'sed -i "" s/a/b/ hooks_x.py'}),
+         # 다른 파일을 쓰는 heredoc 의 주석에 경로가 적힌 것은 그 파일을 고친 게 아니다
+         use('Bash', {'command': "cat > note.sh <<'EOF'\n# app/blog/page.tsx 오탐 기록\necho hi\nEOF"})]
 open(f'{t}/tr.jsonl', 'w').write('\n'.join(lines) + '\n')
 PY
 python3 - "$T" <<'PY'
