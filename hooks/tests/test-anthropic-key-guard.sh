@@ -14,11 +14,11 @@ run() {  # 기대(0|2) 도구 cwd 입력json
 # 막아야 하는 것
 run 2 Bash "$V/mukmap" '{"command":"export ANTHROPIC_API_KEY=$SSUM_ANTHROPIC_API_KEY && python3 x.py"}'
 run 2 Bash "$V/mukmap" '{"command":"ANTHROPIC_API_KEY=$UNSE_ANTHROPIC_API_KEY node run.js"}'
-run 2 Bash "$V/mukmap" '{"command":"curl https://api.anthropic.com/v1/messages -H x-api-key:abc"}'
+run 2 Bash "$V/stash" '{"command":"curl https://api.anthropic.com/v1/messages -H x-api-key:abc"}'
 run 2 Bash "$T" '{"command":"set -a && source .env.local && set +a && python3 a.py"}'
 run 2 Bash "$V/money-web" '{"command":"echo $UNSE_ANTHROPIC_API_KEY"}'
 run 2 Bash "$V/mukmap" '{"command":"cd ~/programming/vibecoding/stash && wrangler secret put ANTHROPIC_API_KEY"}'
-run 2 Write "$V/mukmap" '{"file_path":"'"$V"'/mukmap/.env.local","content":"ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijk\n"}'
+run 2 Write "$V/stash" '{"file_path":"'"$V"'/stash/.env.local","content":"ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijk\n"}'
 run 2 Write "$V/mukmap" '{"file_path":"'"$HOME"'/.claude/.env","content":"UNSE_ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijk\n"}'
 # 허용
 run 0 Bash "$V/money-web/api" '{"command":"wrangler secret put ANTHROPIC_API_KEY"}'
@@ -30,4 +30,10 @@ run 0 Bash "$T" '{"command":"set -a && source .env.local && set +a && env -u ANT
 run 0 Bash "$V/mukmap" '{"command":"grep -n \"ANTHROPIC_API_KEY=\" .env.local | wc -l; unset ANTHROPIC_API_KEY"}'
 run 0 Bash "$V/mukmap" '{"command":"source .env.local && npm run build"}'
 run 0 Write "$V/mukmap" '{"file_path":"'"$HOME"'/.claude/.env","content":"SSUM_ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijk\n"}'
+# 먹맵 번역 = 민구형 키 MUKMAP_ANTHROPIC_API_KEY (사용자 10/25 "먹맵번역에쓸거라구", "ㅇㅇ 그렇게해")
+MK=MUKMAP_ANTHROPIC_API; MK=${MK}_KEY
+run 0 Bash "$V/mukmap" '{"command":"ANTHROPIC_API_KEY=$'"$MK"' python3 scripts/translate_i18n.py --api"}'
+run 0 Bash "$V/mukmap/scripts" '{"command":"python3 translate_i18n.py --api --key-env '"$MK"' && echo $'"$MK"' | wc -c"}'
+run 2 Bash "$V/money-web" '{"command":"echo $'"$MK"'"}'
+run 2 Bash "$V/eodimeok" '{"command":"export ANTHROPIC_API_KEY=$'"$MK"'"}'
 [ $fail = 0 ] && echo PASS || exit 1
