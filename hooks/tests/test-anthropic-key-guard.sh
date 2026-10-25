@@ -23,6 +23,8 @@ run 2 Write "$V/mukmap" '{"file_path":"'"$HOME"'/.claude/.env","content":"UNSE_A
 # 허용
 run 0 Bash "$V/money-web/api" '{"command":"wrangler secret put ANTHROPIC_API_KEY"}'
 run 0 Bash "$V/mukmap" '{"command":"cd ~/programming/vibecoding/area-insight && export ANTHROPIC_API_KEY=$AREA_INSIGHT_ANTHROPIC_API_KEY && npm test"}'
+run 0 Bash "$V/mukmap" '{"command":"cd ~/.claude/skills && ls; cd ~/programming/vibecoding/money-web && curl -H \"x-api-key: $SSUM_ANTHROPIC_API_KEY\" https://api.anthropic.com/v1/messages"}'
+run 2 Bash "$V/mukmap" '{"command":"cd ~/programming/vibecoding/money-web && ls; cd ~/programming/vibecoding/mukmap && echo $SSUM_ANTHROPIC_API_KEY"}'
 run 0 Bash "$V/ai-paper" '{"command":"python3 run.py --key $AI_PAPER_GC_ANTHROPIC_API_KEY"}'
 run 0 Bash "$T" '{"command":"set -a && source .env.local && set +a && env -u ANTHROPIC_API_KEY python3 a.py"}'
 run 0 Bash "$V/mukmap" '{"command":"grep -n \"ANTHROPIC_API_KEY=\" .env.local | wc -l; unset ANTHROPIC_API_KEY"}'

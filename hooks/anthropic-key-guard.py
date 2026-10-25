@@ -40,9 +40,9 @@ def resolve(p, base):
 
 
 def check_bash(cmd, cwd):
+    # 키는 마지막 cd 뒤에서 쓰인다고 본다(앞의 cd 는 다른 일을 하러 간 것)
     dirs = [resolve(d, cwd) for d in CD.findall(cmd)] or [cwd]
-    roots = {root(d) for d in dirs}
-    r = roots.pop() if len(roots) == 1 else None
+    r = root(dirs[-1])
     ok = ALLOW.get(r, set())
     used = {m[0] for m in EXPAND.findall(cmd)} | {m[0] for m in ASSIGN.findall(cmd)} | {m[0] for m in SECRET.findall(cmd)}
     bad = sorted(n for n in used if n not in ok)
