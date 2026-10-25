@@ -9,6 +9,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 HOME = Path.home()
@@ -106,8 +107,34 @@ def needles(path):
             forms.add(prefix + str(path.relative_to(base)))
         except ValueError:
             pass
-    forms.add(path.name)
+    forms.add(f'{path.parent.name}/{path.name}')
+    # 파일명만으로는 레포 안에 같은 이름이 하나뿐일 때만 본다(app/blog/page.tsx 와 app/[lang]/page.tsx 가 섞였다).
+    if path.name not in GENERIC and name_unique(path):
+        forms.add(path.name)
     return [f.encode() for f in forms if f and f not in GENERIC]
+
+
+_SAME_NAME = {}
+
+
+def name_unique(path):
+    root = path.parent
+    while root != root.parent and not (root / '.git').exists():
+        root = root.parent
+    if not (root / '.git').exists():
+        return True
+    if root not in _SAME_NAME:
+        try:
+            out = subprocess.run(['git', '-C', str(root), 'ls-files', '-co', '--exclude-standard'],
+                                 capture_output=True, text=True, timeout=10).stdout
+        except Exception:
+            out = ''
+        counts = {}
+        for f in out.splitlines():
+            n = f.rsplit('/', 1)[-1]
+            counts[n] = counts.get(n, 0) + 1
+        _SAME_NAME[root] = counts
+    return _SAME_NAME[root].get(path.name, 0) <= 1
 
 
 def transcripts(data):
