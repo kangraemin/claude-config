@@ -121,12 +121,14 @@
 <!-- learnings-for-claude:rules end -->
 <!-- learnings-for-claude:rules end -->
 
+<!-- ai-bouncer:start -->
+## ai-bouncer
 
-# --- ai-bouncer-rule start ---
-## ai-bouncer 필수 규칙 <!-- why: decisions/_global/process/dev-bounce-before-development.md -->
+코드 수정·기능 구현·버그 수정·리팩터링 등 **개발 작업은 `/dev-bounce`로 시작한다.**
+스킬을 거치지 않고 Edit / Write / Bash로 소스를 고치지 않는다.
 
-**절대 금지**: `/dev-bounce` 스킬 호출 없이 Edit / Write / Bash로 소스 파일을 수정하는 것.
-
-- 코드 수정 / 기능 구현 / 버그 수정 / 파일 변경 등 **모든 개발 작업** 전에 반드시 `Skill("dev-bounce")`를 호출한다.
-- 사용자 메시지에 `/dev-bounce`가 포함되어 있으면 **가장 먼저** Skill 도구로 실행한다. 다른 어떤 행동보다 우선.
-# --- ai-bouncer-rule end ---
+- 작업이 시작되면 단계마다 할 일이 주입되고, 마지막 단계를 마치기 전에는 멈출 수 없다.
+- 진행 중인 작업이 있는지 `bouncer scan`으로 먼저 확인하고, 있으면 이어서 한다.
+- 질문·설명 요청은 해당 없다. 그냥 답하면 된다.
+- 막히면 우회하지 말고 사유에 적힌 검사를 통과시켜라.
+<!-- ai-bouncer:end -->

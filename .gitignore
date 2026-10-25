@@ -86,3 +86,6 @@ scripts/update-check.sh
 scripts/worklog-write.sh
 git-hooks/post-commit
 .claude-library/
+
+# ai-bouncer 런타임 상태
+.ai-bouncer/
