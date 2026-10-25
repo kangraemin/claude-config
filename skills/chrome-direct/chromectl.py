@@ -285,6 +285,12 @@ def setup(wait_js=False):
 
 def osa(script, timeout=20):
     r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=timeout)
+    for _ in range(2):  # jxa()와 같은 일시 오류(-609 연결이 유효하지 않습니다 등)는 2초 뒤 다시
+        if r.returncode and any(k in r.stderr for k in TRANSIENT + ("응용 프로그램이 실행 중이 아닙니다",)):
+            time.sleep(2)
+            r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=timeout)
+        else:
+            break
     if r.returncode:
         raise RuntimeError(r.stderr.strip())
     return r.stdout.rstrip("\n")
@@ -307,12 +313,27 @@ def chrome_pid():
     return best and best[1]
 
 
+TRANSIENT = ("(-609)", "연결이 유효하지 않습니다", "대상체를 가져올 수 없습니다", "Connection is invalid", "Can't get object")
+
+
 def jxa(body, timeout=20):
     """JXA로 진짜 Chrome에 명령. body는 `C`(Chrome 앱 객체)를 쓰고 return으로 값을 돌려준다."""
     pid = chrome_pid()
     app = str(pid) if pid else '"Google Chrome"'
     script = f"ObjC.import('Foundation'); var C = Application({app}); (function(){{ {body} }})()"
     r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, timeout=timeout)
+    # Chrome이 바쁘거나 Apple Event 연결이 잠깐 끊기면(-609 '연결이 유효하지 않습니다', -1728·'대상체를 가져올 수 없습니다')
+    # 곧 풀린다. th_notify·sns_stats가 이걸로 자주 FAIL이어서 짧게 두 번 다시 해 본다(2026-10-25).
+    for _ in range(2):
+        if r.returncode and any(k in r.stderr for k in TRANSIENT):
+            time.sleep(2)
+            pid = chrome_pid() or pid
+            if pid and f"Application({app})" in script:
+                script = script.replace(f"Application({app})", f"Application({pid})", 1)
+                app = str(pid)
+            r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, timeout=timeout)
+        else:
+            break
     if r.returncode and pid and "(-600)" in r.stderr:
         # Chrome을 실행 파일로 직접 띄우면(open/LaunchServices를 안 거침) pid로는 Apple Event가 안 간다(-600, 2026-10-22).
         # 그때는 이름으로 보낸다
@@ -364,7 +385,7 @@ def find_tab(match):
 CHROME_BIN = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
 
-def new_tab(url, profile=None, timeout=15):
+def new_tab(url, profile=None, timeout=15, _retry=True):
     """Open url in a NEW tab (in the given profile's window) and return "id:<tab id>".
     Uses the Chrome binary, which hands the URL to the running instance (no 2nd instance)."""
     before = {r[4] for r in tabs(with_id=True)}
@@ -390,6 +411,12 @@ def new_tab(url, profile=None, timeout=15):
             except Exception:
                 pass
             return tid
+    # 가끔 Chrome이 URL을 못 받아 탭이 안 생긴다. 한 번만 다시 연다(before를 새로 잡아 중복 탭 방지).
+    if _retry:
+        now = [r for r in tabs(with_id=True) if r[4] not in before and urllib.parse.urlsplit(url).netloc.removeprefix("www.") in r[3]]
+        if not now:
+            return new_tab(url, profile, timeout, _retry=False)
+        return "id:" + now[-1][4]
     raise RuntimeError(f"new tab did not appear for {url}")
 
 
@@ -459,6 +486,26 @@ def run_js(match, code, timeout=20):
                 raise
     finally:
         os.unlink(path)
+
+
+def upload_file(match, path, selector="input[type=file]", idx=0, mime=None, accept=None):
+    """로컬 파일을 페이지의 <input type=file>에 넣고 change를 쏜다(base64 조각 → File → DataTransfer).
+    여러 세션이 매번 손으로 짜던 것(프사·스크린샷·썸네일). 돌려주는 값: 'ok <input 수> <바이트>' 또는 'noinput'.
+    accept: 이 문자열이 input.accept에 들어 있는 것만 후보(예: 'image'). 영상·큰 파일도 되지만 조각 400KB씩 보낸다."""
+    import base64, mimetypes
+    mime = mime or mimetypes.guess_type(path)[0] or "application/octet-stream"
+    b64 = base64.b64encode(open(path, "rb").read()).decode()
+    run_js(match, "window.__cu=[];1")
+    for i in range(0, len(b64), 300000):
+        run_js(match, f"window.__cu.push({q(b64[i:i+300000])});1", 60)
+    return run_js(match, f"""(() => {{ const s = atob(window.__cu.join('')); window.__cu = null; const u = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+  const acc = {q(accept or '')};
+  const ins = [...document.querySelectorAll({q(selector)})].filter(e => !acc || !e.accept || e.accept.includes(acc));
+  const e = ins[{int(idx)}]; if (!e) return 'noinput';
+  const dt = new DataTransfer(); dt.items.add(new File([u], {q(os.path.basename(path))}, {{type: {q(mime)}}}));
+  e.files = dt.files; e.dispatchEvent(new Event('input', {{bubbles: true}})); e.dispatchEvent(new Event('change', {{bubbles: true}}));
+  return 'ok ' + ins.length + ' ' + u.length; }})()""", 120)
 
 
 def window_bounds():
@@ -724,6 +771,8 @@ def main():
             wait(a.match, a.text, a.sel, a.timeout)
         elif a.cmd == "text":
             print(page_text(a.match))
+        elif a.cmd == "upload":  # upload <파일> --match <탭> [--sel input[type=file]] [--value <idx>]
+            print(upload_file(a.match, a.arg, a.sel or "input[type=file]", int(a.value or 0)))
         elif a.cmd == "run":
             steps = json.loads(Path(a.arg).read_text())
             for i, s in enumerate(steps):
