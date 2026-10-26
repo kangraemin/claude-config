@@ -100,9 +100,9 @@ def section(cl, pid, name, day, path=None, skip=()):
     hosts = run(cl, pid, y, y, ['activeUsers'], ['hostName'], 5, 'activeUsers', path=path, skip=skip)
     if len(hosts) > 1:
         lines.append('사이트: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in hosts))
-    src = run(cl, pid, y, y, ['sessions'], ['sessionSource'], 3, 'sessions', path=path, skip=skip)
+    src = run(cl, pid, y, y, ['sessions'], ['sessionSource'], 10, 'sessions', path=path, skip=skip)
     if src:
-        lines.append('유입: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in src))
+        lines.append('유입: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in src[:3]))
     pages = run(cl, pid, y, y, ['screenPageViews'], ['pagePath'], 3, 'screenPageViews', path=path, skip=skip)
     if pages:
         lines.append('페이지: ' + ', '.join(f'{d[0][:40]} {v[0]:.0f}' for d, v in pages))
@@ -223,15 +223,30 @@ def short(name):
     return {'MukMap': '먹맵', "Ram's tech blog": '블로그', '오늘꿈해몽': '꿈해몽'}.get(n, n)
 
 
-SRC_NAME = {'(direct)': '직접 접속', '(not set)': '알 수 없음', 'google': '구글', 'chatgpt.com': 'ChatGPT', 'threads': '스레드',
-            'threads.net': '스레드', 'l.threads.com': '스레드', 'instagram': '인스타', 'l.instagram.com': '인스타', 'naver': '네이버',
-            'm.search.naver.com': '네이버 검색', 'search.naver.com': '네이버 검색', 'kin.naver.com': '지식iN', 'bing': '빙',
-            'youtube': '유튜브', 'm.youtube.com': '유튜브', 't.co': 'X', 'x.com': 'X', 'daum': '다음', 'perplexity.ai': 'Perplexity'}
+def channel(src):
+    """GA sessionSource → 사람이 바로 알아듣는 길 이름. 모르는 사이트는 '다른 사이트'."""
+    x = src.lower()
+    for keys, name in [(('(direct)',), '직접 접속'), (('(not set)',), '출처 모름'),
+                       (('chatgpt', 'perplexity', 'claude.ai', 'gemini', 'copilot'), 'AI 답변'),
+                       (('kin.naver',), '지식iN'), (('cafe.naver', 'blog.naver'), '네이버 카페·블로그'),
+                       (('naver',), '네이버 검색'), (('google',), '구글 검색'), (('bing', 'daum', 'duckduckgo'), '다른 검색'),
+                       (('threads',), '스레드'), (('instagram',), '인스타'), (('youtube',), '유튜브'), (('t.co', 'x.com', 'twitter'), 'X'),
+                       (('kangraemin.github.io',), '개발 블로그'), (('toss',), '토스')]:
+        if any(k in x for k in keys):
+            return name
+    return '다른 사이트'
 
 
 def src_line(x):
-    """사용자 10/26 "어느 채널에서 들어왔는지도 서비스별로" → 서비스마다 유입 상위 3개를 한 줄로."""
-    return f'- {short(x["name"])}: ' + ', '.join(f'{SRC_NAME.get(d[0], d[0])} {v[0]:.0f}' for d, v in x['src'])
+    """사용자 10/26 "어느 채널에서 들어왔는지도 서비스별로" + "정성스럽게" → 길별로 묶어 비중(방문 10번 이상) 또는 횟수로."""
+    tot = sum(v[0] for _, v in x['src'])
+    by = {}
+    for d, v in x['src']:
+        by[channel(d[0])] = by.get(channel(d[0]), 0) + v[0]
+    top = sorted(by.items(), key=lambda kv: -kv[1])[:3]
+    if tot >= 10:
+        return '  └ ' + ' · '.join(f'{k} {v / tot:.0%}' for k, v in top)
+    return '  └ ' + ' · '.join(f'{k} {v:.0f}번' for k, v in top)
 
 
 def bot(x):
@@ -267,14 +282,16 @@ def main():
             x['ai_bot'] = notes.pop(x['name'])
     bots = [x for x in live if bot(x) or x.get('ai_bot')]
     people = [x for x in real if not x.get('ai_bot')]
-    out = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 온 사람'] + [f'- {short(x["name"])} {x["users"]:.0f}명' for x in people]
+    out = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 온 사람과 들어온 길']
+    for x in people:
+        out.append(f'- {short(x["name"])} {x["users"]:.0f}명')
+        if x.get('src'):
+            out.append(src_line(x))
     if dead:
         out.append(f'- 0명인 곳 {len(dead)}개')
     moved = [f'- {short(x["name"])}: {x["prev"]:.0f}명 → {x["users"]:.0f}명' for x in people
              if x['prev'] is not None and max(x['users'], x['prev']) >= 8 and (x['users'] >= x['prev'] * 2 or x['users'] * 2 <= x['prev'])]
-    srcs = [src_line(x) for x in people if x.get('src')]
-    if srcs:
-        out += ['', '어디서 들어왔나 (방문 수)'] + srcs
+    out.append('(직접 접속 = 주소 입력·즐겨찾기·카톡·토스 앱 안 링크처럼 출처가 안 남는 방문)')
     if moved:
         out += ['', '전날보다 크게 바뀐 곳'] + moved
     if bots:
