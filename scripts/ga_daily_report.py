@@ -110,7 +110,7 @@ def section(cl, pid, name, day, path=None, skip=()):
     src7 = run(cl, pid, w, y, ['sessions', 'engagedSessions'], ['sessionSource'], 6, 'sessions', path=path, skip=skip)
     data = {'7일 날짜별 [사용자, 참여세션, 총참여초]': {d[0]: v for d, v in sorted(days)},
             '7일 유입별 [세션, 참여세션]': {d[0]: v for d, v in src7}}
-    return {'name': name, 'users': cur[0], 'prev': prev[0], 'engaged': cur[3], 'per': per, 'new': False,
+    return {'name': name, 'users': cur[0], 'prev': prev[0], 'engaged': cur[3], 'per': per, 'new': False, 'src': src,
             'detail': '\n'.join(lines), 'data': data}
 
 
@@ -223,6 +223,17 @@ def short(name):
     return {'MukMap': '먹맵', "Ram's tech blog": '블로그', '오늘꿈해몽': '꿈해몽'}.get(n, n)
 
 
+SRC_NAME = {'(direct)': '직접 접속', '(not set)': '알 수 없음', 'google': '구글', 'chatgpt.com': 'ChatGPT', 'threads': '스레드',
+            'threads.net': '스레드', 'l.threads.com': '스레드', 'instagram': '인스타', 'l.instagram.com': '인스타', 'naver': '네이버',
+            'm.search.naver.com': '네이버 검색', 'search.naver.com': '네이버 검색', 'kin.naver.com': '지식iN', 'bing': '빙',
+            'youtube': '유튜브', 'm.youtube.com': '유튜브', 't.co': 'X', 'x.com': 'X', 'daum': '다음', 'perplexity.ai': 'Perplexity'}
+
+
+def src_line(x):
+    """사용자 10/26 "어느 채널에서 들어왔는지도 서비스별로" → 서비스마다 유입 상위 3개를 한 줄로."""
+    return f'- {short(x["name"])}: ' + ', '.join(f'{SRC_NAME.get(d[0], d[0])} {v[0]:.0f}' for d, v in x['src'])
+
+
 def bot(x):
     """5명 이상 왔는데 머문 방문이 1할도 안 되고 1인 평균 5초 미만이면 봇·자동 테스트로 본다."""
     return x['engaged'] is not None and x['users'] >= 5 and x['engaged'] < x['users'] * 0.1 and x['per'] < 5
@@ -261,6 +272,9 @@ def main():
         out.append(f'- 0명인 곳 {len(dead)}개')
     moved = [f'- {short(x["name"])}: {x["prev"]:.0f}명 → {x["users"]:.0f}명' for x in people
              if x['prev'] is not None and max(x['users'], x['prev']) >= 8 and (x['users'] >= x['prev'] * 2 or x['users'] * 2 <= x['prev'])]
+    srcs = [src_line(x) for x in people if x.get('src')]
+    if srcs:
+        out += ['', '어디서 들어왔나 (방문 수)'] + srcs
     if moved:
         out += ['', '전날보다 크게 바뀐 곳'] + moved
     if bots:
