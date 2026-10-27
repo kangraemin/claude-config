@@ -34,6 +34,17 @@ def _call(tok, method, args):
         return False
 
 
+def _vdim(p):
+    """영상 가로·세로·길이를 같이 보내야 텔레그램이 세로 영상을 찌그러뜨리지 않는다(10/27 사용자 "영상이 왜 찌부")."""
+    try:
+        import subprocess
+        w, h, d = subprocess.check_output(['ffprobe', '-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=width,height:format=duration',
+                                           '-of', 'default=nw=1:nk=1', p], text=True).split()[:3]
+        return ['-F', f'width={w}', '-F', f'height={h}', '-F', f'duration={int(float(d))}', '-F', 'supports_streaming=true']
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def send(msg, texts=(), media=()):
     """msg + texts[(이름, 글)] 를 글로, media(사진·영상 경로)를 묶음으로 보낸다. 실패해도 게시 흐름은 막지 않는다."""
     try:
@@ -46,7 +57,8 @@ def send(msg, texts=(), media=()):
             grp = media[i:i + 10]
             if len(grp) == 1:
                 kind = 'video' if grp[0].lower().endswith(VIDEO) else 'photo'
-                oks.append(_call(tok, 'send' + kind.capitalize(), ['-F', f'chat_id={chat}', '-F', f'{kind}=@{grp[0]}']))
+                extra = _vdim(grp[0]) if kind == 'video' else []
+                oks.append(_call(tok, 'send' + kind.capitalize(), ['-F', f'chat_id={chat}', '-F', f'{kind}=@{grp[0]}', *extra]))
                 continue
             items = [{'type': 'video' if p.lower().endswith(VIDEO) else 'photo', 'media': f'attach://m{j}'} for j, p in enumerate(grp)]
             args = ['-F', f'chat_id={chat}', '-F', 'media=' + json.dumps(items)]
