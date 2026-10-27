@@ -50,7 +50,11 @@ def check_bash(cmd, cwd):
     # 따옴표 친 heredoc 본문은 셸이 펼치지 않는 글자다(문서에 'secret put …'을 적다 막힌 오탐, 10/28)
     plain = QHEREDOC.sub('', cmd)
     # 키는 마지막 cd 뒤에서 쓰인다고 본다(앞의 cd 는 다른 일을 하러 간 것)
-    dirs = [resolve(d, cwd) for d in CD.findall(plain)] or [cwd]
+    # 상대 cd 는 바로 앞 cd 기준으로 푼다(cd area-insight && cd api 가 my-sns/api 로 잡혀 막힌 오탐, 10/28)
+    dirs, cur = [], cwd
+    for d in CD.findall(plain):
+        cur = resolve(d, cur); dirs.append(cur)
+    dirs = dirs or [cwd]
     r = root(dirs[-1])
     ok = ALLOW.get(r, set())
     used = {m[0] for m in EXPAND.findall(plain)} | {m[0] for m in ASSIGN.findall(plain)} | {m[0] for m in SECRET.findall(plain)}
