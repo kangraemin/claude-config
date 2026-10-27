@@ -43,12 +43,17 @@ def resolve(p, base):
     return p if os.path.isabs(p) else os.path.join(base, p)
 
 
+QHEREDOC = re.compile(r"<<-?\s*(['\"])(\w+)\1[^\n]*\n.*?^\s*\2\s*$", re.S | re.M)
+
+
 def check_bash(cmd, cwd):
+    # 따옴표 친 heredoc 본문은 셸이 펼치지 않는 글자다(문서에 'secret put …'을 적다 막힌 오탐, 10/28)
+    plain = QHEREDOC.sub('', cmd)
     # 키는 마지막 cd 뒤에서 쓰인다고 본다(앞의 cd 는 다른 일을 하러 간 것)
-    dirs = [resolve(d, cwd) for d in CD.findall(cmd)] or [cwd]
+    dirs = [resolve(d, cwd) for d in CD.findall(plain)] or [cwd]
     r = root(dirs[-1])
     ok = ALLOW.get(r, set())
-    used = {m[0] for m in EXPAND.findall(cmd)} | {m[0] for m in ASSIGN.findall(cmd)} | {m[0] for m in SECRET.findall(cmd)}
+    used = {m[0] for m in EXPAND.findall(plain)} | {m[0] for m in ASSIGN.findall(plain)} | {m[0] for m in SECRET.findall(plain)}
     bad = sorted(n for n in used if n not in ok)
     if bad:
         return f'키 {", ".join(bad)} 를 이 위치({dirs[-1]})에서 쓰려 함'
