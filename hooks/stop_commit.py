@@ -21,6 +21,7 @@ COUNTERS = HOOKS / '.counters'
 SKIP = ('.worklogs/', '.claude/ai-bouncer/', '.ai-bouncer/', '.update-check')
 MAX_BLOCKS = 3
 SLACK = 120  # 편집 도구 기록과 실제 파일 저장 사이 차이(초)
+ACTIVE = 300  # 서브에이전트 transcript 가 이 시간(초) 안에 갱신됐으면 아직 작업 중으로 본다
 
 
 def git(cwd, *args):
@@ -81,6 +82,15 @@ def still_mine(pc, files, paths):
     return out
 
 
+def in_flight(pc, files, paths):
+    # 백그라운드 서브에이전트가 아직 고치는 중인 파일은 뺀다(2026-10-28: 장별 검증 에이전트 11개가 책 파일을
+    # 고치는 동안 에이전트 하나가 끝날 때마다 메인 턴이 끝나 '커밋해라'가 반복됨. 커밋하면 횟수가 0으로 돌아가
+    # MAX_BLOCKS 도 안 걸렸다). 끝난 에이전트의 편집은 다음 Stop 에서 그대로 잡힌다.
+    now = time.time()
+    busy = [f for f in files if f.parent.name == 'subagents' and now - os.path.getmtime(f) < ACTIVE]
+    return pc.mine(busy, paths) if busy else set()
+
+
 def main():
     try:
         data = json.load(sys.stdin)
@@ -114,7 +124,8 @@ def main():
     files = pc.transcripts(data)
     if files is None:
         return
-    mine = sorted(still_mine(pc, files, pc.mine(files, dirty)))
+    owned = pc.mine(files, dirty)
+    mine = sorted(set(still_mine(pc, files, owned)) - in_flight(pc, files, owned))
     sid = str(data.get('session_id', 'unknown'))
     counter = COUNTERS / f'.stop-commit-{sid}'
     if not mine:
