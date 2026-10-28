@@ -87,6 +87,7 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 - Terms consent, payment, release, and review-request screens stop with `NEEDS_OWNER` unless the call explicitly asks for that step.
 
 ## Prerequisites
+- **`-1743`(오류가 발생했습니다)는 사용자 몫이 아니다.** Claude 백그라운드 셸에는 Chrome 자동화 권한이 없어서 난다. 권한 설정을 사용자에게 시키지 말고, 권한이 있는 Ghostty로 실행한다: `open -na Ghostty.app --args -e /bin/zsh -c "cd ~/.claude/skills/chrome-direct && <명령> > <out> 2>&1; touch <done>; exit"` 후 done 파일을 기다려 out을 읽는다. 여러 단계는 python 스크립트 하나로 묶어 한 번에 돌린다(2026-10-28, 사용자가 권한 요청에 크게 화냄).
 - Chrome 메뉴 '보기 > 개발자 정보 > Apple Events의 자바스크립트 허용'(프로필마다 따로). 권한·이 메뉴가 의심되거나 종료코드 2에 'Apple Events' 안내가 나오면 `python3 ~/.claude/skills/chrome-direct/chromectl.py setup` → `READY`면 끝, `TODO` 줄만 사용자에게 전한다.
   - 이 항목은 setup이 진짜 마우스로 그 항목 위에 올린 뒤 눌러 자동으로 켠다(System Events click은 Chrome이 무시). 이미 켜져 있으면 누르지 않는다.
   - `TODO js`로 끝나면(자동 클릭 실패): 먼저 사용자에게 "곧 Chrome '보기 > 개발자 정보' 메뉴가 펼쳐집니다. 선택된 'Apple Events의 자바스크립트 허용'을 반드시 눌러 주세요"라고 말한 뒤 `chromectl.py setup --wait-js`를 백그라운드로 돌린다(최대 120초 기다림).
