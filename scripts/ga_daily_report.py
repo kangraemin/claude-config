@@ -120,72 +120,63 @@ WHO = {'dev_ram_kang': '개인', 'eodi_sseot': '어디썼', 'eodimeok': '어디�
 SNS_MIN = 50  # 하루에 이만큼 안 늘면 안 적는다
 
 
-def sns_section():
-    """가장 최근 수집 파일과 그 전날 파일을 비교해 계정마다 '어제 늘어난 조회수' 한 줄. 늘어난 계정만 가장 많이 늘어난 글 하나를 붙인다."""
+def sns_by_service():
+    """가장 최근 수집 파일과 그 전날 파일을 비교해 서비스마다 'SNS' 줄({서비스: [줄]}, 못 읽은 곳)을 만든다. 늘어난 계정만, 많이 늘어난 글 하나를 붙인다."""
     files = sorted(SNS.glob('*.json'))
     if not files:
-        return None
+        return {}, []
     cur = json.loads(files[-1].read_text())
+    errs = [e.split(':')[0] for e in cur.get('errors') or []]
     prev_f = SNS / f'{dt.date.fromisoformat(files[-1].stem) - dt.timedelta(days=1)}.json'
     if not prev_f.exists():
-        return 'SNS 조회수\n- 비교할 전날 기록이 없어요.'
+        return {}, errs + ['전날 기록 없음']
     prev = {(x['site'], x['id']): x['views'] for x in json.loads(prev_f.read_text())['items']}
     groups = {}
     for x in cur['items']:
         if x['views'] is not None:
             groups.setdefault((x['site'], x['handle']), []).append(x)
-    up, tops = [], []
+    out = {}
     for (site, handle), xs in groups.items():
         gain = {x['id']: max(0, x['views'] - (prev.get((site, x['id'])) or 0)) for x in xs}
         tot = sum(gain.values())
         if tot <= 0:
             continue
-        up.append((tot, f'- {SNS_NAME[site]} {WHO.get(handle, handle)}: +{tot:,}회'))
+        line = f'- {SNS_NAME[site]} +{tot:,}회'
         best = max(xs, key=lambda x: gain[x['id']])
         if gain[best['id']] >= SNS_MIN:
             title = best['title'].replace('#shorts', '').split('\n')[0].strip()
-            tops.append((gain[best['id']], f'- {title[:20] + "…" if len(title) > 20 else title} (+{gain[best["id"]]:,}회)'))
-    lines = ['SNS 어제 늘어난 조회수'] + [t for _, t in sorted(up, key=lambda u: -u[0])]
-    if not up:
-        lines.append('- 늘어난 계정 없음')
-    if tops:
-        lines += ['', '많이 본 글'] + [t for _, t in sorted(tops, key=lambda u: -u[0])[:3]]
-    if cur.get('errors'):
-        lines += ['', 'SNS 못 읽은 곳'] + [f'- {e.split(":")[0]}' for e in cur['errors']]
-    return '\n'.join(lines)
+            line += f' (많이 본 글: {title[:20] + "…" if len(title) > 20 else title} +{gain[best["id"]]:,}회)'
+        out.setdefault(WHO.get(handle, handle), []).append((tot, line))
+    return {k: [t for _, t in sorted(v, key=lambda u: -u[0])] for k, v in out.items()}, errs
 
 
 TOSS = Path.home() / '.cache/toss-stats'  # my-sns eodi-sns/scripts/toss_stats.py 가 6시간마다 쓴다
 
 
-def toss_section(day):
-    """앱인토스 콘솔 숫자(사용자 10/28 "토스에서 나온 지표들도 ga 분석기에 합쳐"). 앱마다 어제 사용자·신규·전날 대비·들어온 길."""
+def toss_by_service(day):
+    """앱인토스 콘솔 숫자(사용자 10/28 "토스에서 나온 지표들도 ga 분석기에 합쳐"). ({앱: (사용자, [줄])}, 0명 앱, 오류)."""
     files = sorted(TOSS.glob('*.json'))
     if not files:
-        return None
+        return {}, [], None
     cur = json.loads(files[-1].read_text())
     if cur.get('error'):
-        return f'토스 미니앱\n- 못 읽었어요: {cur["error"]}'
+        return {}, [], cur['error']
     d, p = str(day), str(day - dt.timedelta(days=1))
-    rows, zero = [], []
+    rows, zero = {}, []
     for x in cur['apps']:
         if x.get('error'):
-            rows.append((-1, f'- {x["name"]}: 못 읽음'))
+            rows[x['name']] = (0, ['- 못 읽음'])
             continue
         u, pu, n = x['au'].get(d, 0), x['au'].get(p, 0), x['new'].get(d, 0)
         if not u:
             zero.append(x['name'])
             continue
-        line = f'- {x["name"]} {u}명 (신규 {n}, 전날 {pu}명)'
+        lines = [f'- {u}명 (신규 {n}, 전날 {pu}명)']
         ref = sorted((x.get('referrer_by_day') or {}).get(d, {}).items(), key=lambda kv: -kv[1])[:3]
         if ref:
-            line += '\n  └ ' + ' · '.join(f'{k} {v}' for k, v in ref)
-        rows.append((u, line))
-    out = [f'토스 미니앱 어제 사용자 (콘솔, {cur.get("at", files[-1].stem)} 수집)'] + [t for _, t in sorted(rows, key=lambda r: -r[0])]
-    if zero:
-        out.append(f'- 0명인 앱 {len(zero)}개: ' + ', '.join(zero))
-    out.append('(들어온 길은 콘솔 분류 그대로: 검색·전체탭·미니앱홈·기타)')
-    return '\n'.join(out)
+            lines.append('- ' + ' · '.join(f'{k} {v}' for k, v in ref))
+        rows[x['name']] = (u, lines)
+    return rows, zero, None
 
 
 AI_PROMPT = """아래는 웹사이트(프로젝트)별 어제 GA4 숫자와 지난 7일 자료다. 프로젝트마다 '오늘 해 볼 일' 한 문장을 써라.
@@ -278,8 +269,8 @@ def src_line(x):
         by[channel(d[0])] = by.get(channel(d[0]), 0) + v[0]
     top = sorted(by.items(), key=lambda kv: -kv[1])[:3]
     if tot >= 10:
-        return '  └ ' + ' · '.join(f'{k} {v / tot:.0%}' for k, v in top)
-    return '  └ ' + ' · '.join(f'{k} {v:.0f}번' for k, v in top)
+        return '- ' + ' · '.join(f'{k} {v / tot:.0%}' for k, v in top)
+    return '- ' + ' · '.join(f'{k} {v:.0f}번' for k, v in top)
 
 
 def bot(x):
@@ -315,36 +306,53 @@ def main():
             x['ai_bot'] = notes.pop(x['name'])
     bots = [x for x in live if bot(x) or x.get('ai_bot')]
     people = [x for x in real if not x.get('ai_bot')]
-    out = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 온 사람과 들어온 길']
+    # 사용자 10/28: 서비스마다 '어디먹 / 웹 - … / 토스앱 - …'처럼 묶는다
+    try:
+        toss, toss_zero, toss_err = toss_by_service(day)
+    except Exception as e:
+        toss, toss_zero, toss_err = {}, [], str(e)[:80]
+    try:
+        sns, sns_err = sns_by_service()
+    except Exception as e:
+        sns, sns_err = {}, [str(e)[:80]]
+    svc = {}
     for x in people:
-        out.append(f'- {short(x["name"])} {x["users"]:.0f}명')
-        if x.get('src'):
-            out.append(src_line(x))
+        svc.setdefault(short(x['name']), {})['web'] = x
+    for k in toss:
+        svc.setdefault(k, {})['toss'] = toss[k]
+    for k in sns:
+        svc.setdefault(k, {})['sns'] = sns[k]
+    total = lambda v: (v['web']['users'] if 'web' in v else 0) + (v['toss'][0] if 'toss' in v else 0)
+    out = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 서비스별']
+    for name, v in sorted(svc.items(), key=lambda kv: -total(kv[1])):
+        out += ['', name]
+        if 'web' in v:
+            x = v['web']
+            prev = f' (전날 {x["prev"]:.0f}명)' if x['prev'] is not None else ''
+            out += ['웹', f'- {x["users"]:.0f}명{prev}']
+            if x.get('src'):
+                out.append(src_line(x))
+            if x['name'] in notes:
+                out.append(f'- 할 일: {notes[x["name"]]}')
+        if 'toss' in v:
+            out += ['토스앱'] + v['toss'][1]
+        if v.get('sns'):
+            out += ['SNS'] + v['sns']
+    zero = []
     if dead:
-        out.append(f'- 0명인 곳 {len(dead)}개')
-    moved = [f'- {short(x["name"])}: {x["prev"]:.0f}명 → {x["users"]:.0f}명' for x in people
-             if x['prev'] is not None and max(x['users'], x['prev']) >= 8 and (x['users'] >= x['prev'] * 2 or x['users'] * 2 <= x['prev'])]
-    out.append('(직접 접속 = 주소 입력·즐겨찾기·카톡·토스 앱 안 링크처럼 출처가 안 남는 방문)')
-    if moved:
-        out += ['', '전날보다 크게 바뀐 곳'] + moved
+        zero.append(f'웹 {len(dead)}곳')
+    if toss_zero:
+        zero.append(f'토스앱 {len(toss_zero)}개({", ".join(toss_zero)})')
+    if zero:
+        out += ['', '어제 0명: ' + ', '.join(zero)]
     if bots:
-        out += ['', '봇으로 보이는 곳 (위 숫자에서 뺌)'] + [f'- {short(x["name"])} {x["users"]:.0f}명' for x in bots]
-    todo = [f'- {short(x["name"])}: {notes[x["name"]]}' for x in people if x['name'] in notes][:4]
-    if todo:
-        out += ['', '오늘 할 일'] + todo
+        out += ['', '봇으로 보여 뺀 곳: ' + ', '.join(f'{short(x["name"])} {x["users"]:.0f}명' for x in bots)]
+    if toss_err:
+        out += ['', f'토스 콘솔 못 읽음: {toss_err}']
+    if sns_err:
+        out += ['', 'SNS 못 읽은 곳: ' + ', '.join(sns_err)]
+    out += ['', '(직접 접속 = 주소 입력·즐겨찾기·카톡·토스 앱 안 링크처럼 출처가 안 남는 방문. 토스앱 길은 콘솔 분류 그대로)']
     text = '\n'.join(out)
-    try:
-        sns = sns_section()
-    except Exception as e:
-        sns = f'SNS 조회수\n- 못 읽었어요: {str(e)[:80]}'
-    if sns:
-        text += '\n\n' + sns
-    try:
-        toss = toss_section(day)
-    except Exception as e:
-        toss = f'토스 미니앱\n- 못 읽었어요: {str(e)[:80]}'
-    if toss:
-        text += '\n\n' + toss
     if errs:
         text += '\n\nGA 못 읽은 곳\n' + '\n'.join(f'- {e}' for e in errs)
     OUT.mkdir(parents=True, exist_ok=True)
