@@ -32,7 +32,7 @@ return {url: location.href, title: document.title, account: acct, buttons: btn,
   needsLogin: /accounts\.google\.com/.test(location.host) || /로그인해야|Sign in to continue/.test(txt),
   closed: /더 이상 응답을 받지 않습니다|no longer accepting responses/i.test(txt),
   alreadyResponded: /이미 응답했습니다|You've already responded/i.test(txt),
-  confirmation: /응답이 기록되었습니다|response has been recorded/i.test(txt),
+  confirmation: /응답이 기록되었습니다|response has been recorded/i.test(txt) || /formResponse/.test(location.href),
   editLink: !!document.querySelector('a[href*="edit2="]') || /응답 수정|Edit your response/.test(txt),
   items};"""
 
@@ -103,9 +103,13 @@ def fill_page(tid, answers):
             v = answers[r["key"]]
             js(tid, f"""const it = [...document.querySelectorAll('div[role=listitem]')].filter(e => __vis(e) && e.innerText.includes({json.dumps(r['title'])}))[0];
               __press(it.querySelector('[role=listbox]')); return 1;""")
-            time.sleep(0.8)
-            ok = js(tid, f"""const o = [...document.querySelectorAll('[role=option]')].filter(e => __vis(e) && (e.getAttribute('data-value') === {json.dumps(v)}))[0];
-              if (!o) return false; __press(o); return true;""")
+            ok = False
+            for _ in range(4):  # 펼친 목록이 늦게 뜨거나 __vis가 false로 나오는 일이 있다(10/28 제주 거주지역) → 글자로도 찾고 몇 번 더 본다
+                time.sleep(0.8)
+                ok = js(tid, f"""const os = [...document.querySelectorAll('[role=option]')].filter(e => e.getAttribute('data-value') === {json.dumps(v)} || e.innerText.trim() === {json.dumps(v)});
+                  const o = os.filter(__vis)[0] || os[os.length - 1]; if (!o) return false; __press(o); return true;""")
+                if ok:
+                    break
             time.sleep(0.5)
             r["status"] = "filled" if ok else "no-option"
     return res
