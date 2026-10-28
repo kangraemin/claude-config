@@ -113,7 +113,7 @@ def ask(title, texts=(), media=()):
 
 if __name__ == '__main__':
     ap = argparse.ArgumentParser()
-    ap.add_argument('kind', choices=['done', 'ask', 'check', 'log', 'replies'])
+    ap.add_argument('kind', choices=['done', 'fail', 'ask', 'check', 'log', 'replies'])
     ap.add_argument('--msg', default='')
     ap.add_argument('--service', default='')
     ap.add_argument('--account', default='')
@@ -140,5 +140,5 @@ if __name__ == '__main__':
         print('RESULT:', f'REPLIES {len(rs)}' if rs else 'NONE')
         raise SystemExit(0)
     texts = [(os.path.basename(f), open(f, encoding='utf-8').read()) for f in a.text_file]
-    head = '[업로드 완료] ' if a.kind == 'done' else '[게시 확인 요청] '
+    head = {'done': '[업로드 완료] ', 'fail': '[게시 실패] '}.get(a.kind, '[게시 확인 요청] ')
     print('RESULT:', 'OK' if send(head + a.msg, texts, a.media) else 'FAIL')
