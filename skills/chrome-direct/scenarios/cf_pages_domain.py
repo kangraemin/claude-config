@@ -4,6 +4,7 @@ CLOUDFLARE_API_TOKEN에 Zone·Pages 권한이 없어도 된다(대시보드 쿠�
 
   cf_pages_domain.py xn--ob0butqet42c6pmgpe.kr geulmagam            # 무엇을 할지 출력(DRY_RUN)
   cf_pages_domain.py xn--ob0butqet42c6pmgpe.kr geulmagam --submit   # zone 추가, CNAME 2개, Pages 도메인 2개, www→apex 301, Always HTTPS
+  cf_pages_domain.py mukmap.kr --zone-only --submit   # zone만(DNS 스캔으로 TXT·MX 유지, 옛 A/CNAME 삭제). Worker Custom Domain은 wrangler로(2026-10-28 mukmap)
   cf_pages_domain.py eodimeok.kr eodimeok --routes "eodimeok=/*;eodimeok-intl=/en*,/ja*,/zh-cn*,/zh-tw*" --submit
       # Pages 대신 Workers(정적 자산) 경로 라우팅: AAAA 100::(proxied) 2개 + 워커 라우트(더 긴 패턴이 이긴다).
       # 커스텀 도메인은 라우트보다 우선이라 경로를 나누는 워커에는 쓰지 않는다(2026-10-28 eodimeok).
@@ -17,7 +18,8 @@ import chromectl as c
 
 ap = parser(__doc__, submit=True)
 ap.add_argument("domain", help="punycode 도메인")
-ap.add_argument("project", help="Pages 프로젝트 이름(먼저 wrangler pages project create)")
+ap.add_argument("project", nargs="?", help="Pages 프로젝트 이름(먼저 wrangler pages project create). --zone-only면 생략")
+ap.add_argument("--zone-only", action="store_true", help="zone만 추가: DNS 스캔으로 TXT·MX 등은 가져오고 apex·www의 A/AAAA/CNAME(옛 호스팅)은 지운다. Worker Custom Domain은 wrangler가 붙인다")
 ap.add_argument("--account", default="c023da92383ce204b357f6f18b86eb86")
 ap.add_argument("--routes", help='워커 모드: "워커=/경로*,...;워커2=/..."')
 ap.add_argument("--email", default="remin1994@gmail.com")
@@ -59,7 +61,7 @@ def main():
         if not a.submit:
             emit({"zone": zone and zone["id"]}, "DRY_RUN", "zone 추가·CNAME·Pages 도메인·www 리다이렉트를 하려면 --submit"); return
         if not zone:
-            st, r = api(tid, "POST", "/zones", {"name": D, "account": {"id": a.account}, "type": "full", "jump_start": False})
+            st, r = api(tid, "POST", "/zones", {"name": D, "account": {"id": a.account}, "type": "full", "jump_start": a.zone_only})
             if st != 200: raise RuntimeError(f"zone 추가 실패 {r}")
             zone = r["result"]
         Z = zone["id"]
@@ -72,6 +74,16 @@ def main():
               b.setAttribute('data-cx','1');b.scrollIntoView({block:'center'});return 1})()""")  # 첫 카드 = Free
             c.front(tid); c.rclick(tid, "[data-cx='1']"); time.sleep(12)
         api(tid, "PUT", f"/zones/{Z}/activation_check")  # NS를 이미 바꿨으면 바로 확인
+        if a.zone_only:
+            _, recs = api(tid, "GET", f"/zones/{Z}/dns_records?per_page=100")
+            for x in recs.get("result", []):
+                if x["name"] in (D, "www." + D) and x["type"] in ("A", "AAAA", "CNAME"):
+                    api(tid, "DELETE", f"/zones/{Z}/dns_records/{x['id']}"); print("DELETED", x["type"], x["name"], x["content"])
+            _, recs = api(tid, "GET", f"/zones/{Z}/dns_records?per_page=100")
+            print("KEPT", sorted({(x["type"], x["name"]) for x in recs.get("result", [])}))
+            emit({"zone": Z, "status": zone.get("status"), "name_servers": zone["name_servers"]}, "OK",
+                 "NAMESERVERS " + " ".join(zone["name_servers"]))
+            return
         if a.routes:
             _, recs = api(tid, "GET", f"/zones/{Z}/dns_records")
             have = {x["name"] for x in recs.get("result", [])}
