@@ -5,7 +5,7 @@ AdMob(remin1994, pub-4785237655148075) 개인 정보 보호 및 메시지 > 유�
 Gotchas: (1) 페이지는 admob.google.com/v2/privacymessaging/gdpr, 목록/시작 화면은 same-origin iframe(display-ads-user-messaging-embed)
   안, 에디터(전체화면)는 최상위 문서에 있다. (2) 'Angular'라 c.shot으로 탭을 앞에 띄운 뒤 읽는다. (3) 앱 선택 대화창: mat-checkbox 클릭,
   개인정보처리방침 'URL 추가'(platform-privacy-policy-cell) → input[type=url] 네이티브 setter+input 이벤트 → 저장. 앱 ID는 '—'로 보여 이름+플랫폼으로 고른다.
-  (4) '동의하지 않음'은 기본 '선택'(국가별) → 대화창 맨 위 스위치 input.mdc-switch__native-control을 .click()으로 전체 켜야 '필수' 오류가 사라진다(이벤트 디스패치는 안 먹음).
+  (4) '동의하지 않음'은 기본 '선택'(국가별) → 대화창 맨 위 스위치 input.mdc-switch__native-control을 꺼져 있을 때만 .click()으로 켜야(이미 켜진 걸 누르면 꺼져 게시 실패) '필수' 오류가 사라진다(이벤트 디스패치는 안 먹음).
   (5) 한국어는 언어 목록에 없음 → 영어(en)만. (6) 게시 확인 창의 '게시'는 버튼 목록 마지막. 게시 후 반영까지 최대 1시간.
 RESULT: PUBLISHED | EXISTS:<status> | DRY_RUN
 """
@@ -90,7 +90,7 @@ with tab("https://admob.google.com/v2/privacymessaging", a) as tid:
     # 동의하지 않음: '선택' → 국가 대화창 → 전체 스위치 → 확인
     js(tid, "const e=[...document.querySelectorAll('span.button-text')].find(x=>x.textContent.trim()=='선택'&&x.getClientRects().length);const b=e.closest('button,[role=button],material-button')||e;" + EV + "return 1")
     time.sleep(3)
-    js(tid, "const i=[...document.querySelectorAll('input.mdc-switch__native-control')].filter(x=>x.closest('.mdc-switch').getClientRects().length)[0];i.click();return i.checked")
+    js(tid, "const i=[...document.querySelectorAll('input.mdc-switch__native-control')].filter(x=>x.closest('.mdc-switch').getClientRects().length)[0];if(!i.checked)i.click();return i.checked")
     time.sleep(1)
     top_click(tid, "확인")
     time.sleep(2)
