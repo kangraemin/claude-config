@@ -4,6 +4,9 @@ CLOUDFLARE_API_TOKEN에 Zone·Pages 권한이 없어도 된다(대시보드 쿠�
 
   cf_pages_domain.py xn--ob0butqet42c6pmgpe.kr geulmagam            # 무엇을 할지 출력(DRY_RUN)
   cf_pages_domain.py xn--ob0butqet42c6pmgpe.kr geulmagam --submit   # zone 추가, CNAME 2개, Pages 도메인 2개, www→apex 301, Always HTTPS
+  cf_pages_domain.py eodimeok.kr eodimeok --routes "eodimeok=/*;eodimeok-intl=/en*,/ja*,/zh-cn*,/zh-tw*" --submit
+      # Pages 대신 Workers(정적 자산) 경로 라우팅: AAAA 100::(proxied) 2개 + 워커 라우트(더 긴 패턴이 이긴다).
+      # 커스텀 도메인은 라우트보다 우선이라 경로를 나누는 워커에는 쓰지 않는다(2026-10-28 eodimeok).
 출력 NAMESERVERS a b → 등록기관 네임서버를 이것으로 바꾼다(가비아: gabia_nameserver.py).
 로그아웃이면 CLOUDFLARE_PASSWORD(~/.claude/.env)로 로그인하고 2단계 인증 안내는 'Skip for now'.
 2026-10-28 글쓰기공모전.kr에 같은 순서로 실행(tmux -L gh 창에서 — 기본 tmux 서버는 Chrome Apple 이벤트 -1743).
@@ -16,6 +19,7 @@ ap = parser(__doc__, submit=True)
 ap.add_argument("domain", help="punycode 도메인")
 ap.add_argument("project", help="Pages 프로젝트 이름(먼저 wrangler pages project create)")
 ap.add_argument("--account", default="c023da92383ce204b357f6f18b86eb86")
+ap.add_argument("--routes", help='워커 모드: "워커=/경로*,...;워커2=/..."')
 ap.add_argument("--email", default="remin1994@gmail.com")
 a = ap.parse_args()
 
@@ -59,9 +63,32 @@ def main():
             if st != 200: raise RuntimeError(f"zone 추가 실패 {r}")
             zone = r["result"]
         Z = zone["id"]
+        # API로 만든 zone은 플랜이 없어 'initializing'에 멈춘다(NS를 바꿔도 활성화 안 됨, 10/28 90분 정체) → Free 구독을 붙인다
+        api(tid, "POST", f"/zones/{Z}/subscription", {"rate_plan": {"id": "free"}, "frequency": "monthly"})  # 이미 있으면 에러, 무시
+        # 구독만으론 그대로였다. 대시보드가 /select-plan으로 보내면 Free의 'Select plan'을 실제 클릭해야 pending으로 넘어간다
+        c.goto(tid, f"https://dash.cloudflare.com/{a.account}/{D}"); time.sleep(12)
+        if "/select-plan" in c.run_js(tid, "location.href"):
+            c.run_js(tid, """(()=>{const b=[...document.querySelectorAll('button,a')].filter(e=>e.offsetParent&&e.innerText.trim()=='Select plan')[0];
+              b.setAttribute('data-cx','1');b.scrollIntoView({block:'center'});return 1})()""")  # 첫 카드 = Free
+            c.front(tid); c.rclick(tid, "[data-cx='1']"); time.sleep(12)
+        api(tid, "PUT", f"/zones/{Z}/activation_check")  # NS를 이미 바꿨으면 바로 확인
+        if a.routes:
+            _, recs = api(tid, "GET", f"/zones/{Z}/dns_records")
+            have = {x["name"] for x in recs.get("result", [])}
+            for n in (D, "www." + D):
+                if n not in have:
+                    api(tid, "POST", f"/zones/{Z}/dns_records", {"type": "AAAA", "name": n, "content": "100::", "proxied": True, "ttl": 1})
+            _, rr = api(tid, "GET", f"/zones/{Z}/workers/routes")
+            had = {x["pattern"] for x in rr.get("result", [])}
+            for part in a.routes.split(";"):
+                w, paths = part.split("=")
+                for path in paths.split(","):
+                    if D + path not in had:
+                        st, r = api(tid, "POST", f"/zones/{Z}/workers/routes", {"pattern": D + path, "script": w})
+                        if st != 200: raise RuntimeError(f"route 실패 {D + path} {r}")
         _, recs = api(tid, "GET", f"/zones/{Z}/dns_records?type=CNAME")
         have = {x["name"] for x in recs.get("result", [])}
-        for n in (D, "www." + D):
+        for n in (() if a.routes else (D, "www." + D)):
             if n not in have:
                 api(tid, "POST", f"/zones/{Z}/dns_records", {"type": "CNAME", "name": n, "content": f"{a.project}.pages.dev", "proxied": True, "ttl": 1})
             api(tid, "POST", f"/accounts/{a.account}/pages/projects/{a.project}/domains", {"name": n})  # 이미 있으면 409, 무시
