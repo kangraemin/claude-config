@@ -18,7 +18,13 @@ ap.add_argument("apps", nargs="+")
 ap.add_argument("--from", dest="start", default=(dt.date.today() - dt.timedelta(days=6)).isoformat())
 ap.add_argument("--to", dest="end", default=dt.date.today().isoformat())
 ap.add_argument("--workspace", default="35273")
+ap.add_argument("--out", help="결과 JSON을 이 파일에도 쓴다(toss_stats.py가 씀)")
 a = ap.parse_args()
+
+
+def _day(k):
+    # MCP 응답처럼 [2026, 10, 21] 로 올 때도 있어 'YYYY-MM-DD' 로 맞춘다
+    return "%04d-%02d-%02d" % tuple(k) if isinstance(k, list) else str(k)
 
 
 def main():
@@ -30,13 +36,16 @@ def main():
             api = f"/console/api-public/v3/appsintossconsole/workspaces/{a.workspace}/mini-app/{app}/analytics/au"
             res = js(tid, f"var x=new XMLHttpRequest();x.open('POST',{api!r},false);x.setRequestHeader('Content-Type','application/json');x.send({body!r});return JSON.parse(x.responseText)")
             s = res.get("success") or {}
-            au = {d["dateKey"]: d["value"] for d in s.get("au") or []}
-            new = {d["dateKey"]: d["value"] for d in s.get("newAu") or []}
-            ref = {}
+            au = {_day(d["dateKey"]): d["value"] for d in s.get("au") or []}
+            new = {_day(d["dateKey"]): d["value"] for d in s.get("newAu") or []}
+            ref, ref_day = {}, {}
             for d in s.get("referrer") or []:
                 ref[d["dimension"]] = ref.get(d["dimension"], 0) + d["value"]
+                ref_day.setdefault(_day(d["dateKey"]), {})[d["dimension"]] = d["value"]
             print(f"USERS {app} 일별 {au} 신규 {sum(new.values())} 유입 {ref}" + ("" if s else f" ERROR {res.get('error')}"))
-            out.append({"app": app, "au": au, "new": new, "referrer": ref})
+            out.append({"app": app, "au": au, "new": new, "referrer": ref, "referrer_by_day": ref_day, **({} if s else {"error": res.get("error")})})
+        if a.out:
+            open(a.out, "w").write(json.dumps({"from": a.start, "to": a.end, "apps": out}, ensure_ascii=False, indent=1))
         emit({"from": a.start, "to": a.end, "apps": out}, "OK", f"{len(out)}개 앱 ({a.start}~{a.end})")
 
 

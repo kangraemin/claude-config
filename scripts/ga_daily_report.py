@@ -155,6 +155,39 @@ def sns_section():
     return '\n'.join(lines)
 
 
+TOSS = Path.home() / '.cache/toss-stats'  # my-sns eodi-sns/scripts/toss_stats.py 가 6시간마다 쓴다
+
+
+def toss_section(day):
+    """앱인토스 콘솔 숫자(사용자 10/28 "토스에서 나온 지표들도 ga 분석기에 합쳐"). 앱마다 어제 사용자·신규·전날 대비·들어온 길."""
+    files = sorted(TOSS.glob('*.json'))
+    if not files:
+        return None
+    cur = json.loads(files[-1].read_text())
+    if cur.get('error'):
+        return f'토스 미니앱\n- 못 읽었어요: {cur["error"]}'
+    d, p = str(day), str(day - dt.timedelta(days=1))
+    rows, zero = [], []
+    for x in cur['apps']:
+        if x.get('error'):
+            rows.append((-1, f'- {x["name"]}: 못 읽음'))
+            continue
+        u, pu, n = x['au'].get(d, 0), x['au'].get(p, 0), x['new'].get(d, 0)
+        if not u:
+            zero.append(x['name'])
+            continue
+        line = f'- {x["name"]} {u}명 (신규 {n}, 전날 {pu}명)'
+        ref = sorted((x.get('referrer_by_day') or {}).get(d, {}).items(), key=lambda kv: -kv[1])[:3]
+        if ref:
+            line += '\n  └ ' + ' · '.join(f'{k} {v}' for k, v in ref)
+        rows.append((u, line))
+    out = [f'토스 미니앱 어제 사용자 (콘솔, {cur.get("at", files[-1].stem)} 수집)'] + [t for _, t in sorted(rows, key=lambda r: -r[0])]
+    if zero:
+        out.append(f'- 0명인 앱 {len(zero)}개: ' + ', '.join(zero))
+    out.append('(들어온 길은 콘솔 분류 그대로: 검색·전체탭·미니앱홈·기타)')
+    return '\n'.join(out)
+
+
 AI_PROMPT = """아래는 웹사이트(프로젝트)별 어제 GA4 숫자와 지난 7일 자료다. 프로젝트마다 '오늘 해 볼 일' 한 문장을 써라.
 
 규칙
@@ -306,6 +339,12 @@ def main():
         sns = f'SNS 조회수\n- 못 읽었어요: {str(e)[:80]}'
     if sns:
         text += '\n\n' + sns
+    try:
+        toss = toss_section(day)
+    except Exception as e:
+        toss = f'토스 미니앱\n- 못 읽었어요: {str(e)[:80]}'
+    if toss:
+        text += '\n\n' + toss
     if errs:
         text += '\n\nGA 못 읽은 곳\n' + '\n'.join(f'- {e}' for e in errs)
     OUT.mkdir(parents=True, exist_ok=True)

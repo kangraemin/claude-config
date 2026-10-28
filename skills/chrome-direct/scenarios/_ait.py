@@ -14,8 +14,8 @@ def url(ws, app=None, path=""):
 def wait_page(tid, must, timeout=30):
     """Wait until body text contains `must`; Blocked if a login screen shows."""
     st = poll(tid, f"""const t = document.body ? document.body.innerText : '';
-      if (/login|signin|auth/.test(location.pathname + location.host) && !/apps-in-toss\\.toss\\.im\\/workspace/.test(location.href)) return {{login: location.href}};
-      if (/로그인하고|토스 비즈니스 로그인|QR 코드로 로그인/.test(t)) return {{login: location.href}};
+      if (/login|sign-?in|auth/.test(location.pathname + location.host) && !/apps-in-toss\\.toss\\.im\\/workspace/.test(location.href)) return {{login: location.href}};
+      if (/로그인하고|토스 비즈니스 로그인|QR 코드로 로그인|앱으로 로그인|휴대폰 ?번호 로그인/.test(t)) return {{login: location.href}};
       return t.includes({must!r}) ? {{ok: 1}} : null;""", timeout)
     if "login" in st:
         raise Blocked(f"LOGIN_REQUIRED 토스 비즈니스 로그인 필요 ({st['login'][:80]}) — 폰 승인형 로그인은 Codex/사람")
