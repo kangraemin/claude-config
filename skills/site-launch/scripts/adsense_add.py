@@ -54,6 +54,10 @@ try:
         J(t, "const cb=[...document.querySelectorAll('material-checkbox,mat-checkbox,[role=checkbox]')].find(e=>/코드를 삽입했습니다/.test(e.parentElement?.innerText||e.innerText||''));cb&&cb.getAttribute('aria-checked')!='true'&&cb.click();return 1"); time.sleep(1)
         btn('확인', '.verify-button'); wait('사이트가 확인되었습니다', 40)
         btn('다음'); time.sleep(3)
+    if '정책 위반이 발견되었습니다' in text():
+        # 심사 거절 상태(예: 가치가 별로 없는 콘텐츠, 글마감 10/28). 콘텐츠를 고치기 전에 다시 내지 않는다
+        tx = text(); r = next((l for l in ('가치가 별로 없는 콘텐츠', '사이트 다운 또는 사용 불가', '정책 위반') if l in tx), '정책 위반')
+        print('RESULT: REJECTED', r); sys.exit(3)
     if '검토 요청' in text() and '리뷰가 요청됨' not in text():
         if dry:
             print('RESULT: DRY_RUN (검토 요청 직전)'); sys.exit(0)
