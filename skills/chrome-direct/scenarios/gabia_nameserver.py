@@ -8,6 +8,7 @@
 - 탭·라디오·버튼은 mantine이라 JS click이 안 먹는다 → rclick. 입력칸은 JS 값이 안 들어간다 → rclick + cmd+a 지우고 rtype.
 - 입력칸에 type 속성이 없다(input[type=text] 안 잡힘) → input[name="nameServers.N.value"].
 - '인증번호가 전송되었습니다'·'인증 완료'·'변경 신청하시겠습니까?'·'완료' 는 네이티브 alert/confirm — 떠 있는 동안 JS 실행이 멈춘다. Return 키로는 안 닫힌다 → ok()가 '확인' 좌표를 실제 클릭.
+- 바꾸기 전에 가비아 DNS 레코드(dns.gabia.com)를 새 호스팅 IP로 먼저 바꿔 둔다. 옛 가비아 NS를 하루까지 캐시한 리졸버(KT 168.126.63.1)가 옛 레코드를 계속 준다(2026-10-28 mukmap: Vercel 402가 KT 사용자에게 보임 → Codex로 가비아 A @/www를 Cloudflare IP로 바꿔 해결).
 - 반영은 신청 직후가 아니라 몇 분 뒤 .kr 레지스트리(dig NS <도메인> @b.dns.kr)에서 확인한다. 화면 목록은 한동안 옛 값.
 기본 tmux 서버에선 Chrome Apple 이벤트가 -1743 → tmux -L gh 창에서 돌린다.
 """
