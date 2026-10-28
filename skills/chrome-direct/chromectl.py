@@ -583,6 +583,22 @@ def press(match, sel=None, text=None):
         raise RuntimeError(f"press {sel or text}: {r}")
 
 
+def _chrome_window_id(x1, y1, x2, y2):
+    """CGWindowID of the on-screen Chrome window with these bounds (None if not found)."""
+    js = ('ObjC.import("CoreGraphics");'
+          'const a = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo($.kCGWindowListOptionOnScreenOnly, 0)));'
+          'JSON.stringify(a.filter(w => w.kCGWindowOwnerName == "Google Chrome" && w.kCGWindowLayer == 0)'
+          '.map(w => [w.kCGWindowNumber, w.kCGWindowBounds]))')
+    try:
+        out = subprocess.run(["osascript", "-l", "JavaScript", "-e", js], capture_output=True, text=True, timeout=10).stdout
+        for wid, b in json.loads(out or "[]"):
+            if abs(b["X"] - x1) <= 2 and abs(b["Y"] - y1) <= 2 and abs(b["Width"] - (x2 - x1)) <= 2:
+                return wid
+    except Exception:
+        pass
+    return None
+
+
 def shot(match, path):
     """Screenshot the window showing this tab (brings it to front). path .png or .pdf.
     Needs Screen Recording permission for the terminal/tmux."""
@@ -593,7 +609,12 @@ def shot(match, path):
     x1, y1, x2, y2 = window_bounds()
     path = str(path)
     png = path if path.endswith(".png") else path + ".png"
-    subprocess.run(["screencapture", "-x", "-R", f"{x1},{y1},{x2 - x1},{y2 - y1}", png], check=True)
+    # 창 하나만 찍는다(-l): 영역(-R)으로 찍으면 위에 뜬 키체인·카톡 창까지 찍혀 증거로 못 씀(2026-10-28).
+    wid = _chrome_window_id(x1, y1, x2, y2)
+    if wid:
+        subprocess.run(["screencapture", "-x", "-o", "-l", str(wid), png], check=True)
+    else:
+        subprocess.run(["screencapture", "-x", "-R", f"{x1},{y1},{x2 - x1},{y2 - y1}", png], check=True)
     if png != path:
         subprocess.run(["sips", "-s", "format", "pdf", png, "--out", path], check=True, capture_output=True)
         os.unlink(png)
