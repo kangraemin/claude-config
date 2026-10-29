@@ -17,6 +17,7 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 
 | Script | What it does | Kind | Verified |
 |---|---|---|---|
+| `dc_post.py --gall mukbang --title T --body-file f [--submit] [--captcha X]` | 디시 마이너 갤 유동 글쓰기(기본 dry-run, 중복 시 DUPLICATE, 보안문자는 png 저장 후 BLOCKED, tmux -L gh에서) | Write | yes (10/30 mukbang no=1188) |
 | `google_account.py [--expect remin1994@gmail.com]` | Which Google account is signed in on this profile | Read | yes |
 | `gmail_search.py "<query>" [--limit N] [--open N] [--proof x.pdf]` | List search results / open one thread (`in:sent`, `in:spam` also work) | Read | yes |
 | `gmail_mailcheck.py [--days 5] [--out x.md] [--open-bodies]` | Contest-mail sweep (3 queries, ad/key classification, codes masked) | Read | yes |
