@@ -55,6 +55,11 @@ def main():
             c.fill(tid, 'input[placeholder^="이 지표가 무엇을"]', a.desc)
         js(tid, "const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()==='이벤트 추가하기'); b.scrollIntoView({block:'center'}); __press(b); return 1")
         time.sleep(2)
+        # 팝업 목록은 20개만 보여 준다 → 검색칸에 이름을 넣어 거른다(10/30 먹맵 video_watch_click이 목록 밖이라 BLOCKED로 잘못 나왔다)
+        js(tid, f"""const p=[...document.querySelectorAll('body > div')].pop(); const i=p.querySelector('input'); if(!i) return 0;
+          i.focus(); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i,{a.event!r});
+          i.dispatchEvent(new Event('input',{{bubbles:true}})); return 1""")
+        time.sleep(3)
         r = js(tid, f"""const p=[...document.querySelectorAll('body > div')].pop();
           const li=[...p.querySelectorAll('li')].find(l=>l.innerText.trim()==={a.event!r}); if(!li) return 'NOEVENT';
           __press(li.querySelector('div')||li); return 'OK'""")
