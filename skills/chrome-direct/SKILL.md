@@ -38,6 +38,7 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 | `coworkcity_biz_upload.py [--pdf f] [--unit 가29] [--proof x.png]` | 코워크시티 내 계약 > 사업자등록증 OCR 업로드: PDF를 input[type=file]에 넣고 스캔 팝업(사업자번호·상호) 확인. 구글 로그인 세션 필요(없으면 BLOCKED) | Submit | 수동 실행 yes (2026-10-23), 스크립트 미실행 |
 | `kmong_seller.py biz` (+ import helpers btn/setv/rs_open/rs_pick/upload/dialog) | 크몽 판매자 세팅: 프로필 소개·전문분야(react-select)·보유기술, 사업자 인증 폼을 개인정보.md에서 채움(값 출력 안 함), 사업자등록증·통장사본 DataTransfer 업로드. 은행·계좌는 통장사본 보고 입력 | Submit | yes (2026-10-23, 사업자 인증 제출 → 확인 중) |
 | `naver_form_submit.py <url> answers.json [--add-response] [--marker f] [--lock-held] [--proof x.png] [--submit --contest-id id]` | Naver Form (form.naver.com/response/…, no login) page by page: items `{"q":"^3\\.","text":…}` / `{"q":"^1\\.","choose":"유의사항"}` / `{"ph":"이름을 입력","text":"{name}"}`, one JS call per page (each JXA call ≈5s with 150+ tabs; -1728 retried). Waits for "답변이 제출되었습니다". After the first response the form remembers the browser ("이미 참여한 설문입니다") → `--add-response` presses 설문 추가 참여. `--marker` per entry: writes `<f>.pressed` right before 제출 and `<f>` on completion — `.pressed` without `<f>` blocks a re-press | Submit | yes (2026-10-22 노사발전재단 이름짓기 3건 SUBMITTED) |
+| `naver_form_read.py <url> [--pages N] [--out f.txt]` | Naver Form read-only: dumps visible text of each page (presses 다음 with no input, stops at required fields; never 제출) — 폼 항목·글자 수 확인용 | Read | yes (2026-10-29 KIND 슬로건 폼 2쪽까지) |
 | `gform_read.py <url> [--skeleton a.json]` | Every page, question, and required flag of a Google Form; checks for closed form or existing response | Read | yes |
 | `kipris_tm.py <이름…> [--classes 09,41,42] [--json f]` | KIPRIS 국내 상표 검색(브라우저 없이 검색 XHR 직접) — 이름별 총 건수·관련 상품류에 살아 있는 출원/등록 상표. 네이밍 공모전 상표 중복 확인 | Read | no |
 | `gform_fill.py <url> answers.json [--submit --contest-id id]` | Fill a form. Dry-run by default. File questions go to Codex (Google Picker). Earlier pages' answers can be checked in hidden `input[name=partialResponse]` (JSON, file entry shows Drive id + name) before pressing 제출. Edit link = `a[href*=edit2]` on the confirmation page | Submit | partly (2026-10-28 제주 관광데이터: dropdown failed → fixed in _gform.py to match by text and retry; zip upload + summary by Codex; final page + 제출 by _gform helpers, SUBMITTED) |
@@ -78,6 +79,7 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 | `gabia_nameserver.py <도메인> <ns1> <ns2>.. [--submit]` | 가비아 네임서버 변경: 상세→네임서버/DNS호스트/DNSSEC→설정→ns 입력(rclick+rtype)→소유자 이메일 인증(gmail_code.py)→적용. alert/confirm은 Return. 반영은 dig NS @b.dns.kr | Submit | 같은 순서로 수동 1건 yes (2026-10-28), 스크립트 통짜 실행 미검증 |
 | `page_check.py <url> --kw a --kw b [--name]` | Keyword lines and links on any page; own name (also masked forms) shown as `[이름]` | Read | yes |
 | `announce_check.py [--days N] [--only id]` | Opens result pages for contests in `_radar/announce.json` whose announce date has passed. Hints only | Read | yes |
+| `../win_split.py [--left "Profile N"] [--loop 60]` | Tiles Chrome windows: Profile 1 → left half, SNS persona profiles → right half, so one session raising its window no longer covers the whole screen. Run in `tmux -L gh` (Finder AppleEvents hang → screen size via AppKit) | Write (window bounds only) | yes (10/29, 1 left · 5 right) |
 
 ## Submit-type rules
 - No `--submit` means **dry-run**: fill in, but do not press the final button.
@@ -87,8 +89,8 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 - Terms consent, payment, release, and review-request screens stop with `NEEDS_OWNER` unless the call explicitly asks for that step.
 
 ## Prerequisites
-- **`-1743`(오류가 발생했습니다)는 사용자 몫이 아니다.** Claude 백그라운드 셸에는 Chrome 자동화 권한이 없어서 난다. 권한 설정을 사용자에게 시키지 말고, 권한이 있는 Ghostty로 실행한다: `open -na Ghostty.app --args -e /bin/zsh -c "cd ~/.claude/skills/chrome-direct && <명령> > <out> 2>&1; touch <done>; exit"` 후 done 파일을 기다려 out을 읽는다. 여러 단계는 python 스크립트 하나로 묶어 한 번에 돌린다(2026-10-28, 사용자가 권한 요청에 크게 화냄).
 - **scenarios는 -1743이면 스스로 Ghostty로 다시 돈다**(`_common.relay_if_denied`, 10/29). 그냥 실행하고 출력만 읽는다. 사용자에게 권한 얘기를 하지 않는다. chromectl을 직접 부르는 임시 스크립트만 아래처럼 Ghostty로 돌린다.
+- **`-1743`(오류가 발생했습니다)는 사용자 몫이 아니다.** Claude 백그라운드 셸에는 Chrome 자동화 권한이 없어서 난다. 권한 설정을 사용자에게 시키지 말고, 권한이 있는 Ghostty로 실행한다: `open -na Ghostty.app --args -e /bin/zsh -c "cd ~/.claude/skills/chrome-direct && <명령> > <out> 2>&1; touch <done>; exit"` 후 done 파일을 기다려 out을 읽는다. 여러 단계는 python 스크립트 하나로 묶어 한 번에 돌린다(2026-10-28, 사용자가 권한 요청에 크게 화냄).
 - Chrome 메뉴 '보기 > 개발자 정보 > Apple Events의 자바스크립트 허용'(프로필마다 따로). 권한·이 메뉴가 의심되거나 종료코드 2에 'Apple Events' 안내가 나오면 `python3 ~/.claude/skills/chrome-direct/chromectl.py setup` → `READY`면 끝, `TODO` 줄만 사용자에게 전한다.
   - 이 항목은 setup이 진짜 마우스로 그 항목 위에 올린 뒤 눌러 자동으로 켠다(System Events click은 Chrome이 무시). 이미 켜져 있으면 누르지 않는다.
   - `TODO js`로 끝나면(자동 클릭 실패): 먼저 사용자에게 "곧 Chrome '보기 > 개발자 정보' 메뉴가 펼쳐집니다. 선택된 'Apple Events의 자바스크립트 허용'을 반드시 눌러 주세요"라고 말한 뒤 `chromectl.py setup --wait-js`를 백그라운드로 돌린다(최대 120초 기다림).
