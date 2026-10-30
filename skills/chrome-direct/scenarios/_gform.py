@@ -24,7 +24,9 @@ const items = [...document.querySelectorAll('div[role=listitem]')].filter(__vis)
     : checks.length ? checks.map(e => e.getAttribute('data-answer-value') || e.getAttribute('aria-label'))
     : lb ? [...it.querySelectorAll('[role=option]')].map(e => e.getAttribute('data-value')).filter(Boolean) : [];
   const answered = date ? !!date.value : radios.length ? radios.some(e => e.getAttribute('aria-checked') === 'true')
-    : checks.length ? checks.some(e => e.getAttribute('aria-checked') === 'true') : txts.some(e => e.value);
+    : checks.length ? checks.some(e => e.getAttribute('aria-checked') === 'true')
+    : lb ? [...lb.querySelectorAll('[role=option][aria-selected=true]')].some(e => e.getAttribute('data-value')) || txts.some(e => e.value)
+    : !!it.querySelector('[role=list] [role=listitem][data-tooltip]') || txts.some(e => e.value);  // 파일 칸: 이미 올린 파일 칩(응답 수정)
   const err = ([...it.querySelectorAll('[role=alert]')].filter(__vis)[0] || {}).innerText || '';
   return {i, title, required: req, kind, options: opts.slice(0, 30), answered, error: err.trim()};
 }).filter(x => x.title || x.kind !== 'section');
