@@ -1,7 +1,7 @@
 """애드센스에 사이트 추가 → 소유권 확인 → 검토 요청 — 실제 Chrome 'Profile 1'(remin1994, 애드센스 계정 pub-4785237655148075)을 조작.
-  python3 adsense_add.py https://site [--dry-run]
+  python3 adsense_add.py https://site [--dry-run] [--fixed]  (tmux 세션에선 -1743 → open -na Ghostty --args -e zsh -lc "..."로 돌린다)
 먼저 사이트 모든 페이지 head에 애드센스 코드, 루트에 ads.txt를 배포해 둔다(아래 PRE 검사가 확인).
-이미 목록에 있으면 추가하지 않고 남은 단계(확인·검토 요청)만 진행하거나 상태만 출력. 로그아웃돼 있으면 google_relogin이 다시 로그인한다.
+거절된 뒤 콘텐츠를 고쳤으면 --fixed로 재검토를 요청한다. 이미 목록에 있으면 추가하지 않고 남은 단계(확인·검토 요청)만 진행하거나 상태만 출력. 로그아웃돼 있으면 google_relogin이 다시 로그인한다.
 마지막 줄: RESULT <상태>"""
 import os, sys, time, urllib.parse, urllib.request
 sys.path.insert(0, os.path.expanduser('~/.config/claude-accounts/personal/skills/chrome-direct'))
@@ -57,7 +57,19 @@ try:
     if '정책 위반이 발견되었습니다' in text():
         # 심사 거절 상태(예: 가치가 별로 없는 콘텐츠, 글마감 10/28). 콘텐츠를 고치기 전에 다시 내지 않는다
         tx = text(); r = next((l for l in ('가치가 별로 없는 콘텐츠', '사이트 다운 또는 사용 불가', '정책 위반') if l in tx), '정책 위반')
-        print('RESULT: REJECTED', r); sys.exit(3)
+        if '--fixed' not in sys.argv:
+            print('RESULT: REJECTED', r); sys.exit(3)
+        # --fixed: 콘텐츠를 고친 뒤 재검토 요청 — '문제를 해결했음' 확인 체크 → 검토 요청
+        c.shot(t, '/tmp/adsense-rejected.png')
+        print('REJECTED', r, '→ 재검토 요청 시도')
+        print('CHECK', J(t, "const cs=[...document.querySelectorAll('material-checkbox,mat-checkbox,[role=checkbox],input[type=checkbox]')].filter(e=>e.offsetParent);const cb=cs.find(e=>/해결|확인합니다|수정했/.test((e.closest('label,div')?.innerText)||''))||cs[0];if(!cb)return 'NF';if(cb.getAttribute('aria-checked')!='true'&&!cb.checked)cb.click();return 'ok '+cs.length"))
+        time.sleep(1.5)
+        print('BTN', btn('검토 요청')); time.sleep(3)
+        print('BTN2', btn('제출')); time.sleep(2)  # 확인 대화상자가 뜨면
+        c.shot(t, '/tmp/adsense-after.png')
+        try: wait('리뷰가 요청됨', 30); print('RESULT: RESUBMITTED')
+        except RuntimeError: print('RESULT: RESUBMIT_UNCONFIRMED', text()[:600].replace('\n', ' | '))
+        sys.exit(0)
     if '검토 요청' in text() and '리뷰가 요청됨' not in text():
         if dry:
             print('RESULT: DRY_RUN (검토 요청 직전)'); sys.exit(0)
