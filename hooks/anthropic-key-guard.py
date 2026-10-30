@@ -2,7 +2,7 @@
 """Anthropic API 키는 정해진 레포에서만 쓴다(사용자 10/25 "썸이랑 상권.kr 만 내개인 api 키 쓰고 나머진 전부 못쓰도록").
 - 개인 키: 썸판독기(money-web), 상권.kr(area-insight)
 - 회사 키: ai-paper (사용자 10/25 "ai paper는 회사꺼쓰라고")
-- 민구형 키: 먹맵(mukmap) 번역, 상권.kr(10/28부터), 강화 서바이버(defense-game) 번역(10/30, 상한 $100)
+- 민구형 키: 먹맵(mukmap) 번역, 상권.kr(10/28부터), 강화 서바이버(defense-game) 번역(10/30, 상한 $100), youtubeScript 먹맵 추출·경제 요약(10/31), 오늘의 눈썰미(spot-difference) 13개 언어 번역(10/31, 상한 $50)
 그 밖의 곳에서 키를 넘기거나(export·$VAR·secret put), api.anthropic.com 을 직접 부르거나, sk-ant- 키를 파일에 쓰면 막는다.
 사용자만 끌 수 있다: Claude Code 를 ANTHROPIC_KEY_GUARD_OFF=1 로 띄운다.
 """
@@ -21,6 +21,10 @@ ALLOW = {
     V + 'mukmap': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     # 강화 서바이버 번역: 민구형 키 상한 $100 (사용자 10/30 "민구형 api key활용해서 번역해 100달러상한으로")
     V + 'defense-game': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
+    # 먹맵 추출·경제 요약(youtubeScript): 민구형 키 (사용자 10/31 "민구형꺼쑤", "api key로 다해 한도없어 이번엔 그냥다써야함")
+    # 오늘의 눈썰미 13개 언어 번역: 민구형 키 상한 $50 (사용자 10/31 "번역은전부민구형api key로", "오늘의눈썰미 저거 전부번역하자 13개언어로")
+    V + 'spot-difference': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
+    V + 'youtubeScript': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
 }
 NAME = r'([A-Z][A-Z0-9_]*_)?ANTHROPIC_API_KEY'
 EXPAND = re.compile(r'\$\{?(' + NAME + r')\b')
