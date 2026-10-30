@@ -2,6 +2,7 @@
 """[레딧] 먹맵 계정 가입 (멱등). Profile 7 "먹맵" 창에서만. 구글 로그인 가입 금지(이메일 가입).
 
   reddit_signup.py [--id mukmap_kr] [--email remin1994+mukmap@gmail.com] [--submit]
+  reddit_signup.py --persona BIZ --profile "Profile 5" --id oguriworks --email remin1994+oguri@gmail.com --submit
 
 - 이미 MUK_REDDIT_ID 가 sns.env 에 있으면 RESULT: EXISTS 로 끝낸다(중복 가입 금지).
 - 흐름(10/30 실제): /register/ → (reCAPTCHA 체크박스; 이미지 챌린지가 뜨면 BLOCKED — 그림을 읽어 직접 1회만 풀고 재시도 루프 금지)
@@ -22,6 +23,7 @@ ap = parser(__doc__)
 ap.set_defaults(profile="Profile 7", no_fallback=True)
 ap.add_argument("--id", default="mukmap_kr")
 ap.add_argument("--email", default="remin1994+mukmap@gmail.com")
+ap.add_argument("--persona", default="MUK", help="sns.env 키 앞머리 (MUK·BIZ 등). --profile 도 그 페르소나 프로필로")
 ap.add_argument("--submit", action="store_true")
 a = ap.parse_args()
 a.no_fallback = True
@@ -58,18 +60,21 @@ def click_text(tid, pat):
 
 
 def reddit_code():
-    r = subprocess.run([sys.executable, str(GMAIL_CODE), "from:reddit", "--newer", "10m", "--no-fallback"], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, str(GMAIL_CODE), "from:reddit", "--newer", "10m", "--no-fallback", "--pattern", r"(\d{6}) is your Reddit"], capture_output=True, text=True)
     m = re.search(r"\b(\d{6})\b", r.stdout)
     return m.group(1) if m else None
 
 
 def main(*_):
-    if env_get("MUK_REDDIT_ID"):
+    if env_get(f"{a.persona}_REDDIT_ID"):
         emit({}, "EXISTS", "이미 가입됨(sns.env 저장됨)")
         return
     pw = "".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(14)) + "!7"
     with tab(URL, argparse_ns()) as tid:
-        time.sleep(5)
+        for _ in range(10):  # 10/30 Profile 5: js_challenge 리다이렉트 뒤에야 이메일 칸이 생긴다
+            time.sleep(3)
+            if js(tid, DEEP + "return deep(document,'input[type=email],input[name=email]').length"):
+                break
         txt = js(tid, "return document.body.innerText.slice(0,400)") or ""
         if re.search(r"로봇이 아닙니다|not a robot", txt):
             raise Blocked("reCAPTCHA 체크 필요: iframe[src*=anchor] 사각형 left+28 세로 중앙 클릭, 이미지 챌린지는 그림을 직접 읽어 1회만")
@@ -78,10 +83,10 @@ def main(*_):
         if not a.submit:
             emit({}, "OK", "dry-run 이메일 칸까지")
             return
-        env_set("MUK_REDDIT_PW", pw); env_set("MUK_REDDIT_PROFILE", a.profile)
+        env_set(f"{a.persona}_REDDIT_PW", pw); env_set(f"{a.persona}_REDDIT_PROFILE", a.profile)
         time.sleep(1); click_text(tid, "계속|Continue")
         code = None
-        for _ in range(8):
+        for _ in range(15):  # 10/30 BIZ: 코드 메일이 1분 넘게 걸려 48초로는 놓쳤다
             time.sleep(6)
             code = reddit_code()
             if code:
@@ -97,7 +102,14 @@ def main(*_):
         time.sleep(1); click_text(tid, "계속|Continue")
         time.sleep(6)
         u = js(tid, "return location.href")
-        env_set("MUK_REDDIT_ID", a.id)
+        env_set(f"{a.persona}_REDDIT_ID", a.id)
+        # 10/30: 다음 화면은 Chrome 패스키 저장 시트 → Esc, 그리고 '내 정보'·관심사 '건너뛰기' 2번
+        subprocess.run(["cliclick", "kp:esc"]); time.sleep(2)
+        for _ in range(3):
+            if not click_text(tid, "^(건너뛰기|Skip)$"):
+                break
+            time.sleep(5)
+        u = js(tid, "return location.href")
         emit({"url": u}, "SUBMITTED", "로그인 상태 /user/%s/ 로 확인, 전화·얼굴 인증이 뜨면 멈춤" % a.id)
 
 
