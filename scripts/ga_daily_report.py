@@ -12,6 +12,7 @@
 - launchd com.ram.ga-daily 08:00(사용자 10/28 "ga리포트 오전8시에").
 - 사람에 가까운 수: GA4는 알려진 봇만 자동으로 뺀다. 그래서 '실제로 머문 방문'(참여 세션)과 1인 평균 참여 초를 같이 쓴다.
 - 할 일 한 문장(claude -p 구독 로그인, API 키 아님, claude-p.sh가 한도 걸린 계정 건너뜀). 실패하면 숫자만. --no-ai로 끔.
+- 강화 서바이버(이게 되네) 칸에 '포털' 줄: itch API 조회(~/.cache/game-stats/itch 스냅샷 대비)·CrazyGames 상태(10/31).
 - 끝에 SNS 조회수(쇼츠·릴스·스레드) 계정별 늘어난 수와 가장 많이 늘어난 글 하나. 수집은 my-sns sns_stats.py(th-notify tmux 루프) → ~/.cache/sns-stats/<날짜>.json.
 
 출력 마지막 줄: RESULT: OK <속성 수> | FAIL <이유>
@@ -179,6 +180,34 @@ def toss_by_service(day):
     return rows, zero, None
 
 
+GAME = HOME / '.cache/game-stats'  # 포털판 게임 숫자(itch API 스냅샷)
+GAME_SVC = '강화 서바이버'  # GA 속성 이름과 같은 칸에 붙인다(웹판 GA4 = 561399106)
+ITCH_GAME = 5265293  # kangraemin.itch.io/wait-it-worked. itch판은 GA를 안 보내 API 누적값만 있다(브라우저 플레이는 downloads에 안 잡힘)
+CRAZY_STATUS = '심사 중(공개 전)'  # 공개되면 developer.crazygames.com 대시보드 숫자로 바꾼다(API 없음, 로그인 CRAZYGAMES_EMAIL/PASSWORD)
+
+
+def game_by_service(day):
+    """사용자 10/31 "매일아침에 ga에 그것들도오는지 … 안오면오게해": itch 조회·다운로드(전날 스냅샷 대비)와 CrazyGames 상태. ({서비스: [줄]}, 오류)."""
+    key = env('ITCH_API_KEY')
+    lines = []
+    if key:
+        r = json.load(urllib.request.urlopen(f'https://itch.io/api/1/{key}/my-games', timeout=20))
+        g = next((x for x in r.get('games', []) if x['id'] == ITCH_GAME), None)
+        if g:
+            cur = {'views': g.get('views_count', 0), 'downloads': g.get('downloads_count', 0)}
+            d = GAME / 'itch'
+            d.mkdir(parents=True, exist_ok=True)
+            (d / f'{day + dt.timedelta(days=1)}.json').write_text(json.dumps(cur))  # 리포트 날(오늘 아침) 기준 누적
+            prev = sorted(f for f in d.glob('*.json') if f.stem < str(day + dt.timedelta(days=1)))
+            if prev:
+                pv = json.loads(prev[-1].read_text())
+                lines.append(f'- itch 조회 +{cur["views"] - pv["views"]}회 (누적 {cur["views"]}회, 다운로드 {cur["downloads"]})')
+            else:
+                lines.append(f'- itch 조회 누적 {cur["views"]}회 (다운로드 {cur["downloads"]}, 내일부터 전날 대비)')
+    lines.append(f'- CrazyGames {CRAZY_STATUS}')
+    return {GAME_SVC: lines}
+
+
 AI_PROMPT = """아래는 웹사이트(프로젝트)별 어제 GA4 숫자와 지난 7일 자료다. 프로젝트마다 '오늘 해 볼 일' 한 문장을 써라.
 
 규칙
@@ -315,6 +344,10 @@ def main():
         sns, sns_err = sns_by_service()
     except Exception as e:
         sns, sns_err = {}, [str(e)[:80]]
+    try:
+        game = game_by_service(day)
+    except Exception as e:
+        game = {GAME_SVC: [f'- itch 못 읽음: {str(e)[:60]}', f'- CrazyGames {CRAZY_STATUS}']}
     svc = {}
     for x in people:
         svc.setdefault(short(x['name']), {})['web'] = x
@@ -322,6 +355,8 @@ def main():
         svc.setdefault(k, {})['toss'] = toss[k]
     for k in sns:
         svc.setdefault(k, {})['sns'] = sns[k]
+    for k in game:
+        svc.setdefault(k, {})['game'] = game[k]
     total = lambda v: (v['web']['users'] if 'web' in v else 0) + (v['toss'][0] if 'toss' in v else 0)
     out = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 서비스별']
     for name, v in sorted(svc.items(), key=lambda kv: -total(kv[1])):
@@ -336,6 +371,8 @@ def main():
                 out.append(f'- 할 일: {notes[x["name"]]}')
         if 'toss' in v:
             out += ['토스앱'] + v['toss'][1]
+        if v.get('game'):
+            out += ['포털'] + v['game']
         if v.get('sns'):
             out += ['SNS'] + v['sns']
     zero = []
