@@ -115,7 +115,7 @@ def read_list(t):
     if not hits:
         result("NOT_FOUND", f"신청 내역에 '{a.match}' 없음")
     for i in hits:
-        print(" | ".join(lines[max(0, i - 2):i + 6]))
+        print(" | ".join(lines[max(0, i - 2):i + 10]))  # 10/30: +6이면 처리상태 값이 잘렸다
     i = hits[0]
     st = next((x for x in lines[i:i + 10] if re.search(r"처리중|처리완료|완료|취소|반려|접수|보완", x)), "?")
     return st
