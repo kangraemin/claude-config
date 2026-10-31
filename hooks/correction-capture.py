@@ -19,6 +19,7 @@ REPEAT = re.compile(
     r"않았|않앗|안 ?했|안 ?햇|분명히|이미 ?말|말했|말햇|기록 ?안)"
 )
 NOT_MINE = re.compile(r"내가 ?언제|누가 ?정했|누가 ?정햇|내가 ?그런 ?규칙")
+MISREAD = re.compile(r"^(아니|아닌데|그게 ?아니|그거 ?말고|아니지)")
 ANGRY = re.compile(r"(씨발|시발|ㅅㅂ|ㅆㅂ|병신|개새|씹|좆|ㅈㄴ|미친|또라이|개소리|지랄|호로)")
 
 
@@ -49,6 +50,11 @@ def main():
             "(~/.claude/projects/*/*.jsonl, ~/.config/claude-accounts/*/projects/*/*.jsonl)에서 이전 지적을 찾아 "
             "원래 요구를 정확히 확인한다. 고친 뒤 실제로 실행·화면 확인으로 같은 문제가 없어졌는지 본다. "
             "이 교정은 decisions/<레포>/에 남긴다(이미 있으면 왜 안 지켜졌는지 한 줄 추가)."
+        )
+    if MISREAD.search(p):
+        notes.append(
+            "직전에 사용자 말을 잘못 알아들었다. 사용자의 최근 메시지 원문 3~5개를 다시 읽고, "
+            "무엇을 잘못 알아들었는지 한 줄 쓴 뒤 사용자 말대로 바로 고친다. 질문이었으면 답만 한다."
         )
     if ANGRY.search(p) and not notes:
         notes.append(
