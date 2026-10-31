@@ -42,6 +42,10 @@ VERIFY_CMD = re.compile(
 )
 
 
+UI_EXT = re.compile(r"\.(tsx|jsx|vue|svelte|css|scss|html)$")
+IMG_EXT = re.compile(r"\.(png|jpe?g|webp|gif)$", re.I)
+
+
 def load(path):
     rows = []
     try:
@@ -146,6 +150,20 @@ def check_verify(text, uses):
     if last_edit < 0:
         return None
     after = uses[last_edit + 1:]
+    if UI_EXT.search(uses[last_edit].get("input", {}).get("file_path", "")):
+        # 화면 파일은 실행만으로 부족하다 — 캡처를 직접 열어 봐야 한다("깔끔해졌다고???", "직접 보고 줘라")
+        seen = any(
+            (u.get("name") == "Read" and IMG_EXT.search(u.get("input", {}).get("file_path", "")))
+            or (u.get("name", "").startswith("mcp__") and "screenshot" in u.get("name", ""))
+            for u in after
+        )
+        if not seen:
+            return (
+                "화면 파일을 고치고 캡처를 직접 보지 않은 채 완료라고 했다. "
+                "실제 브라우저·기기에서 캡처를 찍어 Read로 열어 보고, 고친 부분이 의도대로 보이는지 확인한 뒤 보고해라. "
+                "애니메이션은 녹화나 연속 캡처로 끊김을 본다."
+            )
+        return None
     for u in after:
         name = u.get("name", "")
         if name == "Bash" and VERIFY_CMD.search(u.get("input", {}).get("command", "")):
