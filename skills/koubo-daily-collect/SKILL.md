@@ -10,7 +10,7 @@ description: 公募の栞(koubonoshiori.com, 일본 문학 공모전 사이트) 
 - 한국(글마감)은 `ops/mac-local.sh`가 매일 도는데 일본은 빠져 있었다. 레이더 묶음(`my-sns/drafts/src/lit_radar.py`, 09:00)이 오래된 일본 데이터를 그대로 보냈다.
 
 ## 어떻게 도나
-- launchd `kr.geulmagam.jpdaily` 매일 08:00 → 09:00 공모전 레이더보다 먼저 끝난다.
+- launchd `kr.geulmagam.jpdaily` 매일 06:00 → 07:00 공모전 레이더보다 먼저 끝난다(사용자 11/1 "리포트 오전 7시에").
 - 레포 `~/programming/vibecoding/글쓰기공모전`, 코드 `ops/jp/daily.py`, 기록 `ops/jp/logs/daily-<날짜>.log`.
 - 원래 데이터는 일본에서 제일 유명한 공모 모음 사이트 公募ガイド(koubo.jp)에서 출발해 주최사 원문 페이지를 하나씩 찾아 만든 것이다(사용자 11/1 "일본에 유명한 곳 + 원문 사이트들 뒤져 가면서 찾은 거"). 그래서 매일 수집도 두 갈래다.
 - 11/1 기준: 원문 공고 페이지 394개, 원문 사이트(도메인) 309곳, 주최 393곳, 그중 실제 공고 270개, 목록 페이지 227곳.
