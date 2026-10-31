@@ -159,6 +159,27 @@ def check_verify(text, uses):
     )
 
 
+PLAIN_ALLOW = {"API", "AI", "UI", "URL", "SEO", "GEO", "MVP", "PC", "OK", "PDF", "CSV", "QR", "SNS", "GA", "DB", "ID",
+               "PR", "iOS", "Android", "Haiku", "Sonnet", "Opus", "Claude", "Codex", "GPT", "ChatGPT"}
+
+
+def check_plain(text):
+    """"먼말이여"·"한글로 말해" 방지. 코드·경로·URL을 뺀 본문의 영어 단어 비율로 본다.
+    2026-10-31 보정: 혼란 반응 직전 답의 30%를 잡고, 그 외 답은 7%만 걸린다(0.3, 15단어)."""
+    t = re.sub(r"```.*?```", "", text, flags=re.S)
+    t = re.sub(r"`[^`]*`", "", t)
+    t = re.sub(r"https?://\S+", "", t)
+    t = re.sub(r"\S*[/\\]\S*", "", t)
+    toks = re.findall(r"[A-Za-z][A-Za-z0-9.+_-]*|[가-힣]+", t)
+    lat = [x for x in toks if re.match(r"[A-Za-z]", x) and x not in PLAIN_ALLOW and len(x) >= 2]
+    if len(lat) >= 15 and len(lat) / max(1, len(toks)) > 0.3:
+        return (
+            "답에 영어·내부 용어가 너무 많다(사용자 반응 '먼말이여', '한글로 말해'가 반복된 유형). "
+            "물은 것에 대한 결론부터 쉬운 한국어로 다시 써라. 영어 단어·약어·내부 이름은 빼거나 괄호로 풀어 쓴다."
+        )
+    return None
+
+
 def main():
     if os.environ.get("RAM_PROXY_GATE", "on") == "off":
         return
@@ -174,7 +195,7 @@ def main():
     text = last_text(turn)
     uses = tool_uses(turn)
     cwd = data.get("cwd", "")
-    reasons = [r for r in (check_push(cwd, uses), check_verify(text, uses), check_ask(text)) if r]
+    reasons = [r for r in (check_push(cwd, uses), check_verify(text, uses), check_ask(text), check_plain(text)) if r]
     if reasons:
         print(json.dumps({"decision": "block", "reason": "[ram-proxy] " + " / ".join(reasons)}, ensure_ascii=False))
 

@@ -9,6 +9,8 @@
 - **사용자 사전 동의(2026-10-22): "앞으로 니가 하는 거 전부 다 동의할 테니까 멈추지 마라."** 출시 버튼, 콘솔 약관·동의 체크, 서명형 확인 체크박스, 공개 글 발행까지 묻지 않고 진행한다.
 - 남는 예외는 물리적으로 사람만 할 수 있는 단계뿐이다: 결제 본인인증, 문자 인증번호, 토스 앱에서 직접 열기, 실물 도장.
 - 플랫폼이 사람 손을 요구하는 단계(토스 앱에서 열기, 문자 인증번호)만 짧게 요청하고, 나머지는 그 전후로 다 해 둔다.
+- ai-bouncer가 모드·항목을 `ask`로 물어도 사용자에게 묻지 않는다. 추천안을 직접 골라 시작하고 무엇을 골랐는지 한 줄로 알린다.
+- 내가 고른 것(컨셉·아이템·이름·방식)은 "추천안으로 진행"이라고 쓴다. 사용자가 정한 것처럼 "정했어요"라고 쓰지 않는다(10/23 "내가 언제 이걸로 정했음").
 
 ## 사용자에게 넘기기 전 기존 스크립트부터 찾는다 <!-- why: decisions/_global/process/search-existing-scripts-before-handing-step-to-user.md -->
 - 로그인·본인인증(PASS/문자)·보안문자·결제 전 단계처럼 "사람이 해야 할 것 같은" 단계를 사용자에게 넘기기 **전에** 아래를 먼저 찾는다.
@@ -34,10 +36,10 @@
 - 개발·테스트에선 최대한 피한다: 목업·녹화 응답·규칙·`claude -p`·로컬 LLM. 실제 호출 테스트는 최소 건수만.
 - 상용은 실제 입력 표본으로 모델(Haiku·Sonnet·Opus 등)을 벤치마크해 품질 기준을 넘는 것 중 가장 적절한 것을 쓴다. 서비스별 키·월 예산 상한을 둔다.
 
-## 토스 테스트 배포는 링크로 준다 <!-- why: decisions/_global/process/toss-test-deploy-always-send-tappable-link.md -->
-- `ait deploy` 후에는 QR만 보내지 말고 **누르면 열리는 링크를 항상 같이** 준다.
-- 형식: `https://httpbin.org/redirect-to?url=<ait deploy가 출력한 intoss-private:// 링크를 URL 인코딩>`
-- 배포마다 deploymentId가 바뀌므로 매번 새 링크를 준다.
+## 토스 테스트 배포는 테스터 푸시로 보낸다 <!-- why: decisions/_global/process/send-toss-test-push-directly-not-via-codex.md -->
+- `ait deploy` 후에는 링크·QR을 주지 말고 **테스터 푸시를 바로 보낸다**: `python3 ~/.claude/skills/chrome-direct/scenarios/ait_app_register.py push <app> --deployment <id> --submit`.
+- `apps-in-toss-deploy/scripts/deploy.sh`는 배포 끝에 자동으로 푸시한다(`NO_PUSH=1`이면 건너뜀).
+- 푸시가 실패할 때만 `https://httpbin.org/redirect-to?url=<인코딩한 intoss-private 링크>`를 대신 준다.
 
 ## 블로그 글 발행은 허가 후 <!-- why: decisions/_global/process/blog-post-publish-needs-user-approval-via-telegram.md -->
 - 개인 개발 블로그(kangraemin.github.io)는 사용자가 "올려"라고 콕 집은 글만 발행한다(10/22). 사전 동의 해당 없음.
@@ -49,6 +51,10 @@
 - 올리기 전 확인 요청도 같은 봇으로 "[게시 확인 요청]"을 보낸다.
 - 도구: `python3 ~/.claude/scripts/sns_tg.py done|ask --msg "..." [--text-file f] [사진·영상]`. my-sns·insta-web 게시 스크립트는 성공 시 자동으로 보낸다.
 - 키: `~/.claude/.env`의 SNS_UPLOAD_TG_TOKEN / SNS_UPLOAD_TG_CHAT_ID. 공모전 봇(CONTEST_TG)으로 보내지 않는다.
+
+## 화면을 가리는 맥 시스템 창은 직접 닫는다 <!-- why: decisions/_global/process/close-blocking-macos-system-dialogs-yourself-safely.md -->
+- 키체인 'Chrome Safe Storage' 창은 SecurityAgent kill로 닫는다(암호 입력 금지). 하단 경고 시트(UserNotificationCenter)도 kill.
+- 메모리 부족 '강제 종료' 창은 loginwindow 소유라 kill 금지, '강제 종료' 버튼·Enter 금지 → 닫기가 안 먹으면 드래그로 치운다.
 
 ## 환경변수 조회 순서 <!-- why: decisions/_global/process/lookup-project-then-global-env.md -->
 - 환경변수는 프로젝트 `.env` → `~/.claude/.env` 순으로 찾고, `source .env && <명령>`으로 주입한다.
@@ -118,5 +124,4 @@
 - 형식(OKF v0.2 프론트매터, `type` 필수)은 `~/claude-library/GUIDE.md`를 따른다. 파일명은 교훈이 드러나게, 날짜 없이. `index.md`·`LIBRARY.md`는 자동 생성이라 손대지 않는다.
 - 저장 후 `CATALOG.md`에 한 줄 추가 → `git -C ~/claude-library add -A && git -C ~/claude-library commit -m "feat: [주제] 추가" && git -C ~/claude-library push` → `📚 library에 추가: [경로]` 한 줄로 알린다.
 - 미결 상태는 기록하지 않는다.
-<!-- learnings-for-claude:rules end -->
 <!-- learnings-for-claude:rules end -->

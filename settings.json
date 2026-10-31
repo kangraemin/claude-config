@@ -14,7 +14,8 @@
     "OCTO_CAREFUL_MODE": "off",
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
     "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false",
-    "CLAUDE_CODE_GOAL_CHECKIN_MINUTES": "0"
+    "CLAUDE_CODE_GOAL_CHECKIN_MINUTES": "0",
+    "CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION": "2000"
   },
   "attribution": {
     "commit": "",
@@ -86,210 +87,6 @@
     "additionalDirectories": [
       "/Users/ram/claude-library"
     ]
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cd $HOME/.claude && git pull --ff-only origin main 2>/dev/null || true",
-            "timeout": 10,
-            "async": true
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/decision-inject.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/library-activity-log.sh",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "Bash|Skill|Write|Edit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/library-trigger.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/stop.sh",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/library-save-check.sh",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/ralph-x-gate.sh",
-            "timeout": 5
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 /Users/ram/.claude/hooks/ram-proxy-gate.py",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/library-usage-log.sh",
-            "async": true,
-            "timeout": 30
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/library-save-check.sh",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ram/.claude/hooks/library-trigger.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [],
-    "PreToolUse": [
-      {
-        "matcher": "Bash|Edit|Write|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 ~/.claude/hooks/anthropic-key-guard.py"
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "~/.claude/hooks/stdin-multiprocessing-guard.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ]
-  },
-  "statusLine": {
-    "type": "command",
-    "command": "~/.claude/statusline.sh"
-  },
-  "enabledPlugins": {
-    "swift-lsp@claude-plugins-official": false,
-    "telegram@claude-plugins-official": true,
-    "ralph-x@ralph-x": true,
-    "figma@claude-plugins-official": false,
-    "frontend-design@claude-plugins-official": true,
-    "octo@nyldn-plugins": false
-  },
-  "extraKnownMarketplaces": {
-    "nyldn-plugins": {
-      "source": {
-        "source": "git",
-        "url": "https://github.com/nyldn/plugins.git"
-      }
-    }
-  },
-  "modelSettings": {
-    "claude-opus-5": {
-      "effortLevel": "medium"
-    },
-    "claude-opus-5-5": {
-      "autoCompactWindow": 250000
-    }
-  },
-  "autoCompactWindow": 250000,
-  "promptSuggestionEnabled": false,
-  "remote": {
-    "defaultEnvironmentId": "env_014X3Bc9uz6hSCDhWP2niHih"
-  },
-  "tui": "fullscreen",
-  "skipDangerousModePermissionPrompt": true,
-  "skipWorkflowUsageWarning": true,
-  "disableAutoMode": "disable",
-  "theme": "dark",
-  "preferredNotifChannel": "ghostty",
-  "switchModelsOnFlag": false,
-  "teammateMode": "tmux",
-  "remoteControlAtStartup": false,
-  "agentPushNotifEnabled": true,
-  "mcpServers": {
-    "kaggle": {
-      "command": "npx",
-      "args": [
-        "mcp-remote",
-        "https://www.kaggle.com/mcp",
-        "--header",
-        "Authorization: Bearer 84cbed3f8e2d2b21f99b1bbb780af09a"
-      ]
-    },
-    "claude-library": {
-      "command": "uvx",
-      "args": [
-        "--with",
-        "mcp<2",
-        "claude-library-mcp@latest"
-      ],
-      "env": {
-        "LIBRARY_ROOT": "/Users/ram/claude-library"
-      },
-      "alwaysLoad": true
-    }
   },
   "skillOverrides": {
     "accessibility-compliance": "user-invocable-only",
@@ -513,5 +310,268 @@
     "workflow-patterns": "user-invocable-only",
     "writing-skills": "user-invocable-only",
     "xlsx": "user-invocable-only"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd $HOME/.claude && git pull --ff-only origin main 2>/dev/null || true",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/decision-inject.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.config/claude-accounts/personal/ai-bouncer/hooks/session-start.sh",
+            "args": [],
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-activity-log.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Skill|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-trigger.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/stop.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-save-check.sh",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/ralph-x-gate.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ram/.claude/hooks/ram-proxy-gate.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-usage-log.sh",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.config/claude-accounts/personal/ai-bouncer/hooks/stop.sh",
+            "args": [],
+            "timeout": 1800
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-save-check.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.claude/hooks/library-trigger.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/anthropic-key-guard.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/stdin-multiprocessing-guard.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.config/claude-accounts/personal/ai-bouncer/hooks/pre-tool.sh",
+            "args": [],
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ram/.config/claude-accounts/personal/ai-bouncer/hooks/session-end.sh",
+            "args": [],
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ram/.claude/hooks/correction-capture.py"
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "~/.claude/statusline.sh"
+  },
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": false,
+    "telegram@claude-plugins-official": true,
+    "ralph-x@ralph-x": true,
+    "figma@claude-plugins-official": false,
+    "frontend-design@claude-plugins-official": true,
+    "octo@nyldn-plugins": false,
+    "ait@apps-in-toss": true
+  },
+  "extraKnownMarketplaces": {
+    "nyldn-plugins": {
+      "source": {
+        "source": "git",
+        "url": "https://github.com/nyldn/plugins.git"
+      }
+    },
+    "apps-in-toss": {
+      "source": {
+        "source": "github",
+        "repo": "toss/apps-in-toss-harness"
+      }
+    }
+  },
+  "modelSettings": {
+    "claude-opus-5": {
+      "effortLevel": "medium"
+    },
+    "claude-opus-5-5": {
+      "autoCompactWindow": 250000
+    }
+  },
+  "autoCompactWindow": 250000,
+  "promptSuggestionEnabled": false,
+  "remote": {
+    "defaultEnvironmentId": "env_014X3Bc9uz6hSCDhWP2niHih"
+  },
+  "tui": "fullscreen",
+  "skipDangerousModePermissionPrompt": true,
+  "skipWorkflowUsageWarning": true,
+  "disableAutoMode": "disable",
+  "theme": "dark",
+  "preferredNotifChannel": "ghostty",
+  "switchModelsOnFlag": false,
+  "teammateMode": "tmux",
+  "remoteControlAtStartup": false,
+  "agentPushNotifEnabled": true,
+  "mcpServers": {
+    "kaggle": {
+      "command": "npx",
+      "args": [
+        "mcp-remote",
+        "https://www.kaggle.com/mcp",
+        "--header",
+        "Authorization: Bearer 84cbed3f8e2d2b21f99b1bbb780af09a"
+      ]
+    },
+    "claude-library": {
+      "command": "uvx",
+      "args": [
+        "--with",
+        "mcp<2",
+        "claude-library-mcp@latest"
+      ],
+      "env": {
+        "LIBRARY_ROOT": "/Users/ram/claude-library"
+      },
+      "alwaysLoad": true
+    }
   }
 }
