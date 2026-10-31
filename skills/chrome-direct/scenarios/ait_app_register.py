@@ -314,4 +314,7 @@ ap.add_argument('--version')
 ap.add_argument('--notes')
 ap.add_argument('--to', help='push: 본인 말고 더 보낼 멤버 이름, 쉼표로(예: 손유정,서민구)')
 a = ap.parse_args()
+# 백그라운드 셸이 Chrome Apple Events 권한(-1743)이 없으면 Ghostty에서 같은 명령을 다시 돌린다
+from _common import relay_if_denied
+relay_if_denied()
 {'create': cmd_create, 'push': cmd_push, 'meta': cmd_meta, 'review': cmd_review}[a.cmd](a)
