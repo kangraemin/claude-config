@@ -13,7 +13,7 @@ for CFG in /Users/ram/.config/claude-accounts/personal default; do
     CLAUDE_CONFIG_DIR="$CFG" "$EXE" "$@" > "$OUT" 2> "$ERR"
   fi
   RC=$?
-  if grep -qiE "hit your (weekly |session |usage )?limit|usage limit reached" "$OUT" "$ERR"; then
+  if grep -qiE "hit your (weekly |session |usage |monthly spend )?limit|usage limit reached|spend limit" "$OUT" "$ERR"; then
     echo "[claude-p] $CFG 한도 초과 → 다음 계정" >&2
     continue
   fi
