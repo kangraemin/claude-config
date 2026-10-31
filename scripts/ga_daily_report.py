@@ -118,7 +118,7 @@ def section(cl, pid, name, day, path=None, skip=()):
 
 SNS = HOME / '.cache/sns-stats'
 SNS_NAME = {'yt': '유튜브', 'ig': '인스타', 'th': '스레드'}
-WHO = {'dev_ram_kang': '개인', 'eodi_sseot': '어디썼', 'eodimeok': '어디먹', 'oguriworks': '오구리웍스', 'geulmagam': '글마감', 'mukmap.kr': '먹맵', 'mukmap_kr': '먹맵', 'ssum.pandok': '썸판독기'}
+WHO = {'dev_ram_kang': '개인', 'eodi_sseot': '어디썼', 'eodimeok': '어디먹', 'oguriworks': '오구리웍스', 'geulmagam': '글마감', 'mukmap.kr': '먹맵', 'mukmap_kr': '먹맵', 'ssum.pandok': '썸 판독기', 'eodimeok.kr': '어디먹', 'koubonoshiori': '公募の栞', 'nunsseolmi.kr': '오늘의 눈썰미', 'sharpeyesdaily': '오늘의 눈썰미'}  # 썸 판독기는 웹 칸 이름과 맞춘다(11/1 전엔 '썸판독기'로 따로 놀았다)
 SNS_MIN = 50  # 하루에 이만큼 안 늘면 안 적는다
 
 
