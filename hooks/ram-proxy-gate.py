@@ -161,7 +161,7 @@ def check_verify(text, uses):
             return (
                 "화면 파일을 고치고 캡처를 직접 보지 않은 채 완료라고 했다. "
                 "실제 브라우저·기기에서 캡처를 찍어 Read로 열어 보고, 고친 부분이 의도대로 보이는지 확인한 뒤 보고해라. "
-                "애니메이션은 녹화나 연속 캡처로 끊김을 본다."
+                "움직임이 있는 화면은 `python3 ~/.claude/skills/no-ai-look-design/scripts/motion_check.py <url>`로 끊김·속도까지 재라."
             )
         return None
     for u in after:
@@ -198,6 +198,24 @@ def check_plain(text):
     return None
 
 
+MEDIA_MAKE = re.compile(r"(ffmpeg|remotion|render\.py|render\b|moviepy|say -o|tts)[^\n]*\.(mp4|mov|webm|mp3|wav|m4a)\b", re.I)
+
+
+def check_media(text, uses):
+    """영상·소리를 만들고 숫자 검사 없이 넘기면 막는다("음악 너무 커", "음성 끊겨", "냅다 시간만 늘림")."""
+    cmds = [u.get("input", {}).get("command", "") for u in uses if u.get("name") == "Bash"]
+    made = [i for i, c in enumerate(cmds) if MEDIA_MAKE.search(c)]
+    if not made or not DONE_CLAIM.search(text[-600:] + " " + ("보냈" if "보냈" in text else "")):
+        return None
+    if any("av_check" in c for c in cmds[made[-1]:]):
+        return None
+    return (
+        "영상·소리를 만들고 숫자 검사 없이 넘겼다. "
+        "`python3 ~/.claude/skills/no-ai-look-design/scripts/av_check.py <파일> [--bgm 배경음악 --voice 음성]`을 돌려 "
+        "음량·중간 끊김·정지 화면·배경음악 반복을 확인하고, FAIL이면 고친 뒤 보고해라. 영상은 프레임 몇 장을 뽑아 Read로 직접 본다."
+    )
+
+
 def main():
     if os.environ.get("RAM_PROXY_GATE", "on") == "off":
         return
@@ -213,7 +231,7 @@ def main():
     text = last_text(turn)
     uses = tool_uses(turn)
     cwd = data.get("cwd", "")
-    reasons = [r for r in (check_push(cwd, uses), check_verify(text, uses), check_ask(text), check_plain(text)) if r]
+    reasons = [r for r in (check_push(cwd, uses), check_verify(text, uses), check_ask(text), check_plain(text), check_media(text, uses)) if r]
     if reasons:
         print(json.dumps({"decision": "block", "reason": "[ram-proxy] " + " / ".join(reasons)}, ensure_ascii=False))
 
