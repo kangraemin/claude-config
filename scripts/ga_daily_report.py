@@ -13,6 +13,7 @@
 - 사람에 가까운 수: GA4는 알려진 봇만 자동으로 뺀다. 그래서 '실제로 머문 방문'(참여 세션)과 1인 평균 참여 초를 같이 쓴다.
 - 할 일 한 문장(claude -p 구독 로그인, API 키 아님, claude-p.sh가 한도 걸린 계정 건너뜀). 실패하면 숫자만. --no-ai로 끔.
 - 강화 서바이버(이게 되네) 칸에 '포털' 줄: itch API 조회(~/.cache/game-stats/itch 스냅샷 대비)·CrazyGames 상태(10/31).
+- 서비스마다 '구글 검색' 줄: 서치콘솔 7일 노출·클릭·평균 순위(그 앞 7일 대비)와 많이 찾은 검색어 하나. 서치콘솔은 2~3일 늦어 마지막 날짜를 붙인다. 검색어·페이지 상세는 detail 파일, AI 할 일에도 넘긴다(10/31).
 - 끝에 SNS 조회수(쇼츠·릴스·스레드) 계정별 늘어난 수와 가장 많이 늘어난 글 하나. 수집은 my-sns sns_stats.py(th-notify tmux 루프) → ~/.cache/sns-stats/<날짜>.json.
 
 출력 마지막 줄: RESULT: OK <속성 수> | FAIL <이유>
@@ -214,15 +215,78 @@ AI_PROMPT = """아래는 웹사이트(프로젝트)별 어제 GA4 숫자와 지�
 - 한 문장, 25자 안팎. 쉬운 한국어. 숫자 쓰지 말 것. '~하기'로 끝낸다.
 - 할 일만 구체적으로. 페이지 주소(/g/life/ 등)의 뜻을 짐작해 바꿔 쓰지 말고 주소를 그대로 쓴다. 예: '스레드에 구좌읍 글 하나 더 올리기'.
 - (direct)·(not set) 유입이 대부분이고 1인 평균 몇 초면 '봇으로 보여 할 일 없음'이라고 쓴다.
+- 구글 검색(서치콘솔) 자료가 있으면 같이 본다: 노출은 많은데 클릭이 적은 검색어는 그 페이지 제목·설명 고치기, 노출이 갑자기 줄면 색인 확인, 잘 되는 검색어는 같은 종류 페이지 늘리기.
 - 출력은 JSON 하나만: {"<프로젝트 이름 그대로>": "문장"}. 다른 말 금지.
 
 자료:
 """
 
 
-def ai_notes(secs):
+# 구글 서치콘솔(사용자 10/31 "ga 리포트줄때도 구글서치콘솔도 참고해서분석해서줘"). 같은 서비스 계정이 사이트 소유자다.
+# 사이트 → 서비스 이름(short() 결과와 같게). 블로그는 하위 경로 사이트를 빼고 센다.
+GSC = {'https://kangraemin.github.io/oneul-kkum/': '꿈해몽', 'https://kangraemin.github.io/jeju-stay/': '제주 숙소',
+       'https://kangraemin.github.io/': '블로그', 'https://geulmagam.vercel.app/': '글마감', 'https://xn--ob0butqet42c6pmgpe.kr/': '글마감',
+       'https://eodimeok.kr/': '어디먹', 'https://mukmap.kr/': '먹맵', 'https://xn--zf0b677a.kr/': '상권.kr',
+       'https://ssum-pandok.remin1994.workers.dev/': '썸 판독기', 'https://oguriworks.com/': '오구리웍스',
+       'https://eodisseot.pages.dev/': '어디썼', 'https://eodisseot.vercel.app/': '어디썼', 'sc-domain:paper-digest.app': 'ai-paper'}
+GSC_SKIP = {'https://kangraemin.github.io/': ['/oneul-kkum/', '/jeju-stay/']}
+
+
+def gsc_by_service(day):
+    """서비스마다 구글 검색 7일(노출·클릭·평균 순위)과 그 앞 7일 비교, 많이 찾은 검색어·페이지. 서치콘솔은 2~3일 늦어 마지막 날짜를 따로 적는다."""
+    from google.auth.transport.requests import AuthorizedSession
+    s = AuthorizedSession(service_account.Credentials.from_service_account_file(str(SA), scopes=['https://www.googleapis.com/auth/webmasters.readonly']))
+    have = {x['siteUrl'] for x in s.get('https://www.googleapis.com/webmasters/v3/sites').json().get('siteEntry', [])}
+    acc = {}
+    for site, svc in GSC.items():
+        if site not in have:
+            continue
+        url = f'https://www.googleapis.com/webmasters/v3/sites/{urllib.parse.quote(site, safe="")}/searchAnalytics/query'
+        flt = [{'filters': [{'dimension': 'page', 'operator': 'notContains', 'expression': p} for p in GSC_SKIP.get(site, [])]}] if site in GSC_SKIP else []
+        q = lambda body: s.post(url, json={**body, 'dimensionFilterGroups': flt}).json().get('rows', [])
+        rows = q({'startDate': str(day - dt.timedelta(days=20)), 'endDate': str(day), 'dimensions': ['date'], 'rowLimit': 30})
+        if not rows:
+            continue
+        last = max(dt.date.fromisoformat(r['keys'][0]) for r in rows)
+        w0, p0 = last - dt.timedelta(days=6), last - dt.timedelta(days=13)
+        a = acc.setdefault(svc, {'last': last, 'cur': [0, 0, 0], 'prev': [0, 0], 'q': {}, 'p': {}})
+        a['last'] = max(a['last'], last)
+        for r in rows:
+            d = dt.date.fromisoformat(r['keys'][0])
+            if d >= w0:
+                a['cur'][0] += r['impressions']; a['cur'][1] += r['clicks']; a['cur'][2] += r['position'] * r['impressions']
+            elif d >= p0:
+                a['prev'][0] += r['impressions']; a['prev'][1] += r['clicks']
+        for dim, key in (('query', 'q'), ('page', 'p')):
+            for r in q({'startDate': str(w0), 'endDate': str(last), 'dimensions': [dim], 'rowLimit': 10}):
+                v = a[key].setdefault(r['keys'][0], [0, 0, 0])
+                v[0] += r['impressions']; v[1] += r['clicks']; v[2] += r['position'] * r['impressions']
+    gd = lambda c, p: (f' (전주 {p:,.0f})' if p < 30 else delta(c, p)) if p else ''  # 앞 주가 작으면 % 대신 수
+    out = {}
+    for svc, a in acc.items():
+        imp, clk, pos = a['cur']
+        if not imp and not a['prev'][0]:
+            continue
+        top = lambda d, n: sorted(d.items(), key=lambda kv: -kv[1][0])[:n]
+        avg = f' · 평균 {pos / imp:.0f}위' if imp else ''
+        lines = [f'- 7일 노출 {imp:,.0f}{gd(imp, a["prev"][0])} · 클릭 {clk:,.0f}{gd(clk, a["prev"][1])}{avg} (~{a["last"]:%m/%d})']
+        tq = top(a['q'], 1)
+        if tq:
+            k, v = tq[0]
+            lines.append(f'- 많이 찾은 말: {k} (노출 {v[0]:,.0f} · 클릭 {v[1]:,.0f})')
+        det = [f'🔎 {svc} 구글 검색 {a["last"] - dt.timedelta(days=6):%m/%d}~{a["last"]:%m/%d}', lines[0][2:]]
+        det.append('검색어: ' + ', '.join(f'{k} {v[0]:.0f}/{v[1]:.0f}/{v[2] / v[0]:.0f}위' for k, v in top(a['q'], 8) if v[0]))
+        det.append('페이지: ' + ', '.join(f'{k} {v[0]:.0f}/{v[1]:.0f}' for k, v in top(a['p'], 5)))
+        out[svc] = {'lines': lines, 'detail': '\n'.join(det),
+                    'data': {'구글 검색 7일 [노출, 클릭, 평균순위]': [imp, clk, round(pos / imp, 1) if imp else None], '그 앞 7일 [노출, 클릭]': a['prev'],
+                             '검색어 [노출, 클릭, 평균순위]': {k: [v[0], v[1], round(v[2] / v[0], 1)] for k, v in top(a['q'], 10) if v[0]},
+                             '페이지 [노출, 클릭]': {k: v[:2] for k, v in top(a['p'], 8)}}}
+    return out
+
+
+def ai_notes(secs, gsc=None):
     """claude -p(구독 로그인, API 키 아님)로 프로젝트별 분석. 실패하면 {} → 숫자만 보낸다."""
-    src = {s['name']: {'어제 요약': s['detail'].split('\n', 1)[1], **(s['data'] or {})} for s in secs}
+    src = {s['name']: {'어제 요약': s['detail'].split('\n', 1)[1], **(s['data'] or {}), **((gsc or {}).get(short(s['name']), {}).get('data') or {})} for s in secs}
     env = {k: v for k, v in os.environ.items() if k not in ('ANTHROPIC_API_KEY', 'ANTHROPIC_AUTH_TOKEN', 'ANTHROPIC_BASE_URL')}
     env['PATH'] = env.get('PATH', '') + ':/opt/homebrew/bin:/usr/local/bin:' + str(HOME / '.local/bin')
     try:
@@ -329,7 +393,11 @@ def main():
     live = [x for x in secs if x['users'] >= 1]
     dead = [x['name'] for x in secs if x['users'] < 1]
     real = [x for x in live if not bot(x)]
-    notes = {} if a.no_ai else ai_notes([x for x in real if x['users'] >= 3])
+    try:
+        gsc = gsc_by_service(day)
+    except Exception as e:
+        gsc, errs = {}, errs + [f'서치콘솔: {str(e)[:80]}']
+    notes = {} if a.no_ai else ai_notes([x for x in real if x['users'] >= 3], gsc)
     for x in real:  # AI가 봇이라고 본 곳은 할 일에서 빼고 목록에 표시
         if '할 일 없음' in notes.get(x['name'], ''):
             x['ai_bot'] = notes.pop(x['name'])
@@ -357,6 +425,8 @@ def main():
         svc.setdefault(k, {})['sns'] = sns[k]
     for k in game:
         svc.setdefault(k, {})['game'] = game[k]
+    for k in gsc:
+        svc.setdefault(k, {})['gsc'] = gsc[k]['lines']
     total = lambda v: (v['web']['users'] if 'web' in v else 0) + (v['toss'][0] if 'toss' in v else 0)
     out = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 서비스별']
     for name, v in sorted(svc.items(), key=lambda kv: -total(kv[1])):
@@ -369,6 +439,8 @@ def main():
                 out.append(src_line(x))
             if x['name'] in notes:
                 out.append(f'- 할 일: {notes[x["name"]]}')
+        if v.get('gsc'):
+            out += ['구글 검색'] + v['gsc']
         if 'toss' in v:
             out += ['토스앱'] + v['toss'][1]
         if v.get('game'):
@@ -394,7 +466,7 @@ def main():
         text += '\n\nGA 못 읽은 곳\n' + '\n'.join(f'- {e}' for e in errs)
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f'{day}.txt').write_text(text + '\n')
-    (OUT / f'{day}-detail.txt').write_text('\n\n'.join(x['detail'] for x in secs) + '\n')  # 유입·페이지 상세는 파일로만
+    (OUT / f'{day}-detail.txt').write_text('\n\n'.join([x['detail'] for x in secs] + [g['detail'] for g in gsc.values()]) + '\n')  # 유입·페이지 상세는 파일로만
     print(text)
     if not a.dry_run:
         send(text)
