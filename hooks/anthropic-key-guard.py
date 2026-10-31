@@ -2,7 +2,7 @@
 """Anthropic API 키는 정해진 레포에서만 쓴다(사용자 10/25 "썸이랑 상권.kr 만 내개인 api 키 쓰고 나머진 전부 못쓰도록").
 - 개인 키: 썸판독기(money-web), 상권.kr(area-insight)
 - 회사 키: ai-paper (사용자 10/25 "ai paper는 회사꺼쓰라고")
-- 민구형 키: 먹맵(mukmap) 번역, 상권.kr(10/28부터), 강화 서바이버(defense-game) 번역(10/30, 상한 $100), youtubeScript 먹맵 추출·경제 요약(10/31), 오늘의 눈썰미(spot-difference) 13개 언어 번역(10/31, 상한 $50), my-sns 스레드 답글 생성(10/31, 키 다 쓰면 claude -p로)
+- 민구형 키: 먹맵(mukmap) 번역, 상권.kr(10/28부터), 강화 서바이버(defense-game) 번역(10/30, 상한 $100), youtubeScript 먹맵 추출·경제 요약(10/31), 오늘의 눈썰미(spot-difference) 13개 언어 번역(10/31, 상한 $50), my-sns 스레드 답글 생성(10/31, 키 다 쓰면 claude -p로), 과학기록(science-tutor) 사진 판독·보고서 생성(10/31, 월 상한 $30)
 그 밖의 곳에서 키를 넘기거나(export·$VAR·secret put), api.anthropic.com 을 직접 부르거나, sk-ant- 키를 파일에 쓰면 막는다.
 사용자만 끌 수 있다: Claude Code 를 ANTHROPIC_KEY_GUARD_OFF=1 로 띄운다.
 """
@@ -27,6 +27,8 @@ ALLOW = {
     V + 'youtubeScript': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     # my-sns 스레드 답글 생성: 민구형 키 (사용자 10/31 "댓글 생성하는거 claude -p 말고 api key로", "api 민구형꺼 다쓰면 그때 claude -p 로전환하자")
     V + 'my-sns': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
+    # 과학기록 사진 판독·수업일지·월간 보고서·공개 글 생성: 민구형 키 월 상한 $30 (사용자 10/31 "그 규칙 이것도써야지")
+    V + 'science-tutor': {'SCIENCE_TUTOR_ANTHROPIC_API_KEY', 'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
 }
 NAME = r'([A-Z][A-Z0-9_]*_)?ANTHROPIC_API_KEY'
 EXPAND = re.compile(r'\$\{?(' + NAME + r')\b')
@@ -112,7 +114,7 @@ def main():
         why = None
     if why:
         print(f'[anthropic-key-guard] 차단: {why}.\n'
-              'Anthropic API 키는 썸판독기(money-web)·상권.kr(area-insight)=개인 키, ai-paper=회사 키만 쓴다(사용자 10/25).\n'
+              'Anthropic API 키는 썸판독기(money-web)·상권.kr(area-insight)=개인 키, ai-paper=회사 키, 민구형 키는 허용목록 레포만 쓴다(사용자 10/25~).\n'
               '다른 곳은 claude -p(구독)·목업으로 한다. 키를 빼려면 unset ANTHROPIC_API_KEY / env -u ANTHROPIC_API_KEY.', file=sys.stderr)
         return 2
     return 0
