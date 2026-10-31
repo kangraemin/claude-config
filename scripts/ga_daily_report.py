@@ -461,6 +461,8 @@ def main():
     if sns_err:
         out += ['', 'SNS 못 읽은 곳: ' + ', '.join(sns_err)]
     out += ['', '(직접 접속 = 주소 입력·즐겨찾기·카톡·토스 앱 안 링크처럼 출처가 안 남는 방문. 토스앱 길은 콘솔 분류 그대로)']
+    if not a.no_ai and not notes:  # 11/1: 분석이 빠진 걸 사용자가 몰랐다("서치콘솔도 주기로 하지 않음?")
+        out += ['', '⚠️ 오늘은 분석(할 일·서치콘솔 해석)이 빠졌어요. AI 사용 한도에 걸려 숫자만 보냈어요.']
     text = '\n'.join(out)
     if errs:
         text += '\n\nGA 못 읽은 곳\n' + '\n'.join(f'- {e}' for e in errs)
