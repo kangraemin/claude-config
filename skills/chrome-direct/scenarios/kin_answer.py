@@ -120,6 +120,18 @@ def attach_image(tid, path, out):
         raise RuntimeError(f"image not in editor (input={r}, imgs {before}->{n})")
 
 
+def fix_links(text):
+    """링크 경로·쿼리의 한글을 %인코딩한다(10/31 스레드에서 한글 앞에서 링크가 끊겼던 것과 같은 문제 방지). 호스트는 그대로 둔다."""
+    import re, urllib.parse
+    def enc(m):
+        u = m.group(0)
+        p = urllib.parse.urlsplit(u)
+        q = lambda x, safe: urllib.parse.quote(x, safe=safe)
+        return urllib.parse.urlunsplit((p.scheme, p.netloc, q(p.path, "/%"), q(p.query, "=&%"), q(p.fragment, "%")))
+    return re.sub(r"https?://[^\s)\]]+", enc, text)
+
+
+
 def main():
     out = {"url": a.url}
     with tab(a.url, a) as tid:
@@ -142,6 +154,7 @@ def main():
             emit(out, "OK", "답변 가능")
             return
         text = Path(a.text_file).read_text().strip()
+        text = fix_links(text)
         js(tid, NO_UNLOAD)
         c.press(tid, sel="._answerWriteButton")
         poll(tid, "return [...document.querySelectorAll('.se-content .se-text-paragraph')].some(__vis)", 15)
