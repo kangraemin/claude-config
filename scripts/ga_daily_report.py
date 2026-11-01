@@ -48,11 +48,19 @@ def env(name):
             return line.split('=', 1)[1].strip().strip('"')
 
 
+CREATED = {}
+
+
 def properties(cred):
     cred.refresh(Request())
     req = urllib.request.Request('https://analyticsadmin.googleapis.com/v1beta/accountSummaries?pageSize=200',
                                  headers={'Authorization': 'Bearer ' + cred.token})
     r = json.load(urllib.request.urlopen(req, timeout=30))
+    for a in r.get('accountSummaries', []):  # 만든 날(새 속성은 일별 집계가 1~2일 늦어 빈 칸 대신 '아직 없음'을 보인다)
+        q = urllib.request.Request(f"https://analyticsadmin.googleapis.com/v1beta/properties?filter=parent:{a['account']}&pageSize=200",
+                                   headers={'Authorization': 'Bearer ' + cred.token})
+        for x in json.load(urllib.request.urlopen(q, timeout=30)).get('properties', []):
+            CREATED[x['name'].split('/')[1]] = x.get('createTime', '')[:10]
     return [(p['property'].split('/')[1], p['displayName']) for a in r.get('accountSummaries', []) for p in a.get('propertySummaries', [])]
 
 
@@ -87,8 +95,9 @@ def section(cl, pid, name, day, path=None, skip=()):
             return None
         rt = cl.run_realtime_report(RunRealtimeReportRequest(property=f'properties/{pid}', metrics=[Metric(name='activeUsers')]))
         now = sum(float(x.metric_values[0].value) for x in rt.rows)
+        fresh = CREATED.get(pid, '') >= str(day - dt.timedelta(days=3))
         return {'name': name, 'users': now, 'prev': None, 'engaged': None, 'per': 0, 'new': True,
-                'detail': f'📊 {name}\n일별 집계 아직 없음(새 속성) · 지금 30분 실시간 {now:.0f}명', 'data': None} if now else None
+                'detail': f'{name}\n- 새로 붙인 GA라 일별 집계 아직 없음\n- 지금 30분 실시간 {now:.0f}명', 'data': None} if now or fresh else None
     m = ['activeUsers', 'sessions', 'screenPageViews', 'engagedSessions', 'userEngagementDuration']
     cur = (run(cl, pid, y, y, m, path=path, skip=skip) or [([], [0] * 5)])[0][1]
     prev = (run(cl, pid, y2, y2, m, path=path, skip=skip) or [([], [0] * 5)])[0][1]
@@ -114,7 +123,7 @@ def section(cl, pid, name, day, path=None, skip=()):
     src7 = run(cl, pid, w, y, ['sessions', 'engagedSessions'], ['sessionSource'], 6, 'sessions', path=path, skip=skip)
     data = {'8일 날짜별 [사용자, 참여세션, 총참여초]': {d[0]: v for d, v in sorted(days)},
             '7일 유입별 [세션, 참여세션]': {d[0]: v for d, v in src7}}
-    return {'name': name, 'users': cur[0], 'prev': prev[0], 'avg7': avg7, 'engaged': cur[3], 'per': per, 'new': False, 'src': src, 'pid': pid, 'path': path, 'skip': skip,
+    return {'name': name, 'users': cur[0], 'prev': prev[0], 'avg7': avg7, 'engaged': cur[3], 'per': per, 'new': False, 'src': src, 'hosts': [(d[0], v[0]) for d, v in hosts], 'pid': pid, 'path': path, 'skip': skip,
             'detail': '\n'.join(lines), 'data': data}
 
 
@@ -250,8 +259,10 @@ GSC = {'https://kangraemin.github.io/oneul-kkum/': '꿈해몽', 'https://kangrae
        'https://eodimeok.kr/': '어디먹', 'https://mukmap.kr/': '먹맵', 'https://xn--zf0b677a.kr/': '상권.kr',
        'https://ssum-pandok.remin1994.workers.dev/': '썸 판독기', 'https://oguriworks.com/': '오구리웍스',
        'https://eodisseot.pages.dev/': '어디썼', 'https://eodisseot.vercel.app/': '어디썼', 'sc-domain:paper-digest.app': 'ai-paper',
-       'https://koubonoshiori.com/': '公募の栞', 'https://threads-unfollow.pages.dev/': '스레드언팔확인'}  # 11/1 일본판·언팔확인 빠져 있던 것
-GSC_SKIP = {'https://kangraemin.github.io/': ['/oneul-kkum/', '/jeju-stay/']}
+       'https://koubonoshiori.com/': '公募の栞', 'https://threads-unfollow.pages.dev/': '스레드언팔확인',
+       'https://kangraemin.github.io/bid-window-404/': '입찰 창구 404호', 'https://kangraemin.github.io/forge-survivor-play/': '강화 서바이버',
+       'https://gooreum.github.io/ttuk-chiro-clinic/': '뚝 카이로 클리닉', 'https://tax-watcher.remin1994.workers.dev/': '법카로 본 서울'}  # 11/1 일본판·언팔확인 빠져 있던 것
+GSC_SKIP = {'https://kangraemin.github.io/': ['/oneul-kkum/', '/jeju-stay/', '/bid-window-404/', '/forge-survivor-play/']}
 
 
 def gsc_by_service(day):
@@ -336,7 +347,7 @@ def why_drop(sites, start, end):
     for site in sites:
         url = f'https://www.googleapis.com/webmasters/v3/sites/{urllib.parse.quote(site, safe="")}/searchAnalytics/query'
         pages += [(r['impressions'], r['keys'][0], site) for r in s.post(url, json={'startDate': str(start), 'endDate': str(end), 'dimensions': ['page'], 'rowLimit': 5}).json().get('rows', [])]
-    out = []
+    out, raw = [], []
     top = sorted(pages, reverse=True)[:5]
     for _, u, site in top:
         r = s.post('https://searchconsole.googleapis.com/v1/urlInspection/index:inspect', json={'inspectionUrl': u, 'siteUrl': site}).json()
@@ -346,7 +357,8 @@ def why_drop(sites, start, end):
             st = ix.get('coverageState', '')
             why = next((k for c, k in COVER if c in st), '색인 안 됨')
             out.append(f'{pu.netloc.encode().decode("idna")}{urllib.parse.unquote(pu.path)} ({why})')
-    return (len(top), out)
+            raw.append((site, u))
+    return (len(top), out, raw)
 
 
 def ai_notes(svc):
@@ -409,6 +421,9 @@ def send(text):
     if not env('GA_TG_CHAT_ID'):
         with ENV.open('a') as fp:
             fp.write(f'GA_TG_CHAT_ID={cid}\n')
+
+
+HOST = {'kangraemin.github.io': '깃허브 웹판', 'kangraemin.itch.io': 'itch.io'}
 
 
 def short(name):
@@ -551,7 +566,7 @@ def main():
     total = lambda v: (v['web']['users'] if 'web' in v else 0) + (v['toss'][0] if 'toss' in v else 0)
     wd = lambda d: f'{d:%m/%d}({"월화수목금토일"[d.weekday()]})'
     # 사용자 11/1 "납품받는다 생각하면": 맨 위에 '오늘 볼 것'(규칙으로 계산, AI 아님) — 나쁜 일·좋은 일을 나누고 할 일을 붙인다
-    bad_n, good_n, dropped, week_up, reidx, lost, more, g_span = [], [], [], {}, [], [], 0, ''
+    bad_n, good_n, dropped, week_up, reidx, lost, reraw, g_span = [], [], [], {}, [], [], [], ''
     for name, gg in gsc.items():
         f = gg.get('fresh') or {}
         last = gg['day'][0]  # 구글이 확정한 마지막 날. 그 뒤(아직 확정 전) 숫자는 판정에 안 쓴다
@@ -567,8 +582,8 @@ def main():
             g_span = f'{last - dt.timedelta(days=8):%m/%d}~{last - dt.timedelta(days=2):%m/%d} 평균 → {last:%m/%d}'
             if why and why[1]:
                 lost.append(f'{name} {why[0]}개 중 {len(why[1])}개')
-                reidx.extend(why[1][:2])
-                more += len(why[1]) - min(2, len(why[1]))
+                reidx.extend(why[1])
+                reraw.extend(why[2])
             bad_n.append((1e9 + sum(base), t))
             dropped.append(name)
         else:  # 확정된 마지막 7일 합이 그 앞 7일의 3배 넘으면 좋은 소식
@@ -609,14 +624,12 @@ def main():
         out += [f'- {x}' for x in lost]
     if len(dropped) >= 2:
         todo.append(f'- {len(dropped)}곳 같은 때 줄어듦 → 그 무렵 배포·설정 바꾼 것 확인')
-    if reidx:
-        whys = {re.search(r' \((.+)\)$', u).group(1) for u in reidx if re.search(r' \((.+)\)$', u)}
-        todo.append('- 서치콘솔에서 아래 페이지 색인 요청')
-        todo += [f'- {re.sub(r" \(.+\)$", "", u)}' for u in reidx]
-        if more:
-            todo.append(f'- 나머지 {more}개는 서치콘솔 페이지 색인 보고서에')
-        if whys == {'구글이 읽어 갔지만 색인 안 함'}:
-            todo.append('- 모두 구글이 읽고도 뺀 페이지라 내용이 얇거나 겹치는지도 보기')
+    if reraw:  # 사용자 11/1 "색인요청 다 적을려고?": 사람에게 시키지 않는다 → 08:20 홍보 작업(daily_growth_run.sh)이 gsc_request_index.py로 요청
+        OUT.mkdir(parents=True, exist_ok=True)
+        (OUT / f'{day}-reindex.json').write_text(json.dumps(reraw, ensure_ascii=False))
+        todo.append(f'- 빠진 페이지 {len(reraw)}개는 08:20에 자동으로 색인 요청')
+        if {re.search(r' \((.+)\)$', u).group(1) for u in reidx if re.search(r' \((.+)\)$', u)} == {'구글이 읽어 갔지만 색인 안 함'}:
+            todo.append('- 읽고도 뺀 페이지라 얇거나 겹치는지 각 앱에서 보기')
     bot_names = {short(x['name']) for x in bots}
     dead_names = {short(n) for n in dead}
     good_n_txt = [t for _, t in sorted(good_n, key=lambda u: -u[0])][:3]
@@ -627,6 +640,9 @@ def main():
             x = v['web']
             av = x.get('avg7')
             parts.append(f'웹 방문 {x["users"]:.0f}명' + (f' (평소 {av:.0f}명)' if av is not None else ''))
+            hs = [(h, u) for h, u in x.get('hosts') or [] if h and h != '(not set)']
+            if len(hs) > 1 or (hs and GAME_SVC in name):  # 사용자 11/1 "itch인지 뭐 다른데인지 이야기를 해줘야": 어느 사이트로 들어왔는지
+                parts += [f'{HOST.get(h, h)} {u:.0f}명' for h, u in hs]
             if name in SPLIT_KR and x.get('pid'):
                 try:
                     c = kr_split(cl, x, day, raw=True)
@@ -648,9 +664,9 @@ def main():
                 t_, n_ = l.split(' (제일 많이 본 글 ')[1].rstrip(')').rsplit(' ', 1)
                 best = f'많이 본 글 {t_} 조회 {n_}'
             parts += [main_] + ([best] if best else [])
-        if v.get('game'):
-            g0 = v['game'][0].lstrip('- ').split(' (')[0]
-            if '못 읽음' not in g0 and max([int(m.replace(',', '')) for m in re.findall(r'([\d,]+)회', g0)] or [10]) >= 10:
+        for gl in v.get('game') or []:  # 게임은 어느 포털 숫자인지 다 적는다
+            g0 = gl.lstrip('- ').split(' (')[0]
+            if '못 읽음' not in g0:
                 parts.append(g0)
         big_sns = any(int(m) >= 100 for p in parts for m in re.findall(r'조회 \+?([\d]+)회', p.replace(',', '')))
         if total(v) < 5 and not (g and g[1][1]) and not big_sns and name not in dropped:
@@ -673,10 +689,9 @@ def main():
     out += ['', '좋아진 것'] + (good_n_txt or ['- 없음'])
     out += body
     zero = sorted(dead_names - shown - bot_names)
-    low = ([f'- 웹 1~4명: {len(quiet)}곳'] if quiet else []) + ([f'- 웹 0명: {len(zero)}곳'] if zero else []) \
-        + ([f'- SNS·토스앱만 조금: {len(other)}곳'] if other else []) + ([f'- 토스앱 0명: {len(toss_zero)}곳'] if toss_zero else [])
-    if low:
-        out += ['', '거의 안 들어온 곳'] + low + ['- 이름은 상세 파일에']
+    for title, names in ((f'웹 방문 1~4명', quiet), ('웹 방문 0명', zero), ('웹 없이 SNS·토스앱만 조금', other), ('토스앱 방문 0명', [short(t) for t in toss_zero])):
+        if names:  # 사용자 11/1 "이건 장난해?": 개수만 말고 이름을 한 줄에 하나씩
+            out += ['', title] + [f'- {x}' for x in names]
     note = []
     if bots:
         note += [f'- 봇이라 뺌: {short(x["name"])} {x["users"]:.0f}명' for x in bots]
