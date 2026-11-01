@@ -426,6 +426,15 @@ def send(text):
 HOST = {'kangraemin.github.io': '깃허브 웹판', 'kangraemin.itch.io': 'itch.io'}
 
 
+def host_name(h):
+    """주소 대신 사람 말로(11/1 "eodimeok.apps.tossmini.com 이런건뭐여"). 토스 미니앱 주소는 토스 앱 안에서 연 것."""
+    if h.endswith('.private-apps.tossmini.com'):
+        return '토스 테스트판'
+    if h.endswith('.apps.tossmini.com'):
+        return '토스 앱 안'
+    return HOST.get(h, '웹사이트')
+
+
 def short(name):
     """'제주 숙소 (jeju-stay)'·'Ram's tech blog - GA4' 같은 꼬리를 뗀다."""
     n = re.sub(r'\s*(\([^)]*\)|- GA4)$', '', name) or name
@@ -642,7 +651,7 @@ def main():
             parts.append(f'웹 방문 {x["users"]:.0f}명' + (f' (평소 {av:.0f}명)' if av is not None else ''))
             hs = [(h, u) for h, u in x.get('hosts') or [] if h and h != '(not set)']
             if len(hs) > 1 or (hs and GAME_SVC in name):  # 사용자 11/1 "itch인지 뭐 다른데인지 이야기를 해줘야": 어느 사이트로 들어왔는지
-                parts += [f'{HOST.get(h, h)} {u:.0f}명' for h, u in hs]
+                parts += [f'{host_name(h)} {u:.0f}명' for h, u in hs]
             if name in SPLIT_KR and x.get('pid'):
                 try:
                     c = kr_split(cl, x, day, raw=True)
