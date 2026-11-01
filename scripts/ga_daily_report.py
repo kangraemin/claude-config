@@ -212,6 +212,7 @@ def game_by_service(day):
 
 AI_PROMPT = """아래는 서비스별 어제 숫자다(웹 GA4 방문·유입, 구글 서치콘솔 날짜별·7일·검색어·페이지, 토스앱, SNS 조회). 서비스마다 세 가지를 써라.
 
+- "요약": 이 서비스 어제를 한 문장으로(웹·검색·토스앱·SNS를 한데 보고 제일 중요한 것 하나). 35자 안팎. '자료가 없어 알 수 없음' 같은 말은 쓰지 말고 빈 문자열로 둔다.
 - "검색": 구글 서치콘솔 해석 한 줄(자료가 없으면 빈 문자열). 무엇이 늘고 줄었는지, 노출 대비 클릭이 왜 적은지, 어느 검색어·페이지가 끄는지. 날짜별 노출이 갑자기 꺾였으면 그 날짜를 쓴다. 40자 안팎.
 - "종합": 웹·검색·토스앱·SNS를 한데 본 인사이트 두 줄(배열 2개). 어디서 사람이 오고 어디서 끊기는지, 채널끼리 이어지는지(예: SNS 조회는 느는데 방문이 없다). 각 40자 안팎, 숫자는 자료에 있는 것만.
 - "할일": 오늘 해 볼 일 한 문장, 25자 안팎, '~하기'로 끝낸다. 페이지 주소는 그대로 쓴다. 예: '스레드에 구좌읍 글 하나 더 올리기'.
@@ -219,7 +220,7 @@ AI_PROMPT = """아래는 서비스별 어제 숫자다(웹 GA4 방문·유입, �
 규칙
 - 쉬운 한국어. 영어·전문용어(CTR, 임프레션 등) 금지. 지어낸 숫자 금지.
 - 웹 유입이 (direct)·(not set)뿐이고 1인 평균 몇 초면 "할일"에 '봇으로 보여 할 일 없음'이라고 쓴다.
-- 출력은 JSON 하나만: {"<서비스 이름 그대로>": {"검색": "…", "종합": ["…", "…"], "할일": "…"}}. 다른 말 금지.
+- 출력은 JSON 하나만: {"<서비스 이름 그대로>": {"요약": "…", "검색": "…", "종합": ["…", "…"], "할일": "…"}}. 다른 말 금지.
 
 자료:
 """
@@ -295,7 +296,7 @@ def gsc_by_service(day):
         det = [f'🔎 {svc} 구글 검색 {a["last"] - dt.timedelta(days=6):%m/%d}~{a["last"]:%m/%d}', f'7일 노출 {imp:,.0f}{gd(imp, a["prev"][0])} · 클릭 {clk:,.0f}{gd(clk, a["prev"][1])}', lines[0][2:]]
         det.append('검색어: ' + ', '.join(f'{k} {v[0]:.0f}/{v[1]:.0f}/{v[2] / v[0]:.0f}위' for k, v in top(a['q'], 8) if v[0]))
         det.append('페이지: ' + ', '.join(f'{k} {v[0]:.0f}/{v[1]:.0f}' for k, v in top(a['p'], 5)))
-        out[svc] = {'lines': lines, 'detail': '\n'.join(det),
+        out[svc] = {'lines': lines, 'detail': '\n'.join(det), 'day': (a['last'], dc, dp, {k: a['cty'].get(L, {}).get(k, [0, 0]) for k in ('국내', '외국')}),
                     'data': {'날짜별 [노출, 클릭]': {k: v[:2] for k, v in sorted(a['day'].items())}, '구글 검색 7일 [노출, 클릭, 평균순위]': [imp, clk, round(pos / imp, 1) if imp else None], '그 앞 7일 [노출, 클릭]': a['prev'],
                              '검색어 [노출, 클릭, 평균순위]': {k: [v[0], v[1], round(v[2] / v[0], 1)] for k, v in top(a['q'], 10) if v[0]},
                              '페이지 [노출, 클릭]': {k: v[:2] for k, v in top(a['p'], 8)}}}
@@ -402,13 +403,15 @@ def bot(x):
     return x['engaged'] is not None and x['users'] >= 5 and x['engaged'] < x['users'] * 0.1 and x['per'] < 5
 
 
-def kr_split(cl, x, day):
+def kr_split(cl, x, day, raw=False):
     """어제·그제 방문을 국내(South Korea)·외국으로."""
     def one(d):
         r = {'국내': 0, '외국': 0}
         for k, v in run(cl, x['pid'], str(d), str(d), ['activeUsers'], ['country'], path=x['path'], skip=x['skip']):
             r['국내' if k[0] == 'South Korea' else '외국'] += v[0]
         return r
+    if raw:
+        return one(day)
     c, p = one(day), one(day - dt.timedelta(days=1))
     return [f'  · {k}: {c[k]:.0f}명 (전날 {p[k]:.0f}명)' for k in ('국내', '외국')]
 
@@ -473,52 +476,88 @@ def main():
                 svc.pop(k)
     bots = [x for x in live if bot(x) or x.get('ai_bot')]
     total = lambda v: (v['web']['users'] if 'web' in v else 0) + (v['toss'][0] if 'toss' in v else 0)
-    out = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 서비스별']
+    # 사용자 11/1 "이거 읽기가 진짜 너무 힘들어": 텔레그램엔 서비스당 세 줄(숫자 한 줄·요약·할 일), 조용한 곳은 한 줄로. 긴 판은 -full 파일
+    out, quiet = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]})'], []
     for name, v in sorted(svc.items(), key=lambda kv: -total(kv[1])):
-        out += ['', name]
+        n, parts = notes.get(name, {}), []
+        if 'web' in v:
+            x = v['web']
+            t = f'방문 {x["users"]:.0f}' + (f'(전날 {x["prev"]:.0f})' if x['prev'] is not None else '')
+            if name in SPLIT_KR and x.get('pid'):
+                try:
+                    c = kr_split(cl, x, day, raw=True)
+                    t += f' 국내 {c["국내"]:.0f}·외국 {c["외국"]:.0f}'
+                except Exception:
+                    pass
+            parts.append(t)
+        g = gsc.get(name, {}).get('day')
+        if g and (g[1][0] or g[2][0]):
+            t = f'구글 {g[0]:%m/%d} 노출 {g[1][0]:,.0f}(전날 {g[2][0]:,.0f}) 클릭 {g[1][1]:,.0f}'
+            if name in SPLIT_KR:
+                t += f' [외국 노출 {g[3]["외국"][0]:,.0f}]'
+            parts.append(t)
+        if 'toss' in v:
+            parts.append(f'토스 {v["toss"][0]:.0f}명')
+        for l in v.get('sns') or []:
+            parts.append(l.lstrip('- ').split(' (')[0])
+        if v.get('game'):
+            parts.append(v['game'][0].lstrip('- ').split(' (')[0])
+        if total(v) < 5 and not (g and g[1][1]) and not any('+' in p and int(re.sub(r'\D', '', p.split('+')[1].split('회')[0]) or 0) >= 100 for p in parts if '+' in p):
+            quiet.append(name)
+            continue
+        out += ['', f'■ {name}  ' + ' · '.join(parts)]
+        if n.get('요약'):
+            out.append(f'  {n["요약"]}')
+        if n.get('할일'):
+            out.append(f'  → {n["할일"]}')
+    if quiet:
+        out += ['', '조용한 곳: ' + ', '.join(quiet)]
+    full = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 서비스별 (긴 판)']
+    for name, v in sorted(svc.items(), key=lambda kv: -total(kv[1])):
+        out_ = full
+        out_ += ['', name]
         n = notes.get(name, {})
         if n.get('종합'):  # 사용자 11/1 "서비스마다 종합적인 인사이트 두 줄"
-            out += [f'💡 {t}' for t in n['종합'][:2] if t]
+            full += [f'💡 {t}' for t in n['종합'][:2] if t]
         # 사용자 11/1 "서치콘솔 / ga 합쳐서 달라니까": GA 방문과 구글 검색을 '웹' 한 덩어리로
         if 'web' in v or v.get('gsc'):
-            out.append('웹')
+            full.append('웹')
         if 'web' in v:
             x = v['web']
             prev = f' (전날 {x["prev"]:.0f}명)' if x['prev'] is not None else ''
-            out.append(f'- 방문 {x["users"]:.0f}명{prev}')
+            full.append(f'- 방문 {x["users"]:.0f}명{prev}')
             if name in SPLIT_KR and x.get('pid'):
                 try:
-                    out += kr_split(cl, x, day)
+                    full += kr_split(cl, x, day)
                 except Exception as e:
-                    out.append(f'  · 국내·외국 못 읽음: {str(e)[:40]}')
+                    full.append(f'  · 국내·외국 못 읽음: {str(e)[:40]}')
             if x.get('src'):
-                out.append(src_line(x))
+                full.append(src_line(x))
         if v.get('gsc'):
-            out += v['gsc']
+            full += v['gsc']
             if n.get('검색'):  # 사용자 11/1 "분석 그대로도 주고"
-                out.append(f'- 검색 해석: {n["검색"]}')
+                full.append(f'- 검색 해석: {n["검색"]}')
         if n.get('할일'):
-            out.append(f'- 할 일: {n["할일"]}')
+            full.append(f'- 할 일: {n["할일"]}')
         if 'toss' in v:
-            out += ['토스앱'] + v['toss'][1]
+            full += ['토스앱'] + v['toss'][1]
         if v.get('game'):
-            out += ['포털'] + v['game']
+            full += ['포털'] + v['game']
         if v.get('sns'):
-            out += ['SNS'] + v['sns']
+            full += ['SNS'] + v['sns']
     zero = []
     if dead:
         zero.append(f'웹 {len(dead)}곳')
     if toss_zero:
-        zero.append(f'토스앱 {len(toss_zero)}개({", ".join(toss_zero)})')
+        zero.append(f'토스앱 {len(toss_zero)}개')
     if zero:
-        out += ['', '어제 0명: ' + ', '.join(zero)]
+        out += ['어제 0명: ' + ', '.join(zero)]
     if bots:
-        out += ['', '봇으로 보여 뺀 곳: ' + ', '.join(f'{short(x["name"])} {x["users"]:.0f}명' for x in bots)]
+        out += ['봇으로 보여 뺀 곳: ' + ', '.join(f'{short(x["name"])} {x["users"]:.0f}명' for x in bots)]
     if toss_err:
         out += ['', f'토스 콘솔 못 읽음: {toss_err}']
     if sns_err:
         out += ['', 'SNS 못 읽은 곳: ' + ', '.join(sns_err)]
-    out += ['', '(직접 접속 = 주소 입력·즐겨찾기·카톡·토스 앱 안 링크처럼 출처가 안 남는 방문. 토스앱 길은 콘솔 분류 그대로)']
     if not a.no_ai and not notes:  # 11/1: 분석이 빠진 걸 사용자가 몰랐다("서치콘솔도 주기로 하지 않음?")
         out += ['', '⚠️ 오늘은 분석(할 일·서치콘솔 해석)이 빠졌어요. AI 사용 한도에 걸려 숫자만 보냈어요.']
     text = '\n'.join(out)
@@ -526,6 +565,7 @@ def main():
         text += '\n\nGA 못 읽은 곳\n' + '\n'.join(f'- {e}' for e in errs)
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / f'{day}.txt').write_text(text + '\n')
+    (OUT / f'{day}-full.txt').write_text('\n'.join(full) + '\n')
     (OUT / f'{day}-detail.txt').write_text('\n\n'.join([x['detail'] for x in secs] + [g['detail'] for g in gsc.values()]) + '\n')  # 유입·페이지 상세는 파일로만
     print(text)
     if not a.dry_run:
