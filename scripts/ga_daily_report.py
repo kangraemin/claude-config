@@ -482,19 +482,19 @@ def main():
         n, parts = notes.get(name, {}), []
         if 'web' in v:
             x = v['web']
-            t = f'방문 {x["users"]:.0f}' + (f'(전날 {x["prev"]:.0f})' if x['prev'] is not None else '')
+            t = f'방문 {x["users"]:.0f}명' + (f' (전날 {x["prev"]:.0f}명)' if x['prev'] is not None else '')
             if name in SPLIT_KR and x.get('pid'):
                 try:
                     c = kr_split(cl, x, day, raw=True)
-                    t += f' 국내 {c["국내"]:.0f}·외국 {c["외국"]:.0f}'
+                    t += f', 국내 {c["국내"]:.0f}명·외국 {c["외국"]:.0f}명'
                 except Exception:
                     pass
             parts.append(t)
         g = gsc.get(name, {}).get('day')
         if g and (g[1][0] or g[2][0]):
-            t = f'구글 {g[0]:%m/%d} 노출 {g[1][0]:,.0f}(전날 {g[2][0]:,.0f}) 클릭 {g[1][1]:,.0f}'
+            t = f'구글 {g[0]:%m/%d} 노출 {g[1][0]:,.0f} (전날 {g[2][0]:,.0f}), 클릭 {g[1][1]:,.0f}'
             if name in SPLIT_KR:
-                t += f' [외국 노출 {g[3]["외국"][0]:,.0f}]'
+                t += f', 외국 노출 {g[3]["외국"][0]:,.0f}'
             parts.append(t)
         if 'toss' in v:
             parts.append(f'토스 {v["toss"][0]:.0f}명')
@@ -505,11 +505,12 @@ def main():
         if total(v) < 5 and not (g and g[1][1]) and not any('+' in p and int(re.sub(r'\D', '', p.split('+')[1].split('회')[0]) or 0) >= 100 for p in parts if '+' in p):
             quiet.append(name)
             continue
-        out += ['', f'■ {name}  ' + ' · '.join(parts)]
+        # 사용자 11/1 "ㅁㄴㅇㄹ / - ㅁㄴㅇㄹ 이런 식으로 보내라고": 제목 줄 + '- ' 줄, 한 줄에 하나
+        out += ['', name] + [f'- {p}' for p in parts]
         if n.get('요약'):
-            out.append(f'  {n["요약"]}')
+            out.append(f'- {n["요약"]}')
         if n.get('할일'):
-            out.append(f'  → {n["할일"]}')
+            out.append(f'- 할 일: {n["할일"]}')
     if quiet:
         out += ['', '조용한 곳: ' + ', '.join(quiet)]
     full = [f'어제 {day:%m/%d}({"월화수목금토일"[day.weekday()]}) 서비스별 (긴 판)']
