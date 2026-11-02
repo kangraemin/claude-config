@@ -64,8 +64,12 @@ def send():
     js(t, FIRE + "const e=[...document.querySelectorAll('div,li,button')].find(e=>e.children.length==0&&e.innerText.trim()=='SKT 알뜰폰');e&&fire(e);return 1")
     time.sleep(2)
     # 전체 동의는 pointer 이벤트로는 안 켜지고 .click()만 먹는다(10/28)
-    js(t, "const e=[...document.querySelectorAll('[role=button]')].find(e=>/^전체 동의/.test(e.innerText.trim()));e&&e.click();return 1")
-    time.sleep(1)
+    # 통신사 시트가 닫히기 전에 누르면 안 켜진다(11/02) → '다음'이 켜질 때까지 다시 누른다
+    for _ in range(5):
+        js(t, "const e=[...document.querySelectorAll('[role=button]')].find(e=>/^전체 동의/.test(e.innerText.trim()));e&&e.click();return 1")
+        time.sleep(1.5)
+        if js(t, "const n=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()=='다음');return n?n.disabled:true") is False:
+            break
     js(t, FIRE + "const b=[...document.querySelectorAll('button')].find(b=>b.innerText.trim()=='다음');b&&fire(b);return 1")
     time.sleep(5)
     tx = text(t)
