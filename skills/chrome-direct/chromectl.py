@@ -284,11 +284,11 @@ def setup(wait_js=False):
 
 
 def osa(script, timeout=20):
-    r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=timeout)
+    r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, errors="replace", timeout=timeout)
     for _ in range(2):  # jxa()와 같은 일시 오류(-609 연결이 유효하지 않습니다 등)는 2초 뒤 다시
         if r.returncode and any(k in r.stderr for k in TRANSIENT + ("응용 프로그램이 실행 중이 아닙니다",)):
             time.sleep(2)
-            r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=timeout)
+            r = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, errors="replace", timeout=timeout)
         else:
             break
     if r.returncode:
@@ -301,11 +301,12 @@ def chrome_pid():
     --user-data-dir로 띄우면 AppleScript `tell application "Google Chrome"`이 그쪽을 잡는다(2026-10-22).
     그래서 Chrome 명령은 전부 JXA `Application(pid)`로 보낸다. 못 찾으면 None(이름으로 보냄)."""
     # 새 탭을 여는 `Google Chrome --profile-directory=…`도 잠깐 메인처럼 보인다 → 가장 오래 돈 것을 고른다
-    r = subprocess.run(["ps", "-axwwo", "pid=,etime=,args="], capture_output=True, text=True)
+    r = subprocess.run(["ps", "-axwwo", "pid=,etime=,rss=,args="], capture_output=True, text=True)
     best = None
     for line in r.stdout.splitlines():
-        pid, et, args = (line.split(None, 2) + ["", ""])[:3]
-        if args.startswith(CHROME_BIN) and "--type=" not in args and "--user-data-dir" not in args:
+        pid, et, rss, args = (line.split(None, 3) + ["", "", ""])[:4]
+        # 재시작 뒤 껍데기만 남은 옛 메인(RSS 수백 KB)을 고르면 모든 명령이 -2700으로 실패한다(2026-11-03)
+        if args.startswith(CHROME_BIN) and "--type=" not in args and "--user-data-dir" not in args and int(rss or 0) > 20000:
             d, _, hms = et.rpartition("-")
             secs = int(d or 0) * 86400 + sum(int(x) * 60 ** i for i, x in enumerate(reversed(hms.split(":"))))
             if best is None or secs > best[0]:
@@ -321,7 +322,7 @@ def jxa(body, timeout=20):
     pid = chrome_pid()
     app = str(pid) if pid else '"Google Chrome"'
     script = f"ObjC.import('Foundation'); var C = Application({app}); (function(){{ {body} }})()"
-    r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, timeout=timeout)
+    r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, errors="replace", timeout=timeout)
     # Chrome이 바쁘거나 Apple Event 연결이 잠깐 끊기면(-609 '연결이 유효하지 않습니다', -1728·'대상체를 가져올 수 없습니다')
     # 곧 풀린다. th_notify·sns_stats가 이걸로 자주 FAIL이어서 짧게 두 번 다시 해 본다(2026-10-25).
     for _ in range(2):
@@ -331,14 +332,14 @@ def jxa(body, timeout=20):
             if pid and f"Application({app})" in script:
                 script = script.replace(f"Application({app})", f"Application({pid})", 1)
                 app = str(pid)
-            r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, timeout=timeout)
+            r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, errors="replace", timeout=timeout)
         else:
             break
     if r.returncode and pid and "(-600)" in r.stderr:
         # Chrome을 실행 파일로 직접 띄우면(open/LaunchServices를 안 거침) pid로는 Apple Event가 안 간다(-600, 2026-10-22).
         # 그때는 이름으로 보낸다
         script = script.replace(f"Application({app})", 'Application("Google Chrome")', 1)
-        r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, timeout=timeout)
+        r = subprocess.run(["osascript", "-l", "JavaScript", "-e", script], capture_output=True, text=True, errors="replace", timeout=timeout)
     if r.returncode:
         raise RuntimeError(r.stderr.strip())
     out = r.stdout.rstrip("\n")
@@ -346,12 +347,13 @@ def jxa(body, timeout=20):
 
 
 def tabs(with_id=False):
-    # Retry when another session closes a tab mid-loop (-1719 invalid index)
+    # Retry when another session closes a tab or window mid-loop (-1719 invalid index, -1728 no such object,
+    # -2700 t[i] undefined: window list changed between the JXA calls; 11/3 08:20 reindex died on this)
     for i in range(5):
         try:
             out = _tabs_raw(); break
         except RuntimeError as e:
-            if "-1719" not in str(e) or i == 4: raise
+            if not any(c in str(e) for c in ("-1719", "-1728", "-2700")) or i == 4: raise
             time.sleep(0.5)
     rows = [l.split("\t") for l in out.splitlines() if l.strip()]
     return [r[:5] for r in rows] if with_id == True else rows if with_id == "full" else [r[:4] for r in rows]
@@ -401,8 +403,10 @@ def new_tab(url, profile=None, timeout=15, _retry=True):
         # 다른 세션이 같은 순간 연 탭을 집지 않게, 요청한 주소의 호스트와 맞는 새 탭만 고른다.
         # 다른 호스트로 바로 넘어가는 주소(로그인 등)는 시간이 반쯤 지나면 아무 새 탭이나 받는다.
         host = urllib.parse.urlsplit(url).netloc.removeprefix("www.")
-        if time.time() < end - timeout / 2:
-            new = [r for r in new if not host or host in r[3]]
+        if not host:  # about:blank는 호스트가 없다. 주소가 같은 탭만 받는다(win_split이 남의 새 탭을 집어 닫던 사고, 11/3)
+            new = [r for r in new if r[3] == url]
+        elif time.time() < end - timeout / 2:
+            new = [r for r in new if host in r[3]]
         if new:
             tid = "id:" + new[-1][4]
             # 메모리가 빠듯하면 뒤쪽 탭은 렌더가 멈춰 execute가 타임아웃난다. 새 탭을 앞으로 띄운다.
@@ -413,7 +417,8 @@ def new_tab(url, profile=None, timeout=15, _retry=True):
             return tid
     # 가끔 Chrome이 URL을 못 받아 탭이 안 생긴다. 한 번만 다시 연다(before를 새로 잡아 중복 탭 방지).
     if _retry:
-        now = [r for r in tabs(with_id=True) if r[4] not in before and urllib.parse.urlsplit(url).netloc.removeprefix("www.") in r[3]]
+        host = urllib.parse.urlsplit(url).netloc.removeprefix("www.")
+        now = [r for r in tabs(with_id=True) if r[4] not in before and (host in r[3] if host else r[3] == url)]
         if not now:
             return new_tab(url, profile, timeout, _retry=False)
         return "id:" + now[-1][4]
@@ -562,7 +567,7 @@ def rclick(match, sel=None, text=None):
     """Real mouse click (cliclick) at the element's screen position — for cross-origin
     iframes (Google sign-in button) and pages that ignore synthetic clicks."""
     pick = f"__all(document, {q(sel)}).filter(__vis)[0]" if sel else f"__byText({q(text)})"
-    js = FIND + f"""(() => {{ const e = {pick}; if (!e) return 'NOTFOUND'; e.scrollIntoView({{block:'center'}});
+    js = FIND + f"""(() => {{ const e = {pick}; if (!e) return 'NOTFOUND'; e.scrollIntoView({{block:'center',behavior:'instant'}});
   const b = e.getBoundingClientRect(); const top = window.outerHeight - window.innerHeight;
   return Math.round(window.screenX + b.left + b.width / 2) + ',' + Math.round(window.screenY + top + b.top + b.height / 2); }})()"""
     _t, win = ref(match)
