@@ -1,0 +1,10 @@
+#!/usr/bin/python3
+# 사용자가 터미널에서 직접 실행: 스크립트 하나에 24시간 동안 호출 상한을 더 준다. 에이전트는 훅에 막힌다.
+import json, os, sys, time
+if len(sys.argv) != 3 or not sys.argv[2].isdigit(): sys.exit('사용: headless-allow <호출자> <추가호출수>')
+p = os.path.expanduser('~/.claude/.headless-allow.json')
+try: d = json.load(open(p))
+except Exception: d = {}
+d[sys.argv[1]] = {'max': int(sys.argv[2]), 'until': time.time() + 86400}
+json.dump(d, open(p, 'w'), ensure_ascii=False)
+print(f'허용: {sys.argv[1]} +{sys.argv[2]}회, 24시간')

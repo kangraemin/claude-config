@@ -141,3 +141,8 @@
 - 저장 후 `CATALOG.md`에 한 줄 추가 → `git -C ~/claude-library add -A && git -C ~/claude-library commit -m "feat: [주제] 추가" && git -C ~/claude-library push` → `📚 library에 추가: [경로]` 한 줄로 알린다.
 - 미결 상태는 기록하지 않는다.
 <!-- learnings-for-claude:rules end -->
+
+## claude -p 상한 (2026-11-04, 젠더 측정이 Opus -p 약 2만 회로 주간 한도 40% 소진)
+- 스크립트에서 `claude -p`를 부르면 파일에 `CLAUDE_P_MAX=<총 호출 수>`를 적고 코드로 그 수에서 멈춘다. 100회가 넘으면 서브에이전트나 모델 없는 방식으로 줄인다.
+- `~/.local/bin/claude` 앞단이 호출을 세어 상한을 넘으면 막는다(스크립트 시간당 100·하루 400, Opus 시간당 40·하루 150, 전체 시간당 200·하루 800, 동시 8). 풀기는 사용자가 직접 `! ~/.claude/scripts/headless-allow <호출자> <수>`.
+- 사용량·토큰 질문에는 먼저 `python3 ~/.claude/scripts/headless_watch.py --report`로 호출자를 보고 답한다. 세션 비용 표시에는 `-p` 호출이 안 잡힌다.

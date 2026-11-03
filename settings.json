@@ -476,6 +476,15 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Bash|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 /Users/ram/.claude/hooks/headless-guard-hook.py"
+          }
+        ]
       }
     ],
     "SessionEnd": [
