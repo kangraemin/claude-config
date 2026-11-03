@@ -3,6 +3,8 @@
 
   gov24_status.py --match 통신판매업            → 로그인돼 있으면 바로 읽음, 아니면 카카오 간편인증 요청까지 하고 멈춤
   gov24_status.py --match 통신판매업 --approved → 사용자가 카톡에서 승인한 뒤 같은 탭에서 '인증 완료' → 내역 읽기
+  gov24_status.py --match 통신판매업 --req 20261029-16753184 → 그 접수번호 상세(진행상태·구청 메모)를 바로 읽음. 4일 넘은 건은 이걸 쓴다
+- 목록(plus.gov.kr)은 기본 최근 4일만 보여 준다(11/3: 10/29 건이 NOT_FOUND로 나옴). 목록의 NOT_FOUND는 '없다'가 아니다.
 - 마지막 줄: RESULT: OK <상태줄> | NEEDS_PHONE_APPROVAL | NOT_FOUND | FAIL <이유>  (종료코드 0 / 2 / 3 / 1)
 - 사람 몫: 카카오톡 인증 요청 승인 1번. 값(이름·생년월일·휴대폰)은 개인정보.md '## 대표자'에서 패턴으로 읽고 출력하지 않는다.
 - 왜 화면 조작인가: 정부24 신청 내역은 공개 API가 없고 간편인증이 iframe이다. 로그인 흐름은 gov24_chobon.py와 같다.
@@ -25,6 +27,7 @@ TABFILE = os.path.expanduser("~/.cache/gov24_status.tab")
 ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
 ap.add_argument("--match", required=True, help="찾을 민원 이름 일부 (예: 통신판매업)")
 ap.add_argument("--approved", action="store_true")
+ap.add_argument("--req", help="접수번호(예 20261029-16753184): 상세 화면에서 진행상태·구청 메모를 읽는다")
 ap.add_argument("--profile", default="Profile 1")
 ap.add_argument("--provider", default="카카오톡")
 ap.add_argument("--wait", type=int, default=0, help="요청 뒤 이 초만큼 승인을 기다리며 '인증 완료'를 계속 눌러 본다(10/30: 승인 뒤 늦게 --approved 하면 만료돼 로그인 안 됨)")
@@ -102,7 +105,23 @@ def finish_login(t):
     time.sleep(5)
 
 
+def read_req(t):
+    no = a.req.replace("-", "")
+    d = time.strftime("%Y%m%d")
+    c.goto(t, f"https://www.gov.kr/mw/AA040MyResultView.do?srvcSrchNm=&FROM_DATE={no[:8]}&TO_DATE={d}&BIZ_NO=&BIZ_PLACE_NM=&USER_DTL_SECT_CD=101&CAPP_REQ_NO={no}&chrger_name=&dept_name=&dept_telno=")
+    time.sleep(7)
+    lines = [x.strip() for x in c.js_json(t, "return document.body.innerText").split("\n") if x.strip()]
+    hits = [i for i, x in enumerate(lines) if a.match in x]
+    if not hits:
+        result("NOT_FOUND", f"접수번호 {a.req} 상세에 '{a.match}' 없음")
+    i = hits[0]
+    print("MEMO:", lines[i + 1][:300])  # 11/3: 취소 사유는 접수 목록 바로 다음 줄에 대괄호로 나온다
+    return lines[i].split("\t")[-1]
+
+
 def read_list(t):
+    if a.req:
+        return read_req(t)
     if "mbrAplySrvcList" not in c.js_json(t, "return location.href"):
         c.goto(t, LIST)
     wait_js(t, "return location.href.includes('mbrAplySrvcList')&&document.body.innerText.length>500", 30)
