@@ -456,7 +456,7 @@ def channel(src):
     return '다른 사이트'
 
 
-def src_line(x):
+def src_parts(x):
     """사용자 10/26 "어느 채널에서 들어왔는지도 서비스별로" + "정성스럽게" → 길별로 묶어 비중(방문 10번 이상) 또는 횟수로."""
     tot = sum(v[0] for _, v in x['src'])
     by = {}
@@ -464,8 +464,12 @@ def src_line(x):
         by[channel(d[0])] = by.get(channel(d[0]), 0) + v[0]
     top = sorted(by.items(), key=lambda kv: -kv[1])[:3]
     if tot >= 10:
-        return '- ' + ' · '.join(f'{k} {v / tot:.0%}' for k, v in top)
-    return '- ' + ' · '.join(f'{k} {v:.0f}번' for k, v in top)
+        return [f'{k} {v / tot:.0%}' for k, v in top]
+    return [f'{k} {v:.0f}번' for k, v in top]
+
+
+def src_line(x):
+    return '- ' + ' · '.join(src_parts(x))
 
 
 def bot(x):
@@ -512,7 +516,7 @@ def check(text):
             bad.append('뜻이 애매한 줄: ' + l)
     if '나빠진 것' not in text:
         bad.append('맨 위 나빠진 것 없음')
-    if len(text) > 3800:
+    if len(text) > 7600:  # send()가 칸 단위로 나눠 보내므로 2통까지 허용(11/4 유입 줄 추가)
         bad.append(f'너무 김 {len(text)}자')
     return bad
 
@@ -658,6 +662,7 @@ def main():
                     parts.append(f'국내 {c["국내"]:.0f}명, 외국 {c["외국"]:.0f}명')
                 except Exception:
                     pass
+            parts += [f'유입 {p}' for p in src_parts(x)] if x.get('src') else []  # 사용자 11/4 "들어온 채널도 적도록": 짧은 판에도 한 줄에 하나
         g = gsc.get(name, {}).get('day')
         if name in week_up:
             parts += week_up[name]
