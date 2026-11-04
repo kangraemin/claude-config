@@ -13,6 +13,7 @@
 import argparse
 import glob
 import os
+import random
 import re
 import sys
 import time
@@ -30,7 +31,7 @@ ap.add_argument("--approved", action="store_true")
 ap.add_argument("--req", help="접수번호(예 20261029-16753184): 상세 화면에서 진행상태·구청 메모를 읽는다")
 ap.add_argument("--profile", default="Profile 1")
 ap.add_argument("--provider", default="카카오톡")
-ap.add_argument("--wait", type=int, default=0, help="쓰지 않는다(11/4 승인 전 클릭으로 2번 실패, 요청 후 멈췄다가 승인 뒤 --approved가 성공). 요청 뒤 이 초만큼 승인을 기다리며 '인증 완료'를 계속 눌러 본다(10/30: 승인 뒤 늦게 --approved 하면 만료돼 로그인 안 됨)")
+ap.add_argument("--wait", type=int, default=280, help="기본 280초(토큰 약 5분). 20~40초 무작위 간격으로 승인 여부를 스스로 확인. 0이면 요청 후 멈추고 --approved로 이어 감(11/4 성공 경로). 요청 뒤 이 초만큼 승인을 기다리며 '인증 완료'를 계속 눌러 본다(10/30: 승인 뒤 늦게 --approved 하면 만료돼 로그인 안 됨)")
 a = ap.parse_args()
 
 
@@ -159,7 +160,7 @@ def main():
                     end = time.time() + a.wait
                     first = time.time() + 30  # 승인 전에 '인증완료'를 누르면 요청이 깨질 수 있어 30초 뒤부터 누른다
                     while time.time() < end:
-                        time.sleep(8)
+                        time.sleep(random.uniform(20, 40))  # 11/4 사용자 지시: "했어"를 기다리지 말고 무작위 간격으로 스스로 확인
                         if time.time() < first:
                             continue
                         # 11/4: 오류창을 안 읽어 '토큰 유효 시간 만료' 뒤에도 8분을 조용히 돌았다. 창이 뜨면 글을 찍고 닫는다
