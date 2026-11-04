@@ -9,7 +9,7 @@ from google.auth.transport.requests import AuthorizedSession
 site = sys.argv[1].rstrip('/') + '/'
 key = os.environ.get('GSC_SA_JSON', os.path.expanduser('~/.claude/ai-paper-analytics-sa.json'))
 s = AuthorizedSession(service_account.Credentials.from_service_account_file(key, scopes=['https://www.googleapis.com/auth/webmasters']))
-urls = sys.argv[2:] or [site] + re.findall(r'<loc>\s*(.*?)\s*</loc>', urllib.request.urlopen(site + 'sitemap.xml', timeout=20).read().decode())[1:5]
+urls = sys.argv[2:] or [site] + re.findall(r'<loc>\s*(.*?)\s*</loc>', urllib.request.urlopen(urllib.request.Request(site + 'sitemap.xml', headers={'User-Agent': 'Mozilla/5.0'}), timeout=20).read().decode())[1:5]
 props = [site, 'sc-domain:' + urllib.parse.urlsplit(site).netloc]
 for u in urls:
     for p in props:
