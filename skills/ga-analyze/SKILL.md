@@ -86,6 +86,17 @@ git commit -m "feat: GA4 snapshot tooling + baseline"
 
 이 구조는 **절대 바꾸지 말 것**. 미래의 비교가 깨진다. 필드를 추가하는 건 OK, 이름 변경/삭제는 ❌.
 
+## 아침 방문 리포트 (`~/.claude/scripts/ga_daily_report.py`, 텔레그램)
+- 다시 보내기: `python3 ~/.claude/scripts/ga_daily_report.py --day <어제> --force`. 보내지 않고 보기는 `--dry-run --no-ai`.
+- 숫자가 이상하면 말하기 전에 그 서비스를 직접 나눠 본다(시간·나라·기기·유입·페이지). 사이트도 직접 연다(11/5 "꿈해몽 웹도확인해").
+- 자동 접속이 몰려도 서비스를 통째로 빼지 않는다(11/5 "꿈해몽 방문왜없음").
+  - 봇 판정(`bot()`)에 걸리면 머문 방문과 검색·SNS 유입을 보여 준다.
+  - 실제 사례: 꿈해몽 11/4 전체 1,806명 중 싱가포르 직접 접속 1,717명, 사람은 약 89명.
+- 토스앱 0명이 16개 앱 전부면 수집 멈춤부터 의심한다.
+  - 그날을 담지 않은 파일은 0명이 아니라 '토스 숫자 못 읽음'으로 적는다.
+  - 수집은 `eodi-sns` 스킬의 th-notify 반복이 부른다. 옛 명령으로 다시 띄우면 빠지니 `ps`로 `toss_stats` 포함을 본다.
+  - 로그인이 풀리면 `chrome-direct/scenarios/toss_business_login.py send` → 문자 6자리만 받아 `code <6자리>`.
+
 ## 리포트 구조
 
 - **Headline**: 활성유저, 신규, 세션, 평균세션, engagement rate — vs prev
