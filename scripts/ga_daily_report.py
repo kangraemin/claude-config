@@ -191,6 +191,9 @@ def toss_by_service(day):
     if cur.get('error'):
         return {}, [], cur['error']
     d, p = str(day), str(day - dt.timedelta(days=1))
+    # 11/5: 수집이 10/31에 멈췄는데 16개 앱이 전부 '0명'으로 나왔다. 그날을 안 담은 파일은 0명이 아니라 '못 읽음'이다
+    if cur.get('to') and cur['to'] < d:
+        return {}, [], f'{cur["to"][5:].replace("-", "/")} 뒤로 수집이 멈춤'
     rows, zero = {}, []
     for x in cur['apps']:
         if x.get('error'):
@@ -544,6 +547,7 @@ def main():
     live = [x for x in secs if x['users'] >= 1]
     dead = [x['name'] for x in secs if x['users'] < 1]
     real = [x for x in live if not bot(x)]
+    bots_first = [x for x in live if bot(x)]
     try:
         gsc = gsc_by_service(day)
     except Exception as e:
@@ -564,6 +568,8 @@ def main():
     svc = {}
     for x in real:
         svc.setdefault(short(x['name']), {})['web'] = x
+    for x in bots_first:  # 11/5 "꿈해몽 방문왜없음": 자동 접속이 몰려도 서비스를 통째로 빼지 않고 사람에 가까운 수를 보인다
+        svc.setdefault(short(x['name']), {})['botweb'] = x
     for k in toss:
         svc.setdefault(k, {})['toss'] = toss[k]
     for k in sns:
@@ -576,7 +582,7 @@ def main():
     notes = {} if a.no_ai else ai_notes(svc)
     # 11/1 AI가 사람 29명(머문 방문 13)을 봇이라 했다 → 봇 판정은 규칙(bot())만. AI 말은 할 일에만 쓴다
     bots = [x for x in live if bot(x)]
-    total = lambda v: (v['web']['users'] if 'web' in v else 0) + (v['toss'][0] if 'toss' in v else 0)
+    total = lambda v: (v['web']['users'] if 'web' in v else 0) + (v['botweb']['engaged'] if 'botweb' in v else 0) + (v['toss'][0] if 'toss' in v else 0)
     wd = lambda d: f'{d:%m/%d}({"월화수목금토일"[d.weekday()]})'
     # 사용자 11/1 "납품받는다 생각하면": 맨 위에 '오늘 볼 것'(규칙으로 계산, AI 아님) — 나쁜 일·좋은 일을 나누고 할 일을 붙인다
     bad_n, good_n, dropped, week_up, reidx, lost, reraw, g_span = [], [], [], {}, [], [], [], ''
@@ -663,6 +669,16 @@ def main():
                 except Exception:
                     pass
             parts += [f'유입 {p}' for p in src_parts(x)] if x.get('src') else []  # 사용자 11/4 "들어온 채널도 적도록": 짧은 판에도 한 줄에 하나
+        if 'botweb' in v:
+            x = v['botweb']
+            av = x.get('avg7')
+            parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 하루 {av:.0f}명 방문)' if av is not None else ''))
+            parts.append(f'자동 접속 의심 {x["users"]:,.0f}명은 뺌')
+            by = {}
+            for d_, v_ in x.get('src') or []:
+                if channel(d_[0]) not in ('직접 접속', '출처 모름'):
+                    by[channel(d_[0])] = by.get(channel(d_[0]), 0) + v_[0]
+            parts += [f'유입 {k} {u:.0f}번' for k, u in sorted(by.items(), key=lambda kv: -kv[1])[:3]]
         g = gsc.get(name, {}).get('day')
         if name in week_up:
             parts += week_up[name]
@@ -708,14 +724,14 @@ def main():
             out += ['', title] + [f'- {x}' for x in names]
     note = []
     if bots:
-        note += [f'- 봇이라 뺌: {short(x["name"])} {x["users"]:.0f}명' for x in bots]
+        note += [f'- 봇이라 뺌: {short(x["name"])} {x["users"]:.0f}명' for x in bots if short(x['name']) not in shown]
     span = sns_span()
     if span:
         note.append(f'- SNS 조회는 {span} 사이 증가')
     if gsc:
         note.append('- 검색 숫자는 이틀 늦게 확정돼 그 날짜로 적음')
     if toss_err:
-        note.append(f'- 토스 콘솔 못 읽음')
+        note.append(f'- 토스 숫자 못 읽음: {toss_err}')
     if sns_err:
         note.append(f'- SNS 못 읽은 곳 {len(sns_err)}개')
     if not a.no_ai and not notes:
