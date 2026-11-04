@@ -485,6 +485,15 @@
             "command": "/usr/bin/python3 /Users/ram/.claude/hooks/headless-guard-hook.py"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 /Users/ram/.claude/hooks/sns-post-approval-gate.py"
+          }
+        ]
       }
     ],
     "SessionEnd": [
