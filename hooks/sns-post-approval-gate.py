@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""SNS 게시 허락 검사(사용자 11/4 "너 올리기전에나한테 허락받아", "훅으로막아").
+"""개인 계정 게시 허락 검사. 사용자 11/4 "이제는 올리라고 할 때만 올리지 말고"로 다른 계정은 검사하지 않는다.
+개인 계정은 10/22 "내가 올리라고 한 것만"이 그대로라 남긴다. 처음 만든 이유: 11/4 "너 올리기전에나한테 허락받아", "훅으로막아".
 Claude 세션의 Bash 게시 명령을, 사람이 보낸 마지막 메시지에 허락이 없으면 막는다(exit 2).
 - 허락은 대화 기록의 사람 메시지(origin.kind=human)에서만 읽는다. Claude가 쓴 글·다른 세션 메시지·예약 프롬프트는 허락이 아니다.
 - 미리보기(--dry 등, --post/--share 없는 실행)는 통과. 서브에이전트 게시는 막는다.
@@ -8,6 +9,7 @@ Claude 세션의 Bash 게시 명령을, 사람이 보낸 마지막 메시지에 
 import json, os, re, sys, time
 from datetime import datetime
 
+PERSONAL = re.compile(r'dev_ram|linkedin|hada\.io|kangraemin\.github', re.I)
 MAX_AGE = 3600  # 허락은 1시간 안에만 유효하다. 낮에 받은 '올려'로 저녁 일을 올리지 않게
 
 FLAGGED = {'th_post.py': '--post', 'x_post.py': '--post', 'yt_post.py': '--post', 'th_reply.py': '--post', 'x_reply.py': '--post',
@@ -144,8 +146,9 @@ def main():
     except ValueError: return 0
     if d.get('tool_name') != 'Bash': return 0
     if os.environ.get('CLAUDE_CODE_ENTRYPOINT') == 'sdk-cli': return 0  # 예약 무인 실행(사람이 없다)
-    what = posting_in((d.get('tool_input') or {}).get('command') or '')
-    if not what: return 0
+    cmd = (d.get('tool_input') or {}).get('command') or ''
+    what = posting_in(cmd)
+    if not what or not PERSONAL.search(cmd): return 0
     tp = d.get('transcript_path') or ''
     if d.get('agent_id') or '/subagents/' in tp:
         print(f'게시 차단: {what}. 서브에이전트는 게시할 수 없습니다. 메인 세션에서 사용자 허락을 받고 올리세요.', file=sys.stderr); return 2
