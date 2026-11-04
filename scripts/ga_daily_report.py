@@ -673,7 +673,7 @@ def main():
             x = v['botweb']
             av = x.get('avg7')
             parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 하루 {av:.0f}명 방문)' if av is not None else ''))
-            parts.append(f'자동 접속 의심 {x["users"]:,.0f}명은 뺌')
+            parts.append(f'전체 {x["users"]:,.0f}명은 자동 접속이 섞여 안 믿음')
             by = {}
             for d_, v_ in x.get('src') or []:
                 if channel(d_[0]) not in ('직접 접속', '출처 모름'):
