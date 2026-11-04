@@ -6,6 +6,9 @@ H = os.path.expanduser('~/.claude')
 BIN = os.path.expanduser('~/.local/bin/claude')
 SHIM, REAL = H + '/scripts/claude_shim.sh', H + '/.headless-real'
 LEDGER, HIST, STATE = H + '/.headless-ledger.jsonl', H + '/.headless-usage-hist', H + '/.headless-watch.json'
+PIDS, VERS = H + '/.headless-pids', os.path.expanduser('~/.local/share/claude/versions/')
+HEAD = re.compile(r'^\s*(\S*(?:/claude|/versions/[\d.]+))\s(?:.*\s)?(?:-[A-Za-z]*p[A-Za-z]*|--print)\s')
+ALERTED = {}
 RISE, WINDOW, COOLDOWN = 3.0, 3600, 3 * 3600  # 1시간에 3%p 이상이면 알림(11/4 사고 때 시간당 약 3%p)
 
 def send(text):
@@ -31,7 +34,7 @@ def rows(sec=86400):
 
 def live():
     r = subprocess.run(['ps', '-axo', 'pid=,etime=,command='], capture_output=True, text=True).stdout
-    return [l.strip()[:90] for l in r.splitlines() if re.search(r'(/claude|/versions/[\d.]+)\s(.*\s)?(-p|--print)\s', l + ' ') and 'headless_' not in l and 'claude_shim' not in l]
+    return [l.strip()[:90] for l in r.splitlines() if re.search(r'^\s*\d+\s+\S+\s+\S*(?:/claude|/versions/[\d.]+)\s(?:.*\s)?(?:-[A-Za-z]*p[A-Za-z]*|--print)\s', l + ' ')]
 
 def report():
     out = ['claude -p 호출 집계']
@@ -49,6 +52,62 @@ def ensure_shim():
         if 'versions' in t:
             open(REAL, 'w').write(t)
             os.unlink(BIN); shutil.copy2(SHIM, BIN); os.chmod(BIN, 0o755)
+    elif open(BIN, 'rb').read() != open(SHIM, 'rb').read():
+        os.unlink(BIN); shutil.copy2(SHIM, BIN); os.chmod(BIN, 0o755)
+
+def once(key, text, sec=3600):
+    now = time.time()
+    if now - ALERTED.get(key, 0) < sec: return
+    ALERTED[key] = now
+    try: send(text)
+    except Exception as e: print('send', e, file=sys.stderr)
+
+def enforce():
+    ps = subprocess.run(['ps', '-axo', 'pid=,ppid=,command='], capture_output=True, text=True).stdout
+    procs = {}
+    for l in ps.splitlines():
+        p = l.split(None, 2)
+        if len(p) == 3: procs[p[0]] = (p[1], p[2])
+    sus = [(pid, v) for pid, v in procs.items() if HEAD.search(v[1] + ' ')]
+    if not sus: return
+    try: known = set(open(PIDS).read().split())
+    except FileNotFoundError: known = set()
+    for pid, (ppid, cmd) in sus:
+        if pid in known: continue
+        exe = cmd.split()[0]
+        pexe = procs.get(ppid, ('', 'x'))[1].split()[0]
+        if os.path.basename(pexe) == 'claude' or '/versions/' in pexe: continue  # Claude Code 내부 호출
+        parent = procs.get(ppid, ('', '?'))[1][:80]
+        if exe.startswith(VERS):
+            os.kill(int(pid), 15)
+            once('kill:' + parent, f'앞단 안 거친 claude -p 종료\n- PID {pid}\n- 부모: {parent}')
+        else:
+            once('other:' + exe, f'다른 경로의 claude -p 발견\n- {exe[:80]}\n- 부모: {parent}')
+
+def tamper():
+    import hashlib
+    names = ['scripts/headless_guard.py', 'scripts/headless_watch.py', 'scripts/claude_shim.sh', 'scripts/headless-allow', 'hooks/headless-guard-hook.py']
+    h = hashlib.sha256()
+    for n in names: h.update(open(H + '/' + n, 'rb').read())
+    try: st = json.load(open(STATE))
+    except Exception: st = {}
+    d = h.hexdigest()
+    if st.get('hash') and st['hash'] != d: once('tamper', '가드 파일이 바뀜\n- 사용자 지시가 없었다면 확인 필요', 60)
+    st['hash'] = d; json.dump(st, open(STATE, 'w'))
+    if 'headless-guard-hook' not in open(H + '/settings.json').read(): once('nohook', '가드 훅이 설정에서 빠짐\n- 작성 검사가 꺼진 상태')
+
+def daemon():
+    n = 0
+    while True:
+        try:
+            ensure_shim(); enforce()
+            if n % 60 == 0: usage(); tamper()
+            if n % 720 == 0 and os.path.exists(PIDS):
+                keep = open(PIDS).read().split()[-3000:]
+                open(PIDS, 'w').write('\n'.join(keep) + '\n')
+        except Exception as e:
+            print('watch', e, file=sys.stderr, flush=True)
+        n += 1; time.sleep(5)
 
 def usage():
     try: st = json.load(open(STATE))
@@ -81,5 +140,6 @@ def usage():
 if __name__ == '__main__':
     if '--send' in sys.argv: send(sys.argv[sys.argv.index('--send') + 1])
     elif '--report' in sys.argv: print(report())
+    elif '--daemon' in sys.argv: daemon()
     else:
-        ensure_shim(); usage()
+        ensure_shim(); enforce(); usage(); tamper()

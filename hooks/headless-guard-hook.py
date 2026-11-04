@@ -23,7 +23,10 @@ if t in ('Write', 'Edit'):
     if GUARD.search(os.path.basename(p)) or p.endswith('/.local/bin/claude'):
         block('[headless-guard] 가드 파일은 에이전트가 고치지 않는다. 고칠 일이면 사용자에게 알린다.')
     if p.endswith(('.py', '.sh', '.js', '.mjs', '.ts', '.zsh', '.bash')) or '.' not in os.path.basename(p):
-        need_cap(i.get('content') or i.get('new_string') or '', p)
+        txt = i.get('content') or i.get('new_string') or ''
+        if '.local/share/claude/versions' in txt: block('[headless-guard] 스크립트에 실제 실행 파일 경로를 적지 않는다. `claude`로 부른다.')
+        if GUARD.search(txt): block('[headless-guard] 가드 파일을 건드리는 스크립트는 에이전트가 쓰지 않는다.')
+        need_cap(txt, p)
 elif t == 'Bash':
     c = i.get('command', '')
     if GUARD.search(c) and not re.search(r'headless_watch\.py\s+--report', c) and re.search(r'headless-allow|launchctl\s+(unload|bootout|remove|disable)|\brm\b|\bmv\b|\bcp\b|sed\s+-i|>\s*\S*(headless|claude_shim)|\bchmod\b|\bunlink\b', c):

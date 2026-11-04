@@ -27,7 +27,7 @@ def caller():
 
 def live():
     r = subprocess.run(['ps', '-axo', 'command='], capture_output=True, text=True).stdout
-    return sum(1 for l in r.splitlines() if re.search(r'(/claude|/versions/[\d.]+)\s(.*\s)?(-p|--print)\s', l + ' ') and 'headless_guard' not in l and 'claude_shim' not in l)
+    return sum(1 for l in r.splitlines() if re.search(r'^\s*\S*(?:/claude|/versions/[\d.]+)\s(?:.*\s)?(?:-[A-Za-z]*p[A-Za-z]*|--print)\s', l + ' '))
 
 def notify(key, text):
     try: seen = json.load(open(SENT))
@@ -40,7 +40,11 @@ def notify(key, text):
 
 def main():
     a = sys.argv[1:]
-    model = a[a.index('--model') + 1] if '--model' in a and a.index('--model') + 1 < len(a) else os.environ.get('ANTHROPIC_MODEL', 'default')
+    model = os.environ.get('ANTHROPIC_MODEL', 'default')
+    for n, x in enumerate(a):
+        if x == '--model' and n + 1 < len(a): model = a[n + 1]; break
+        if x.startswith('--model='): model = x.split('=', 1)[1]; break
+    heavy = lambda m: not re.search('haiku|sonnet', m.lower())  # 모델 미지정도 Opus로 친다
     me, now = caller(), time.time()
     try: allow = json.load(open(ALLOW))
     except Exception: allow = {}
@@ -60,12 +64,12 @@ def main():
             except Exception: pass
         hr = [r for r in rows if now - r['t'] < 3600]
         c = lambda rs, fn: sum(1 for r in rs if fn(r))
-        mine, op = (lambda r: r['c'] == me), (lambda r: 'opus' in r['m'].lower())
+        mine, op = (lambda r: r['c'] == me), (lambda r: heavy(r['m']))
         over = None
         if c(hr, mine) >= lim['caller_hr'] + extra: over = f"이 스크립트 시간당 {lim['caller_hr'] + extra}회"
         elif c(rows, mine) >= lim['caller_day'] + extra: over = f"이 스크립트 하루 {lim['caller_day'] + extra}회"
-        elif 'opus' in model.lower() and c(hr, op) >= lim['opus_hr'] + extra: over = f"Opus 시간당 {lim['opus_hr'] + extra}회"
-        elif 'opus' in model.lower() and c(rows, op) >= lim['opus_day'] + extra: over = f"Opus 하루 {lim['opus_day'] + extra}회"
+        elif heavy(model) and c(hr, op) >= lim['opus_hr'] + extra: over = f"Opus 시간당 {lim['opus_hr'] + extra}회"
+        elif heavy(model) and c(rows, op) >= lim['opus_day'] + extra: over = f"Opus 하루 {lim['opus_day'] + extra}회"
         elif len(hr) >= lim['all_hr'] + extra: over = f"전체 시간당 {lim['all_hr'] + extra}회"
         elif len(rows) >= lim['all_day'] + extra: over = f"전체 하루 {lim['all_day'] + extra}회"
         elif live() > lim['live'] + extra: over = f"동시 {lim['live'] + extra}개"
@@ -86,5 +90,5 @@ try:
 except SystemExit:
     raise
 except Exception as e:
-    print(f'[headless-guard] 오류, 통과: {e}', file=sys.stderr)
-    sys.exit(0)
+    print(f'[headless-guard] 오류, 막음: {e}', file=sys.stderr)
+    sys.exit(75)
