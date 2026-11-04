@@ -23,6 +23,7 @@ ap.add_argument('--country', help='비교로 붙일 국가 ID (예: KR)')
 ap.add_argument('--label', default='국내')
 ap.add_argument('--out', required=True)
 ap.add_argument('--profile', default='Profile 1')
+ap.add_argument('--expect', help='화면 글자에 있어야 내보내는 정규식(예: 국내 줄 숫자) — 없으면 FAIL')
 a = ap.parse_args()
 
 p = f'_u.date00={a.start}&_u.date01={a.end}'
@@ -40,8 +41,18 @@ try:
     time.sleep(12)
     c.shot(t, '/tmp/ga_report_pdf.png')  # 앞으로 띄워야 Angular 화면이 그려진다
     if a.country:
-        c.js_json(t, "document.querySelectorAll('mat-slide-toggle button[aria-checked=false]').forEach(b=>b.click()); return 1")
-        time.sleep(6)
+        # 11/4: 같은 스위치가 화면에 둘(보이는 것·숨은 것)이고 상태를 공유한다. 전부 누르면 두 번 뒤집혀 꺼진 채 PDF가 나온다 → 하나만 누르고 켜졌는지 본다.
+        for _ in range(4):
+            if c.js_json(t, "const u=document.querySelector('mat-slide-toggle button'); return u&&u.getAttribute('aria-checked')=='true'"):
+                break
+            c.js_json(t, "document.querySelector('mat-slide-toggle button').click(); return 1")
+            time.sleep(8)
+        else:
+            print('RESULT: FAIL 비교(' + a.label + ') 토글이 안 켜짐'); sys.exit(1)
+    if a.expect:
+        body = c.js_json(t, "return document.body.innerText") or ''
+        if not __import__('re').search(a.expect, body):
+            print('RESULT: FAIL 화면에 기대값 없음: ' + a.expect); sys.exit(1)
     before = set(glob.glob(DL + '/*.pdf'))
     c.js_json(t, "const b=[...document.querySelectorAll('button')].find(b=>b.offsetParent&&b.getAttribute('aria-label')=='이 보고서 공유'); b.click(); return 1")
     time.sleep(3)
