@@ -30,7 +30,7 @@ ap.add_argument("--approved", action="store_true")
 ap.add_argument("--req", help="접수번호(예 20261029-16753184): 상세 화면에서 진행상태·구청 메모를 읽는다")
 ap.add_argument("--profile", default="Profile 1")
 ap.add_argument("--provider", default="카카오톡")
-ap.add_argument("--wait", type=int, default=0, help="요청 뒤 이 초만큼 승인을 기다리며 '인증 완료'를 계속 눌러 본다(10/30: 승인 뒤 늦게 --approved 하면 만료돼 로그인 안 됨)")
+ap.add_argument("--wait", type=int, default=0, help="쓰지 않는다(11/4 승인 전 클릭으로 2번 실패, 요청 후 멈췄다가 승인 뒤 --approved가 성공). 요청 뒤 이 초만큼 승인을 기다리며 '인증 완료'를 계속 눌러 본다(10/30: 승인 뒤 늦게 --approved 하면 만료돼 로그인 안 됨)")
 a = ap.parse_args()
 
 
@@ -162,6 +162,16 @@ def main():
                         time.sleep(8)
                         if time.time() < first:
                             continue
+                        # 11/4: 오류창을 안 읽어 '토큰 유효 시간 만료' 뒤에도 8분을 조용히 돌았다. 창이 뜨면 글을 찍고 닫는다
+                        msg = c.js_json(tab, """const f=document.querySelector('iframe[src*=simpleCert]'); if(!f) return '';
+                          const b=[...f.contentDocument.querySelectorAll('button,a')].find(e=>e.offsetParent&&e.innerText.trim()=='확인'); if(!b) return '';
+                          let p=b; for(let i=0;i<5&&p.parentElement;i++){p=p.parentElement; if(p.innerText.length>12) break}
+                          const t=p.innerText.replace(/\\s+/g,' ').slice(0,200); b.click(); return t""")
+                        if msg:
+                            print("DIALOG:", msg, flush=True)
+                            if "만료" in msg or "닫고 다시" in msg:
+                                raise Fail("인증 토큰 만료: " + msg)
+                            time.sleep(2)
                         c.js_json(tab, f"""const f=document.querySelector('iframe[src*=simpleCert]'); if(!f) return 0;
                           const b=[...f.contentDocument.querySelectorAll('button,a')].find(e=>e.innerText&&e.innerText.replace(/\\s/g,'').includes('인증완료')&&e.offsetParent);
                           if(b) b.click(); return 1""")
