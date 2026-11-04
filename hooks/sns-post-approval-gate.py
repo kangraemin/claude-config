@@ -20,8 +20,8 @@ READ_ONLY = {'grep', 'rg', 'egrep', 'cat', 'sed', 'awk', 'ls', 'head', 'tail', '
 EXEC_HEREDOC = re.compile(r'^\s*(?:\S+=\S+\s+)*(?:python3?|bash|sh|zsh|node)\b')
 CLICK = re.compile(r'\.click\(\)')
 BUTTON = re.compile(r"게시|공유하기|tweetButton|['\"](?:Post|Share)['\"]")
-APPROVE = re.compile(r'올려|올리자|게시해|업로드해')
-DENY = re.compile(r'올려\s*(놨|놓|뒀|둔|있|서|야|도\s*되|도\s*돼\s*\?)|왜\s*올|안\s*올|못\s*올|올리지|말고|하지\s*마|[?？]\s*$')
+APPROVE = re.compile(r'올려|올리자|올리라|게시해|업로드해')  # 11/4 사용자 '좀 올리라고'를 못 읽어 막았다
+DENY = re.compile(r'누가|언제|올리라고?\s*(했|한|그랬|그런)\s*(냐|니|어|적)|올려\s*(놨|놓|뒀|둔|있|서|야|도\s*되|도\s*돼\s*\?)|왜\s*올|안\s*올|못\s*올|올리지|말고|하지\s*마|[?？]\s*$')
 SHORT_OK = re.compile(r'^\s*(ㅇㅇ+|응|네|예|그래|좋아|ㄱㄱ?|고고|해|해라|\d번)[.!\s]*$')
 ASKED = re.compile(r'올릴까요|올려도 될까요|올려도 돼요|허락해\s*주')
 
