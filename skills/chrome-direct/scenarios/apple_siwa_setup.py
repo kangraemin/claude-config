@@ -7,6 +7,7 @@
 전제: Chrome Profile 1에 Apple Developer 로그인. 로그아웃이면 RESULT: BLOCKED login.
   로그인 순서(2026-11-05 확인): idmsa 화면에서 '패스키로 로그인' 실제 클릭 → Mac 시트 '계속'.
   이메일칸 드롭다운은 패스키 항목을 눌러도 시트가 안 뜰 수 있고, 저장 비밀번호가 채워지면 틀린 값일 수 있다.
+  Mac 패스키 시트가 cliclick 클릭을 무시하면 `cliclick kp:return`으로 확인한다(2026-11-06 확인).
 왜 화면 조작: Sign in with Apple 설정은 App Store Connect API로 만들 수 없다.
 함정:
   - 키 주소는 keys/가 아니라 authkeys/. 키 파일은 한 번만 받을 수 있어 받자마자 --out으로 옮긴다(600).
