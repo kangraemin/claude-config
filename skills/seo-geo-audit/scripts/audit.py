@@ -163,7 +163,7 @@ for u, st, final, hd, h in res:
     lang = (re.search(r'<html[^>]+lang="([^"]+)"', h) or [None, None])[1]
     body = text_of(h)
     if not lang: note('WARN', u, 'html lang 없음')
-    elif len(re.findall(r'[가-힣]', body)) > 0.3 * max(1, len(re.findall(r'[A-Za-z가-힣]', body))) and not lang.lower().startswith('ko'):
+    elif len(re.findall(r'[가-힣]', body)) > 0.3 * max(1, len(re.findall(r'[A-Za-z가-힣\u3040-\u30ff\u4e00-\u9fff]', body))) and not lang.lower().startswith('ko'):
         note('WARN', u, f'본문은 한국어인데 html lang="{lang}" — ko로(og:locale도 ko_KR)')
     if t:
         parts = [x.strip() for x in re.split(r'[|—–-]', t) if x.strip()]
