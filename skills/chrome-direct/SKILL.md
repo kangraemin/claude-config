@@ -17,6 +17,7 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 
 | Script | What it does | Kind | Verified |
 |---|---|---|---|
+| `etax_pay.py <전자납부번호> [--submit]` | 서울시 이택스 지방세 조회(기본), `--submit`이면 카카오페이 카톡결제 요청 후 폰 승인 대기·완료 확인(Profile 1, tmux -L gh). 사용자가 그 건 납부를 지시했을 때만 | Write | 조회+납부 끝난 건 NOT_PAYABLE 경로는 스크립트로 실행, 납부 경로는 2026-11-05 같은 순서를 단계별로 성공(스크립트 통째 실행은 미검증) |
 | `dc_post.py --gall mukbang --title T --body-file f [--submit] [--captcha X]` | 디시 마이너 갤 유동 글쓰기(기본 dry-run, 중복 시 DUPLICATE, 보안문자는 png 저장 후 BLOCKED, tmux -L gh에서) | Write | yes (10/30 mukbang no=1188) |
 | `fmkorea_signup.py [--submit] / --verify / --phone / --phone-code N` | 에펨코리아 먹맵 계정 가입(naver.com 메일만 허용 → 오구리웍스 네이버 메일, 인증 링크는 네이버 메일에서, 휴대폰 문자 인증까지, 멱등 EXISTS, tmux -L gh) | Write | partial (10/30 가입·메일인증·로그인 확인, 문자 인증번호 대기) |
 | `hn_post.py --signup/--login/--post --draft f [--submit]` | Hacker News 먹맵 계정 가입(아이디·비번만) + Show HN 게시(Profile 7, tmux -L gh). 새 계정은 /showlim("Show HN 임시 제한")으로 게시 막힘 | Write | partial (10/30 가입 OK, Show HN 제한으로 미게시) |
