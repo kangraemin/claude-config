@@ -8,6 +8,7 @@
   그 뒤: gh secret set CLOUDFLARE_API_TOKEN < /tmp/cf_token && rm /tmp/cf_token
 같은 이름 토큰이 이미 있으면 지우지 않고 새로 하나 더 만든다(값은 생성 때만 나온다).
 2026-10-28 ai-paper(paper-digest.app) Vercel→Workers 이관 때 GitHub Actions 배포 토큰으로 만듦(tmux -L gh 창에서 실행).
+2026-11-05 러너스하이 서버 배포 토큰도 이 스크립트로 만듦. DNS 전환까지 하려면 --zone-perms에 "DNS Write"를 넣는다.
 """
 import json, os, time
 from _common import Blocked, emit, parser, run, tab
