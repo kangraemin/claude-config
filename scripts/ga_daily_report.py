@@ -449,7 +449,8 @@ def channel(src):
     """GA sessionSource → 사람이 바로 알아듣는 길 이름. 모르는 사이트는 '다른 사이트'."""
     x = src.lower()
     for keys, name in [(('(direct)',), '직접 접속'), (('(not set)',), '출처 모름'),
-                       (('chatgpt', 'perplexity', 'claude.ai', 'gemini', 'copilot'), 'AI 답변'),
+                       (('chatgpt', 'openai'), 'ChatGPT'), (('perplexity',), '퍼플렉시티'), (('claude.ai',), '클로드'), (('gemini',), '제미나이'), (('copilot',), '코파일럿'),  # 11/5 "AI 답변 어딘진 모름?": 묶지 않는다
+                       
                        (('kin.naver',), '지식iN'), (('cafe.naver', 'blog.naver'), '네이버 카페·블로그'),
                        (('naver',), '네이버 검색'), (('google',), '구글 검색'), (('bing', 'daum', 'duckduckgo'), '다른 검색'),
                        (('threads',), '스레드'), (('instagram',), '인스타'), (('youtube',), '유튜브'), (('t.co', 'x.com', 'twitter'), 'X'),
