@@ -461,7 +461,7 @@ def short(name):
     """'제주 숙소 (jeju-stay)'·'Ram's tech blog - GA4' 같은 꼬리를 뗀다."""
     n = re.sub(r'\s*(\([^)]*\)|- GA4)$', '', name) or name
     n = re.sub(r'(?<=[가-힣])\s+[A-Za-z][\w-]*$', '', n)
-    return {'MukMap': '먹맵', "Ram's tech blog": '개발 블로그', '오늘꿈해몽': '꿈해몽', 'forge-survivor-app': '강화 서바이버 앱 소개 페이지', 'claude inspector': '클로드 인스펙터', 'ai-paper': 'AI 논문 요약'}.get(n, n)
+    return {'MukMap': '먹맵', "Ram's tech blog": '개발 블로그', '오늘꿈해몽': '꿈해몽', 'forge-survivor-app': '강화 서바이버 스토어 앱', 'claude inspector': '클로드 인스펙터', 'ai-paper': 'AI 논문 요약'}.get(n, n)
 
 
 def channel(src):
