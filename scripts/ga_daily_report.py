@@ -521,7 +521,8 @@ def check(text):
     """보내기 전 점검(사용자 11/1 "납품받는다 생각하면"). 걸린 것 목록을 돌려준다."""
     bad, L = [], text.split('\n')
     titles = [l for i, l in enumerate(L) if l and not l.startswith('- ') and i and not L[i - 1].strip()]
-    dup = {t for t in titles if titles.count(t) > 1}
+    SUBS = {'웹', '토스', '유입', '노출'}
+    dup = {t for t in titles if titles.count(t) > 1 and t not in SUBS}
     if dup:
         bad.append('같은 칸이 두 번: ' + ', '.join(dup))
     for i, l in enumerate(L):  # 사용자 11/1 형식: '제목' + '- 짧은 줄'만
@@ -532,12 +533,14 @@ def check(text):
                 bad.append('너무 긴 줄: ' + l[:30])
             if ', ' in l and l.count(', ') >= 2:
                 bad.append('나열 줄: ' + l[:30])
+        elif l.startswith('[') and l.endswith(']'):
+            continue  # 서비스 머리줄(사용자 11/7 웹·토스·유입·노출 네 칸)
         elif i and L[i - 1].strip():
             bad.append('- 없는 줄: ' + l[:30])
         elif len(l) > 20:
             bad.append('제목이 김: ' + l[:30])
     for l in L:
-        if l.startswith('- 구글') and not re.search(r'\d\d/\d\d', l):
+        if l.startswith(('- 구글 노출', '- 구글 클릭')) and not re.search(r'\d\d/\d\d', l):
             bad.append('날짜 없는 구글 줄: ' + l)
         if re.search(r'사용자 \d|\+\d[\d,]*회$', l) and '조회' not in l and '조회' not in l:
             bad.append('뜻이 애매한 줄: ' + l)
@@ -686,54 +689,49 @@ def main():
     good_n_txt = [t for _, t in sorted(good_n, key=lambda u: -u[0])][:3]
     body = []
     for name, v in sorted(svc.items(), key=lambda kv: -total(kv[1])):
-        n, parts = notes.get(name, {}), []
-        # 사용자 11/7: 모든 서비스가 같은 네 줄로 시작한다(웹 어제·웹 30일·토스앱 어제·토스앱 30일). 없는 채널은 '없음'
-        fixed = []
+        n = notes.get(name, {})
+        # 사용자 11/7 "웹 / 토스 / 유입 / 노출 이렇게 보내도록해": 모든 서비스가 같은 네 칸. 없는 칸은 '- 없음'
+        web_l, toss_l, src_l, exp_l = [], [], [], []
         wx = v.get('web') or v.get('botweb')
         if wx:
             av = wx.get('avg7')
-            fixed.append(f'웹 어제 {wx["users"]:,.0f}명' + (f' (평소 {av:.0f}명)' if av is not None else ''))
-            fixed.append(f'웹 최근 30일 {wx["m30"]:,.0f}명' if wx.get('m30') is not None else '웹 최근 30일 집계 전')
-        else:
-            fixed += ['웹 없음']
-        if 'toss' in v:
-            fixed.append(f'토스앱 어제 {v["toss"][0]:,.0f}명')
-            t30 = v['toss'][2] if len(v['toss']) > 2 else None
-            fixed.append(f'토스앱 최근 30일 {t30:,.0f}명' if t30 is not None else '토스앱 최근 30일 확인 안 됨')
-        else:
-            fixed += ['토스앱 출시 전' if short(name) in TOSS_PREPARE else '토스앱 없음']
+            web_l.append(f'어제 {wx["users"]:,.0f}명' + (f' (평소 {av:.0f}명)' if av is not None else ''))
+            web_l.append(f'최근 30일 {wx["m30"]:,.0f}명' if wx.get('m30') is not None else '최근 30일 집계 전')
+            if wx.get('engaged') is not None:
+                ea = wx.get('eavg7')
+                web_l.append(f'실제로 머문 방문 {wx["engaged"]:.0f}회' + (f' (평소 {ea:.0f}회)' if ea is not None else ''))
+            if wx.get('botday') or 'botweb' in v:
+                web_l.append('자동 접속이 섞여 머문 방문으로 봄')
         if 'web' in v:
             x = v['web']
-            if x.get('engaged') is not None:
-                ea = x.get('eavg7')
-                parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 {ea:.0f}회)' if ea is not None else ''))
-            if x.get('botday'):
-                parts.append('웹 방문엔 자동 접속이 섞임 → 머문 방문으로 봄')
             hs = [(h, u) for h, u in x.get('hosts') or [] if h and h != '(not set)']
-            if len(hs) > 1 or (hs and GAME_SVC in name):  # 사용자 11/1 "itch인지 뭐 다른데인지 이야기를 해줘야": 어느 사이트로 들어왔는지
-                parts += [f'{host_name(h)} {u:.0f}명' for h, u in hs]
+            if len(hs) > 1 or (hs and GAME_SVC in name):  # 사용자 11/1 "itch인지 뭐 다른데인지 이야기를 해줘야"
+                web_l += [f'{host_name(h)} {u:.0f}명' for h, u in hs]
             if name in SPLIT_KR and x.get('pid'):
                 try:
                     c = kr_split(cl, x, day, raw=True)
-                    parts.append(f'국내 {c["국내"]:.0f}명, 외국 {c["외국"]:.0f}명')
+                    web_l.append(f'국내 {c["국내"]:.0f}명, 외국 {c["외국"]:.0f}명')
                 except Exception:
                     pass
-            parts += [f'유입 {p}' for p in src_parts(x)] if x.get('src') else []  # 사용자 11/4 "들어온 채널도 적도록": 짧은 판에도 한 줄에 하나
+            src_l += src_parts(x) if x.get('src') else []
         if 'botweb' in v:
             x = v['botweb']
-            av = x.get('eavg7')
-            parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 {av:.0f}회)' if av is not None else ''))
-            parts.append('웹 방문엔 자동 접속이 섞임 → 머문 방문으로 봄')
             by = {}
             for d_, v_ in x.get('src') or []:
                 if channel(d_[0]) not in ('직접 접속', '출처 모름'):
                     by[channel(d_[0])] = by.get(channel(d_[0]), 0) + v_[0]
-            parts += [f'유입 {k} {u:.0f}번' for k, u in sorted(by.items(), key=lambda kv: -kv[1])[:3]]
+            src_l += [f'{k} {u:.0f}번' for k, u in sorted(by.items(), key=lambda kv: -kv[1])[:3]]
+        if 'toss' in v:
+            toss_l.append(f'어제 {v["toss"][0]:,.0f}명')
+            t30 = v['toss'][2] if len(v['toss']) > 2 else None
+            toss_l.append(f'최근 30일 {t30:,.0f}명' if t30 is not None else '최근 30일 확인 안 됨')
+        elif short(name) in TOSS_PREPARE:
+            toss_l.append('출시 전')
         g = gsc.get(name, {}).get('day')
         if name in week_up:
-            parts += week_up[name]
+            exp_l += week_up[name]
         elif g and max(g[1][0], g[2][0]) >= 10 and name not in dropped:  # 줄어든 곳은 맨 위에 있다
-            parts.append(f'구글 노출 {g[1][0]:,.0f}회, 클릭 {g[1][1]:,.0f}회 ({g[0]:%m/%d})')
+            exp_l.append(f'구글 노출 {g[1][0]:,.0f}회, 클릭 {g[1][1]:,.0f}회 ({g[0]:%m/%d})')
         for l in v.get('sns') or []:
             if max([int(m.replace(',', '')) for m in re.findall(r'([\d,]+)회', l.split(' (')[0])] or [0]) < 10:  # 한 자릿수 증감은 뺀다
                 continue
@@ -741,16 +739,15 @@ def main():
             if ' (제일 많이 본 글 ' in l:
                 t_, n_ = l.split(' (제일 많이 본 글 ')[1].rstrip(')').rsplit(' ', 1)
                 best = f'많이 본 글 {t_} 조회 {n_}'
-            parts += [main_] + ([best] if best else [])
+            exp_l += [main_] + ([best] if best else [])
         for gl in v.get('game') or []:  # 게임은 어느 포털 숫자인지 다 적는다
             g0 = gl.lstrip('- ').split(' (')[0]
             if '못 읽음' not in g0:
-                parts.append(g0)
-        big_sns = any(int(m) >= 100 for p in parts for m in re.findall(r'조회 \+?([\d]+)회', p.replace(',', '')))
-        if total(v) < 5 and not (g and g[1][1]) and not big_sns and name not in dropped:
-            parts = []  # 적은 곳은 고정 네 줄만
+                exp_l.append(g0)
         shown.add(short(name))
-        body += ['', short(name)] + [f'- {p}' for p in fixed + parts]
+        body += ['', f'[{short(name)}]']
+        for sub, ls in (('웹', web_l), ('토스', toss_l), ('유입', src_l), ('노출', exp_l)):
+            body += ['', sub] + [f'- {p}' for p in (ls or ['없음'])]
         eng = re.sub(r'(https?://|/)\S+|[\w.-]+\.(kr|com|app|io|dev)\S*', '', n.get('할일', ''))
         if name in dropped and re.search(r'검색|구글|순위', n.get('근거', '') + n.get('할일', '')):
             n = {}  # 구글 색인에서 빠진 곳은 다시 올리기가 먼저
@@ -766,7 +763,7 @@ def main():
     span = sns_span()
     if span:
         note.append(f'- SNS 조회는 {span} 사이 증가')
-    note.append('- 웹 30일은 GA 순 방문자, 토스앱 30일은 하루 방문자를 더한 값')
+    note.append('- 웹 30일은 GA 순 방문자, 토스 30일은 하루 방문자를 더한 값')
     if gsc:
         note.append('- 검색 숫자는 이틀 늦게 확정돼 그 날짜로 적음')
     if toss_err:
