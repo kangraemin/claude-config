@@ -139,7 +139,7 @@ def cmd_push(a):
                              # 이름을 쳐 넣어 목록을 띄운다(누르기만으론 가끔 안 열린다)
                              "Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i,%s);i.dispatchEvent(new Event('input',{bubbles:true}));return 1" % json.dumps(name))
                 time.sleep(1.5)
-                r = c.js_json(t, "var o=[...document.querySelectorAll('[role=option]')].find(o=>o.innerText.trim()==%s);if(!o)return 'NOTFOUND';"
+                r = c.js_json(t, "var o=[...document.querySelectorAll('[role=option],[role=menuitem],[role=menuitemradio]')].find(o=>o.innerText.trim()==%s);if(!o)return 'NOTFOUND';"
                                  "['pointerdown','mousedown','pointerup','mouseup','click'].forEach(k=>o.dispatchEvent(new MouseEvent(k,{bubbles:true})));return 'ok'" % json.dumps(name))
                 if r == 'ok':
                     break
@@ -187,18 +187,20 @@ def cmd_meta(a):
                 break
             time.sleep(1)
         cur = lambda i: c.js_json(t, "var e=[...document.querySelectorAll('[role=combobox]')][%d];return e?e.innerText.trim():''" % i)
+        # 2026-11-06 sora-godong: 3단계 칸은 고른 뒤 이름 대신 카테고리 ID(예 '663')를 보여 준다 → 숫자면 고른 것으로 본다
+        ok = lambda i, label: (lambda v: v == label or (i == 2 and v.isdigit()))(cur(i) or '')
         for i, label in enumerate(a.category.split('/')):
             for _ in range(2):  # 이미 골라져 있으면 건너뛴다(재실행). 드롭다운이 늦게 열리면 한 번 더
-                if cur(i) == label:
+                if ok(i, label):
                     break
                 c.js_json(t, "var e=[...document.querySelectorAll('[role=combobox]')][%d];e.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'mouse'}));e.click();return 1" % i)
                 time.sleep(1.5)
-                c.js_json(t, "var o=[...document.querySelectorAll('[role=option]')].find(o=>o.innerText.trim()==%s);if(!o)return 0;o.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));o.click();return 1" % json.dumps(label))
+                c.js_json(t, "var L=%s;var o=[...document.querySelectorAll('[role=option],[role=menuitem],[role=menuitemradio]')].find(o=>o.innerText.trim()==L)||[...document.querySelectorAll('[data-radix-popper-content-wrapper] *')].filter(e=>e.innerText&&e.innerText.trim()==L).pop();if(!o)return 0;o.dispatchEvent(new PointerEvent('pointerup',{bubbles:true}));o.click();return 1" % json.dumps(label))  # 2026-11 콘솔 카테고리는 radix 메뉴(role=option 아님)
                 time.sleep(1)
-            if cur(i) != label:
+            if not ok(i, label):
                 c.js_json(t, "var e=[...document.querySelectorAll('[role=combobox]')][%d];e.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerType:'mouse'}));e.click();return 1" % i)
                 time.sleep(1.5)
-                opts = c.js_json(t, "return [...document.querySelectorAll('[role=option]')].map(o=>o.innerText.trim()).join('|')")
+                opts = c.js_json(t, "var w=document.querySelector('[data-radix-popper-content-wrapper]');return w?w.innerText.trim().split('\\n').join('|'):''")
                 sys.exit(f'RESULT: CATEGORY_NF {label} 없음 — 고를 수 있는 것: {opts}')
         try:
             click_text(t, '임시저장'); time.sleep(3)
@@ -208,7 +210,11 @@ def cmd_meta(a):
         click_text(t, '다음'); time.sleep(3)
         # 로고: 올리면 그 input 이 사라져서 두 번째도 index 0
         for p in [a.icon, a.dark_icon or a.icon]:
-            files_into(t, "[...document.querySelectorAll('input[type=file][accept*=png]')][0]", [p])
+            try:
+                files_into(t, "[...document.querySelectorAll('input[type=file][accept*=png]')][0]", [p])
+            except RuntimeError as e:  # 재실행: 이미 올린 로고는 입력칸이 사라진다(11/06 sora-godong). DRAFT icon/dark 로 확인
+                if 'NOINPUT' not in str(e):
+                    raise
         if a.replace_shots:  # 스크린샷마다 div.delete-button > button[aria-label=삭제]. 누르면 확인 창 없이 바로 빠진다(10/22 ssum-pandok)
             for _ in range(30):
                 if not c.js_json(t, "var b=document.querySelector('.delete-button > button[aria-label=\"삭제\"]');if(!b)return 0;b.click();return 1"):
@@ -231,7 +237,8 @@ def cmd_meta(a):
         d = xhr(t, 'GET', base + a.app)['success']['draft']
         state = {'titleEn': d['titleEn'], 'desc': d['description'], 'detail': len(d['detailDescription'] or ''), 'cs': bool(d['csEmail']),
                  'icon': bool(d['iconUri']), 'dark': bool(d['darkModeIconUri']), 'images': len(d['images']),
-                 'keywords': d['impression']['keywordList'], 'category': [p['subCategory']['name'] for p in d['impression']['categoryPaths'] if p.get('subCategory')]}
+                 'keywords': d['impression']['keywordList'], 'category': [p['subCategory']['name'] for p in d['impression']['categoryPaths'] if p.get('subCategory')]
+                 or (d['impression'].get('appsInTossCategory') or {}).get('path', [])}  # 2026-11 새 분류는 appsInTossCategory.path
         print('DRAFT', json.dumps(state, ensure_ascii=False))
         if not a.submit:
             print('RESULT: DRY_RUN 임시저장까지')
