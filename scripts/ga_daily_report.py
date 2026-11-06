@@ -21,6 +21,7 @@
 import argparse
 import datetime as dt
 import json
+import statistics
 import os
 import re
 import subprocess
@@ -87,6 +88,13 @@ def delta(cur, prev):
     return f' ({"+" if p >= 0 else ""}{p}%)'
 
 
+def baseline(vals):
+    """'평소' 기준 하나: 앞 7일 하루값의 중앙값. 모든 서비스·모든 날 같은 식(11/6)."""
+    v = list(vals)[-7:]
+    v += [0] * (7 - len(v))  # GA가 안 준 날은 0명
+    return float(statistics.median(v))
+
+
 def section(cl, pid, name, day, path=None, skip=()):
     y, y2, w = str(day), str(day - dt.timedelta(days=1)), str(day - dt.timedelta(days=6))
     if not run(cl, pid, str(day - dt.timedelta(days=29)), y, ['activeUsers'], path=path, skip=skip):
@@ -119,9 +127,10 @@ def section(cl, pid, name, day, path=None, skip=()):
         lines.append('페이지: ' + ', '.join(f'{d[0][:40]} {v[0]:.0f}' for d, v in pages))
     days = run(cl, pid, str(day - dt.timedelta(days=7)), y, ['activeUsers', 'engagedSessions', 'userEngagementDuration'], ['date'], path=path, skip=skip)
     before = [v[0] for d, v in days if d[0] != day.strftime('%Y%m%d')]
-    avg7 = sum(before) / 7 if days else None  # 어제 앞 7일 하루 평균(빠진 날은 0명)
-    # 11/6 "ga리포트 이전꺼랑 수치가 왤케 달라": 자동 접속이 몰린 날이 사용자 평균에 섞여 '평소'가 부풀고, 머문 방문을 사용자 평균과 비교했다 → 머문 방문은 머문 방문 평균과 비교
-    eavg7 = sum(v[1] for d, v in days if d[0] != day.strftime('%Y%m%d')) / 7 if days else None
+    # 11/6 "기준을 왔다갔다 안 하게": '평소' = 어제 앞 7일의 중앙값(빠진 날은 0). 평균은 자동 접속 하루(꿈해몽 11/4 1,806명)에 337명으로 부풀었다
+    ebefore = [v[1] for d, v in days if d[0] != day.strftime('%Y%m%d')]
+    avg7 = baseline(before) if days else None
+    eavg7 = baseline(ebefore) if days else None
     src7 = run(cl, pid, w, y, ['sessions', 'engagedSessions'], ['sessionSource'], 6, 'sessions', path=path, skip=skip)
     data = {'8일 날짜별 [사용자, 참여세션, 총참여초]': {d[0]: v for d, v in sorted(days)},
             '7일 유입별 [세션, 참여세션]': {d[0]: v for d, v in src7}}
@@ -569,10 +578,10 @@ def main():
     except Exception as e:
         game = {GAME_SVC: [f'- itch 못 읽음: {str(e)[:60]}', f'- CrazyGames {CRAZY_STATUS}']}
     svc = {}
-    for x in real:
+    # 11/6 "기준을 왔다갔다 안 하게": 자동 접속이 몰린 날도 다른 날과 같은 줄(웹 방문·실제로 머문 방문)로 보이고, 안내 한 줄만 더한다
+    for x in live:
+        x['botday'] = bot(x)
         svc.setdefault(short(x['name']), {})['web'] = x
-    for x in bots_first:  # 11/5 "꿈해몽 방문왜없음": 자동 접속이 몰려도 서비스를 통째로 빼지 않고 사람에 가까운 수를 보인다
-        svc.setdefault(short(x['name']), {})['botweb'] = x
     for k in toss:
         svc.setdefault(k, {})['toss'] = toss[k]
     for k in sns:
@@ -616,7 +625,7 @@ def main():
                 # 11/1 검사: 눌린 게 적으면 '좋아진 것'이 아니다 → 그 서비스 칸에만 적는다
                 c7 = sum(v[1] for d, v in gg.get('data', {}).get('날짜별 [노출, 클릭]', {}).items() if d in ds14[:7])
                 week_up[name] = [f'구글 노출 {last - dt.timedelta(days=6):%m/%d}~{last:%m/%d} {w1:,.0f}회 (그 앞 7일 {w2:,.0f}회)', f'구글 클릭 {last - dt.timedelta(days=6):%m/%d}~{last:%m/%d} {c7:,.0f}회']
-    for x in real:  # 웹 방문이 평소(앞 7일 평균)의 2배 넘게 늘거나 절반 아래로 준 곳(10명 이상만)
+    for x in live:  # 실제로 머문 방문이 평소(앞 7일 중앙값)의 1.5배 이상이거나 절반 이하인 곳(10회 이상만)
         # 11/6 "기준은 그대로라는거?": 자동 접속이 섞인 사용자 수 대신 실제로 머문 방문으로 좋아짐·나빠짐을 판단한다
         av, ev, ea = x.get('avg7'), x.get('engaged'), x.get('eavg7')
         if av is None or ev is None or ea is None or max(ev, ea) < 10:
@@ -666,6 +675,8 @@ def main():
             if x.get('engaged') is not None:
                 ea = x.get('eavg7')
                 parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 {ea:.0f}회)' if ea is not None else ''))
+            if x.get('botday'):
+                parts.append('웹 방문엔 자동 접속이 섞임 → 머문 방문으로 봄')
             hs = [(h, u) for h, u in x.get('hosts') or [] if h and h != '(not set)']
             if len(hs) > 1 or (hs and GAME_SVC in name):  # 사용자 11/1 "itch인지 뭐 다른데인지 이야기를 해줘야": 어느 사이트로 들어왔는지
                 parts += [f'{host_name(h)} {u:.0f}명' for h, u in hs]
