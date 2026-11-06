@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Usage: play_release.py --dev <개발자ID> --app <앱ID> status | sha1 | submit [--submit] | upload --track <트랙ID> --aab <파일> [--notes "<ko-KR 노트>"] [--submit]
+"""Usage: play_release.py --dev <개발자ID> --app <앱ID> status | sha1 | managed [--submit] | submit [--submit] | upload --track <트랙ID> --aab <파일> [--notes "<ko-KR 노트>"] [--submit]
 
 Play Console 앱 한 개의 출시 상태를 읽고, 앱 서명 SHA-1을 얻고, '검토를 위해 변경사항 N개 제출'을 누른다.
 - status: 게시 개요의 제출 버튼 글자·활성 여부·차단 문제 수를 읽는다. 누르지 않는다.
 - sha1: 앱 서명 키 SHA-1과 카카오용 base64 해시를 출력한다. 카카오 등록은 kakao_app_setup.py --hash.
 - upload: 트랙에 '새 버전 만들기' → AAB 업로드 → 출시 노트 → 다음 → 저장(검토 제출은 안 함). 같은 버전 코드가 이미 트랙에 있으면 건너뛴다.
   미제출 출시가 있으면 새 출시가 그것을 대체한다. --submit 없으면 업로드까지만 하고 저장하지 않는다.
+- managed: 관리형 게시(승인돼도 '게시 준비됨'에서 대기, 수동 게시) 상태를 읽고 --submit이면 켠다. 이미 켜져 있으면 그대로 둔다.
+  드롭다운은 JS click·cliclick으로 안 열리고 pointer/mouse 이벤트 연속 dispatch(CK)로만 열린다. 검토 중인 변경사항이 있어도 켤 수 있다.
 - submit: 문제 0개이고 버튼이 켜졌을 때만 진행. --submit 없으면 dry-run. 실패 시 재클릭하지 않는다.
 Pre: Profile 1 로그인. 화면 조작인 이유: 게시 개요 제출과 조직 계정 앱의 선언은 공개 API로 못 한다.
 Gotcha: Angular라 c.shot으로 앞에 띄운 뒤 읽는다. 지문 값은 DOM에 없고 복사 버튼에만 있어 c.rclick 실제 클릭 후 pbpaste로 읽는다
@@ -15,7 +17,7 @@ Gotcha: Angular라 c.shot으로 앞에 띄운 뒤 읽는다. 지문 값은 DOM�
         첫 프로덕션은 트랙 국가가 0개라 '저장하려면 오류를 수정하세요'로 막힌다 → tracks/<ID>?tab=countryAvailability 에서
         '국가/지역 수정' → mat-checkbox[aria-label='모든 행 선택']의 .mat-checkbox-container에 마우스 이벤트(그냥 click은 안 먹음) → 저장(178개).
         --track production 도 된다(콘솔이 숫자 트랙 ID로 바꿈). 출시 노트 기본 언어가 en-US면 <en-US>도 넣는다.
-RESULT: READY <버튼> | BLOCKED <문제 수> | NOT_READY | SUBMITTED | DRY_RUN_READY | SHA1 <해시> | FAIL
+RESULT: MANAGED_ON | MANAGED_OFF | READY <버튼> | BLOCKED <문제 수> | NOT_READY | SUBMITTED | DRY_RUN_READY | SHA1 <해시> | FAIL
 """
 import base64
 import json
@@ -29,7 +31,7 @@ import time
 from _common import c, js, parser, tab
 
 ap = parser("Play Console release status / signing SHA-1 / submit", submit=True)
-ap.add_argument("action", choices=["status", "sha1", "submit", "upload"])
+ap.add_argument("action", choices=["status", "sha1", "submit", "upload", "managed"])
 ap.add_argument("--track", help="upload: 트랙 ID (tracks/<ID> 주소의 숫자)")
 ap.add_argument("--aab", help="upload: 올릴 .aab 경로")
 ap.add_argument("--notes", default="", help="upload: 출시 노트 본문(ko-KR)")
@@ -42,7 +44,7 @@ PNG = os.path.join(tempfile.gettempdir(), "play_release.png")
 
 def out(s):
     print("RESULT:", s)
-    sys.exit(0 if s.split()[0] in ("READY", "SUBMITTED", "DRY_RUN_READY", "SHA1") else 2)
+    sys.exit(0 if s.split()[0] in ("READY", "SUBMITTED", "DRY_RUN_READY", "SHA1", "MANAGED_ON") else 2)
 
 
 def show(tid, wait=8):
@@ -164,12 +166,31 @@ def upload(tid):
     out(("SUBMITTED 저장됨 version " + code) if "변경사항이 저장되었습니다" in x else "FAIL 저장 확인 안 됨 — 재클릭 금지")
 
 
+def managed(tid):
+    st = lambda: js(tid, """return [...document.querySelectorAll('[debug-id="managed-publishing-dropdown"] .button-text')].map(e=>e.innerText.trim())[0]||''""")
+    show(tid)
+    cur = st(); print("state", cur)
+    if "사용 설정됨" in cur:
+        out("MANAGED_ON 이미 켜져 있음")
+    if not a.submit:
+        out("MANAGED_OFF dry-run(--submit이면 켬)")
+    js(tid, CK + "ck(document.querySelector('[debug-id=\"managed-publishing-dropdown\"] [role=button]'));return 1")
+    time.sleep(2)
+    js(tid, CK + """const e=[...document.querySelectorAll('material-select-dropdown-item')].find(x=>x.getClientRects().length&&x.innerText.includes('관리형 게시가 사용 설정됨')); if(e) ck(e); return !!e""")
+    time.sleep(4)
+    c.goto(tid, BASE + "/publishing")
+    show(tid)
+    out("MANAGED_ON 켬" if "사용 설정됨" in st() else "FAIL 켠 뒤 확인 안 됨")
+
+
 path = {"sha1": "/keymanagement", "upload": f"/tracks/{a.track}"}.get(a.action, "/publishing")
 with tab(BASE + path, a) as tid:
     if a.action == "sha1":
         sha1(tid)
     elif a.action == "submit":
         submit(tid)
+    elif a.action == "managed":
+        managed(tid)
     elif a.action == "upload":
         upload(tid)
     else:
