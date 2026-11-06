@@ -3,6 +3,7 @@
 
   gov24_status.py --match 통신판매업            → 로그인돼 있으면 바로 읽음, 아니면 카카오 간편인증 요청까지 하고 멈춤
   gov24_status.py --match 통신판매업 --approved → 사용자가 카톡에서 승인한 뒤 같은 탭에서 '인증 완료' → 내역 읽기
+  gov24_status.py --match 통신판매업 --print ~/Documents/x.jpg → 처리완료면 발급문서를 JPG로 저장
   gov24_status.py --match 통신판매업 --req 20261029-16753184 → 그 접수번호 상세(진행상태·구청 메모)를 바로 읽음. 4일 넘은 건은 이걸 쓴다
 - 목록(plus.gov.kr)은 기본 최근 4일만 보여 준다(11/3: 10/29 건이 NOT_FOUND로 나옴). 목록의 NOT_FOUND는 '없다'가 아니다.
 - 마지막 줄: RESULT: OK <상태줄> | NEEDS_PHONE_APPROVAL | NOT_FOUND | FAIL <이유>  (종료코드 0 / 2 / 3 / 1)
@@ -11,6 +12,7 @@
 - Chrome Apple 이벤트라 tmux -L gh(또는 Ghostty)에서 돌린다.
 """
 import argparse
+import base64
 import glob
 import os
 import random
@@ -29,6 +31,7 @@ ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
 ap.add_argument("--match", required=True, help="찾을 민원 이름 일부 (예: 통신판매업)")
 ap.add_argument("--approved", action="store_true")
 ap.add_argument("--req", help="접수번호(예 20261029-16753184): 상세 화면에서 진행상태·구청 메모를 읽는다")
+ap.add_argument("--print", dest="out", help="처리완료면 발급문서를 이 JPG 경로로 저장(목록 AA040MyResultsList.do의 '문서출력' 실제 클릭 → ezpdfwv 뷰어 캡처)")
 ap.add_argument("--profile", default="Profile 1")
 ap.add_argument("--provider", default="카카오톡")
 ap.add_argument("--wait", type=int, default=280, help="기본 280초(토큰 약 5분). 20~40초 무작위 간격으로 승인 여부를 스스로 확인. 0이면 요청 후 멈추고 --approved로 이어 감(11/4 성공 경로). 요청 뒤 이 초만큼 승인을 기다리며 '인증 완료'를 계속 눌러 본다(10/30: 승인 뒤 늦게 --approved 하면 만료돼 로그인 안 됨)")
@@ -141,6 +144,65 @@ def read_list(t):
     return st
 
 
+def allow_astx():
+    """AhnLab Safe Transaction '허용' 창(없으면 그냥 지나감)."""
+    try:
+        return c.osa('''tell application "System Events"
+          if exists process "astxStatus" then
+            tell process "astxStatus"
+              repeat with w in windows
+                try
+                  click button "허용" of w
+                  return "ALLOWED"
+                end try
+              end repeat
+            end tell
+          end if
+        end tell
+        return "NONE"''', timeout=10)
+    except Exception:
+        return "ERR"
+
+
+def save_doc(t):
+    """처리완료 발급문서를 JPG로 저장(11/6 성공 경로).
+    - 버튼은 목록(plus.gov.kr 서비스 신청 내역) 행의 '문서출력'. 상세 화면(AA040MyResultView)엔 없다.
+    - 버튼은 www.gov.kr/nlogin/ssoPlusGov/login 으로 가는 form(target=prdocPopup)을 채워 팝업으로 연다.
+      팝업은 막히거나 실제 클릭이 다른 세션 창에 떨어질 수 있어, JS로 버튼을 누른 뒤 form target을 _self로 바꿔 같은 탭에서 연다.
+    - 뷰어(#viewerFrame) 캔버스 width 1490이 한 장씩(신고증 + 변경사항). 위아래로 이어 붙인다. 탭을 앞으로 띄워야 그려진다."""
+    if "mbrAplySrvcList" not in c.js_json(t, "return location.href"):
+        c.goto(t, LIST)
+    wait_js(t, "return [...document.querySelectorAll('button,a')].some(e=>e.offsetParent&&e.innerText.trim()=='문서출력')", 30)
+    c.js_json(t, """window.open=function(){return null};
+      const e=[...document.querySelectorAll('button,a')].find(e=>e.offsetParent&&e.innerText.trim()=='문서출력'); e.click(); return 1""")
+    time.sleep(3)
+    c.js_json(t, """const f=[...document.forms].find(f=>f.target=='prdocPopup'); if(!f) return 0;
+      f.target='_self'; setTimeout(()=>f.submit(),10); return 1""")
+    wait_js(t, "return location.href.includes('DocViewer')&&!!document.querySelector('#viewerFrame')", 60)
+    shot = os.path.expanduser("~/.cache/gov24_viewer.png")
+    js = """const d=document.querySelector('#viewerFrame').contentDocument;
+      const cs=d?[...d.querySelectorAll('canvas')].filter(x=>x.width==1490):[]; if(!cs.length) return 0;
+      const o=document.createElement('canvas');o.width=1490;o.height=cs.reduce((s,x)=>s+x.height,0);
+      const g=o.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,o.width,o.height);
+      let y=0;cs.forEach(x=>{g.drawImage(x,0,y);y+=x.height});
+      window.__jpg=o.toDataURL('image/jpeg',0.95).split(',')[1];return window.__jpg.length"""
+    n = 0
+    for _ in range(12):
+        allow_astx()
+        c.shot(t, shot)  # 앞으로 띄워야 캔버스가 그려진다(뒤에 있으면 흰 장)
+        time.sleep(5)
+        n = c.js_json(t, js) or 0
+        if n > 150000:  # 흰 장 2개는 약 2만, 글자가 그려지면 수십만
+            break
+    if n <= 150000:
+        raise Fail("뷰어 캔버스가 비어 있음")
+    data = base64.b64decode("".join(c.js_json(t, f"return window.__jpg.slice({i},{i + 150000})") for i in range(0, n, 150000)))
+    out = os.path.expanduser(a.out)
+    os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
+    open(out, "wb").write(data)
+    print("SAVED:", out, len(data), "bytes")
+
+
 def main():
     tab = None
     try:
@@ -181,12 +243,17 @@ def main():
                             break
                     else:
                         raise Fail("승인 대기 시간 초과")
-                    result("OK", read_list(tab))
+                    st = read_list(tab)
+                    if a.out and "처리완료" in st:
+                        save_doc(tab)
+                    result("OK", st)
                 os.makedirs(os.path.dirname(TABFILE), exist_ok=True)
                 open(TABFILE, "w").write(tab)
                 tab = None  # 승인 뒤 같은 탭에서 이어간다
                 result("NEEDS_PHONE_APPROVAL", "카카오톡에서 승인한 뒤 --approved 로 다시 실행")
         st = read_list(tab)
+        if a.out and "처리완료" in st:
+            save_doc(tab)
         result("OK", st)
     finally:
         if tab:
