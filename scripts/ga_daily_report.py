@@ -687,7 +687,7 @@ def main():
     bot_names = {short(x['name']) for x in bots}
     dead_names = {short(n) for n in dead}
     good_n_txt = [t for _, t in sorted(good_n, key=lambda u: -u[0])][:3]
-    body = []
+    body, allzero = [], []
     for name, v in sorted(svc.items(), key=lambda kv: -total(kv[1])):
         n = notes.get(name, {})
         # 사용자 11/7 "웹 / 토스 / 유입 / 노출 이렇게 보내도록해": 모든 서비스가 같은 네 칸. 없는 칸은 '- 없음'
@@ -745,6 +745,12 @@ def main():
             if '못 읽음' not in g0:
                 exp_l.append(g0)
         shown.add(short(name))
+        # 사용자 11/7 "전부 0인건 묶어": 웹·토스 어제·30일이 다 0이고 유입·노출도 없으면 한 칸에 이름만
+        w0 = not wx or (wx['users'] < 1 and not wx.get('m30'))
+        t0 = 'toss' not in v or (v['toss'][0] < 1 and not (v['toss'][2] if len(v['toss']) > 2 else 0))
+        if w0 and t0 and not src_l and not exp_l:
+            allzero.append(short(name) + (' (토스 출시 전)' if short(name) in TOSS_PREPARE else ''))
+            continue
         body += ['', f'[{short(name)}]']
         for sub, ls in (('웹', web_l), ('토스', toss_l), ('유입', src_l), ('노출', exp_l)):
             body += ['', sub] + [f'- {p}' for p in (ls or ['없음'])]
@@ -756,6 +762,8 @@ def main():
     out += ['', '오늘 할 일'] + (todo or ['- 없음'])
     out += ['', '좋아진 것'] + (good_n_txt or ['- 없음'])
     out += body
+    if allzero:
+        out += ['', '전부 0인 곳'] + [f'- {z}' for z in allzero]
     zero = sorted(dead_names - shown - bot_names)
     note = []
     if bots:
