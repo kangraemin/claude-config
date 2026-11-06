@@ -52,6 +52,10 @@ description: 앱·게임·토스 미니앱·웹에 GA4 이벤트 로깅과 크�
   - `python3 ~/.claude/skills/site-launch/scripts/ga_custom_dims.py <속성ID> [이름:매개변수:event|user ...]` (GA 화면 조작, 멱등, tmux -L gh 에서).
   - 표시 이름에 괄호를 쓰면 저장이 안 된다.
 - 확인용 Playwright 는 모바일 user_agent 를 준다. HeadlessChrome UA 는 GA가 봇으로 걸러 실시간에 안 뜬다.
+- 웹(gtag)은 이벤트 파라미터를 `gtag('config', ID, { app_platform: 'web' })`에 넣는다. `gtag('set', {...})`로는 `ep.`가 실리지 않았다(상권.kr 11/7 실제 /g/collect 요청으로 확인). 사용자 속성은 `gtag('set', 'user_properties', {...})`로 된다. 확인은 /g/collect 요청에서 `ep.app_platform`·`up.app_platform`을 센다.
+- 헤드리스 브라우저 접속은 GA 실시간에 안 잡힌다. 실시간 확인은 실제 Chrome으로 연다.
+- gtag 웹은 `gtag('set', {...})`로 넣으면 이벤트 파라미터로 안 실린다(11/7 상권.kr). `gtag('config', ID, { app_platform, build })`에 넣고, 사용자 속성은 `user_properties`로 따로 넣는다.
+- 확인은 실제 `/g/collect` 요청을 보고 `ep.app_platform`·`up.app_platform`이 붙었는지 센다. 코드만 보고 됐다고 하지 않는다.
 - `build`(release/test)도 붙여 테스트 배포 기록을 걸러 낸다.
 - 개발 서버·localhost에서는 보내지 않는다. 단 스토어 앱 웹뷰 주소도 localhost라 앱은 주소로 거르지 않는다.
 
