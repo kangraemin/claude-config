@@ -617,18 +617,19 @@ def main():
                 c7 = sum(v[1] for d, v in gg.get('data', {}).get('날짜별 [노출, 클릭]', {}).items() if d in ds14[:7])
                 week_up[name] = [f'구글 노출 {last - dt.timedelta(days=6):%m/%d}~{last:%m/%d} {w1:,.0f}회 (그 앞 7일 {w2:,.0f}회)', f'구글 클릭 {last - dt.timedelta(days=6):%m/%d}~{last:%m/%d} {c7:,.0f}회']
     for x in real:  # 웹 방문이 평소(앞 7일 평균)의 2배 넘게 늘거나 절반 아래로 준 곳(10명 이상만)
-        av = x.get('avg7')
-        if av is None or max(x['users'], av) < 20:
+        # 11/6 "기준은 그대로라는거?": 자동 접속이 섞인 사용자 수 대신 실제로 머문 방문으로 좋아짐·나빠짐을 판단한다
+        av, ev, ea = x.get('avg7'), x.get('engaged'), x.get('eavg7')
+        if av is None or ev is None or ea is None or max(ev, ea) < 10:
             continue
         by = {}
         for d, v in x.get('src') or []:
             by[channel(d[0])] = by.get(channel(d[0]), 0) + v[0]
         top = max(by.items(), key=lambda kv: kv[1])[0] if by else ''
-        t = f'- {short(x["name"])} 웹 방문 {x["users"]:.0f}명 (평소 {av:.0f}명)'
-        if x['users'] >= av * 1.5:
-            good_n.append((x['users'] - av, t))
-        elif x['users'] <= av * 0.5:
-            bad_n.append((av - x['users'], t))
+        t = f'- {short(x["name"])} 실제로 머문 방문 {ev:.0f}회 (평소 {ea:.0f}회)'
+        if ev >= ea * 1.5:
+            good_n.append((ev - ea, t))
+        elif ev <= ea * 0.5:
+            bad_n.append((ea - ev, t))
     span_s = sns_span() + ' 사이' if sns_span() else ''
     for name, v in svc.items():  # SNS 조회가 한 계정에서 1,000회 넘게 늘면 좋은 소식
         for l in v.get('sns') or []:
