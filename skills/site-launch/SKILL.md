@@ -22,6 +22,14 @@ python3 ga_property.py "<속성 이름>" https://site [--dry-run]
 - 다른 프로젝트 측정 ID 재사용 금지(데이터 섞임). 사이트 전용 속성을 만든다.
 - 맞춤 측정기준·이벤트 설정은 서비스 계정 API로 가능(기존 속성에 edit 허용된 범위).
 
+## 1-1. 앱(Firebase) GA 연결·측정기준
+```
+python3 firebase_ga_link.py <firebase프로젝트ID> <저장폴더>   # addGoogleAnalytics + google-services.json/plist 저장 (gcloud 토큰, x-goog-user-project 헤더 필수)
+python3 ga_custom_dims.py <속성ID>                          # 앱 플랫폼(이벤트)·앱 플랫폼 사용자(사용자)·빌드 등록(Chrome Profile 1)
+```
+- 속성 이름·통화는 API로 못 바꿔 GA 화면(admin/property/settings)에서 고친다. 서비스 계정은 계정 단위 뷰어라 새 속성이 바로 보인다(러너스하이 562974551, 2026-11-07).
+- 측정기준 이름에 괄호는 못 쓴다('앱 플랫폼(사용자)' → '앱 플랫폼 사용자').
+
 ## 2. 구글 서치콘솔 (로그인 불필요)
 ```
 python3 gsc_register.py token  https://site/     # meta 출력 → <head>에 넣고 배포
@@ -41,6 +49,7 @@ python3 naver_register.py crawl   https://site URL [URL ...]   # '웹 페이지 
 # 네이버 RSS는 RSS 2.0만 받는다(Jekyll atom.xml은 "형식이 올바르지 않습니다"). 제출마다 보안문자를 사용자에게 물으니 재시도 루프 금지, 한 번에 몰아서.
 ```
 - 사이트 단위만 받는다(경로 붙은 주소 불가). 확인 파일 내용은 `naver-site-verification: naverXXXX.html`.
+- Vercel에 Next.js(`output:'export'`)로 올리면 `public/naverXXXX.html`이 `.html` 붙은 주소에서 404가 나서(확장자 없는 주소만 200) verify가 FAIL 난다. `web/vercel.json`에 `{"rewrites":[{"source":"/:file(naver[0-9a-f]{32}).html","destination":"/:file"}]}`를 넣는다(2026-10-25 eodisseot.vercel.app). verify 전에 `curl -o /dev/null -w '%{http_code}' https://site/naverXXXX.html`로 200인지 먼저 본다.
 - 보안문자는 Claude가 푼다: verify를 백그라운드로 돌리고 `/tmp/site-launch/cap.png`가 새로 바뀌면 Read로 보고 글자를 `/tmp/site-launch/answer.txt`에 쓴다. 한 번만 제출(재시도 루프 금지). 틀려서 실패하면 한 번 더 돌릴 수 있고, 그래도 안 되면 그때만 사용자에게 그림을 보낸다. 텔레그램 전송은 하지 않는다(NAVER_CAPTCHA_TG=1일 때만). 사용자에게 보안문자를 묻지 않는다(2026-10-23 사용자 지시).
 - 네이버 로그아웃이면 `chrome-direct/scenarios/naver_login.py --qr --notify`.
 - 사이트맵 칸은 전체 URL을 넣어야 확인 버튼이 켜진다.

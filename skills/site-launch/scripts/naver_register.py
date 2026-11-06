@@ -89,6 +89,7 @@ try:
     elif cmd in ('sitemap', 'rss'):
         sm = site + '/' + (sys.argv[3] if len(sys.argv) > 3 else 'sitemap.xml' if cmd == 'sitemap' else 'feed.xml')
         c.goto(t, f'https://searchadvisor.naver.com/console/site/request/{cmd}?site={q}'); time.sleep(7); front(t)
+        c.wait(t, sel='input[type=text]', timeout=40)  # 첫 시도에서 입력칸이 안 그려져 NOTFOUND 난 적 있음(2026-10-23)
         c.fill(t, 'input[type=text]', sm); time.sleep(1)  # 전체 URL이어야 확인 버튼이 켜진다
         c.run_js(t, "setTimeout(()=>{[...document.querySelectorAll('button')].find(b=>b.innerText.trim()=='확인').click()},10);'ok'"); time.sleep(5)
         captcha(t)

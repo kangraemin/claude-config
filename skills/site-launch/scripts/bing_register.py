@@ -28,7 +28,8 @@ def call(m, **kw):
 
 if '--submit-urls' in sys.argv:
     su = sys.argv[1].rstrip('/') + '/'  # 경로 붙은 사이트는 그 주소 그대로 등록돼 있다
-    urls = re.findall(r'<loc>([^<]+)</loc>', urllib.request.urlopen(su + 'sitemap.xml', timeout=30).read().decode())
+    # Cloudflare는 Python-urllib 기본 UA를 403으로 막는다 → UA를 붙인다
+    urls = re.findall(r'<loc>([^<]+)</loc>', urllib.request.urlopen(urllib.request.Request(su + 'sitemap.xml', headers={'User-Agent': 'Mozilla/5.0'}), timeout=30).read().decode())
     q = call('GetUrlSubmissionQuota', siteUrl=su)['DailyQuota']
     for i in range(0, min(len(urls), q), 500):
         call('SubmitUrlBatch', siteUrl=su, urlList=urls[i:min(i + 500, q)])

@@ -1,5 +1,5 @@
 """빙 웹마스터에 sitemap 주소를 하루 한도(보통 100개)만큼 나눠 낸다. 크론으로 매일 돌린다.
-  python3 bing_daily_submit.py https://site/ [--first URL ...] [--dry-run]
+  python3 bing_daily_submit.py https://site/ [--first URL ...] [--prefer TEXT ...] [--dry-run]
 - 빙이 아직 안 가져간 새 사이트는 sitemap만 내면 몇 주씩 안 온다. SubmitUrlBatch로 직접 넣으면 바로 가져간다.
 - 낸 주소는 ~/.cache/bing-submit/<host>.json에 적어 두고 다음 날 그다음 것을 낸다. 다 내면 처음부터 다시 돈다(갱신 알림).
 - --first: 매번 먼저 낼 주소(홈 등). 키: BING_WEBMASTER_API_KEY(~/.claude/.env).
@@ -10,6 +10,7 @@ from pathlib import Path
 ap = argparse.ArgumentParser()
 ap.add_argument('site')
 ap.add_argument('--first', nargs='*', default=[])
+ap.add_argument('--prefer', nargs='*', default=[], help='이 글자가 든 주소를 먼저 낸다(목록·허브 페이지)')
 ap.add_argument('--dry-run', action='store_true')
 a = ap.parse_args()
 site = a.site.rstrip('/') + '/'
@@ -47,8 +48,15 @@ all_urls = locs(site + 'sitemap.xml')
 todo = [u for u in all_urls if u not in sent]
 if not todo:  # 한 바퀴 다 냈으면 처음부터
     sent, todo = set(), all_urls
+pf = state_f.with_suffix('.prefer')  # crontab을 못 고칠 때: 줄마다 '먼저 낼 주소 일부'(http로 시작하면 --first에 더함)
+if pf.exists():
+    for ln in pf.read_text().split():
+        (a.first if ln.startswith('http') else a.prefer).append(ln)
+todo.sort(key=lambda u: not any(p in u for p in a.prefer))  # 사이트맵이 크면(먹맵 3.5만) 가게 상세만 몇 달 내다 허브가 밀린다
 batch = list(dict.fromkeys(a.first + todo))[:quota]
 print(f'sitemap {len(all_urls)} · 이미 낸 것 {len(sent)} · 오늘 한도 {quota} · 낼 것 {len(batch)}')
+if a.dry_run:
+    print(*[urllib.parse.unquote(u) for u in batch[:12]], sep='\n')
 if not batch or a.dry_run:
     print('RESULT: SKIP'); sys.exit(0)
 # 한 번에 너무 많이 넣으면 400(2026-10-23 2,836건). 500건씩 나눠 내고, 실패하면 거기까지 저장하고 멈춘다
