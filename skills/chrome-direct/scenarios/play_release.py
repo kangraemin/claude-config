@@ -12,6 +12,9 @@ Gotcha: Angular라 c.shot으로 앞에 띄운 뒤 읽는다. 지문 값은 DOM�
         (JS click은 클립보드에 안 들어간다). 정규식은 20바이트 전체 일치로 본다(SHA-256 앞부분이 걸린다).
         한국 계정 정보 3칸이 비면 '문제 1개'로 막힌다(무료 앱도 면제 없음) → play_iap_bulk.py korea-info --submit 먼저.
         타겟 API·데이터 보안·건강 앱 선언 오류는 빠른 검사에 최대 14분 걸린 뒤 뜬다.
+        첫 프로덕션은 트랙 국가가 0개라 '저장하려면 오류를 수정하세요'로 막힌다 → tracks/<ID>?tab=countryAvailability 에서
+        '국가/지역 수정' → mat-checkbox[aria-label='모든 행 선택']의 .mat-checkbox-container에 마우스 이벤트(그냥 click은 안 먹음) → 저장(178개).
+        --track production 도 된다(콘솔이 숫자 트랙 ID로 바꿈). 출시 노트 기본 언어가 en-US면 <en-US>도 넣는다.
 RESULT: READY <버튼> | BLOCKED <문제 수> | NOT_READY | SUBMITTED | DRY_RUN_READY | SHA1 <해시> | FAIL
 """
 import base64
@@ -95,6 +98,30 @@ CK = ("const ck=e=>['pointerdown','mousedown','pointerup','mouseup','click'].for
       "const bt=s=>[...document.querySelectorAll('button,a[role=button]')].find(x=>x.offsetParent&&x.innerText.includes(s));")
 
 
+
+def big_upload(tid, path, N=4_000_000):
+    """c.upload_file(300KB 조각)는 90MB AAB에서 조각 400번 중 하나만 늦어도 -1728로 죽는다(2026-11-06).
+    4MB 조각으로 보내고 조각마다 5번까지 다시 보낸다. 로컬 서버 fetch는 Play 콘솔이 막는다(요청이 서버에 안 닿음)."""
+    import base64
+    b64 = base64.b64encode(open(path, "rb").read()).decode()
+    def rj(s, t=90):
+        for k in range(5):
+            try:
+                return js(tid, s, t)
+            except Exception as e:
+                print("retry", k, str(e)[:80]); time.sleep(5)
+        out("FAIL 조각 전송 실패")
+    rj("window.__cu=[];return 1")
+    n = 0
+    for i in range(0, len(b64), N):
+        rj("window.__cu[%d]=%s;return 1" % (n, json.dumps(b64[i:i+N]))); n += 1
+    return rj("""if(window.__cu.length!=%d||window.__cu.some(x=>!x)) return 'missing'; const s=atob(window.__cu.join('')); window.__cu=null;
+const u=new Uint8Array(s.length); for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);
+const e=[...document.querySelectorAll('input[type=file]')].find(x=>(x.accept||'').includes('.aab'))||document.querySelector('input[type=file]'); if(!e) return 'noinput';
+const dt=new DataTransfer(); dt.items.add(new File([u],%s,{type:'application/octet-stream'})); e.files=dt.files;
+e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); return 'ok '+u.length""" % (n, json.dumps(os.path.basename(path))))
+
+
 def upload(tid):
     import zipfile
     if not a.track or not a.aab or not os.path.exists(a.aab):
@@ -108,7 +135,7 @@ def upload(tid):
     show(tid, 9)
     if "/prepare" not in js(tid, "return location.href"):
         out("FAIL 새 버전 화면이 안 열림")
-    print(c.upload_file(tid, os.path.abspath(a.aab), selector='input[type=file][accept=".aab"]', mime="application/octet-stream"))
+    print(big_upload(tid, os.path.abspath(a.aab)))
     code = None
     for _ in range(36):
         time.sleep(5)
