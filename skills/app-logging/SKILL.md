@@ -48,7 +48,10 @@ description: 앱·게임·토스 미니앱·웹에 GA4 이벤트 로깅과 크�
 ## app_platform (토스·웹·안드로이드·iOS 구분)
 - 값: `toss` / `web` / `android` / `ios`. 판정은 실행 환경으로 한다(토스 SDK 존재, Capacitor `getPlatform()`, Unity `Application.platform`).
 - 모든 이벤트의 **이벤트 파라미터**와 **사용자 속성**에 둘 다 붙인다.
-- GA 맞춤 측정기준으로 등록한다: '앱 플랫폼'(이벤트 범위, app_platform)과 '앱 플랫폼(사용자)'(사용자 범위). 등록 안 하면 보고서에서 못 쓴다. 서비스 계정은 뷰어라 등록은 GA 화면(Profile 1)에서 한다.
+- GA 맞춤 측정기준으로 등록한다: '앱 플랫폼'(이벤트 범위, app_platform)과 '앱 플랫폼 사용자'(사용자 범위). 등록 안 하면 보고서에서 못 쓴다.
+  - `python3 ~/.claude/skills/site-launch/scripts/ga_custom_dims.py <속성ID> [이름:매개변수:event|user ...]` (GA 화면 조작, 멱등, tmux -L gh 에서).
+  - 표시 이름에 괄호를 쓰면 저장이 안 된다.
+- 확인용 Playwright 는 모바일 user_agent 를 준다. HeadlessChrome UA 는 GA가 봇으로 걸러 실시간에 안 뜬다.
 - `build`(release/test)도 붙여 테스트 배포 기록을 걸러 낸다.
 - 개발 서버·localhost에서는 보내지 않는다. 단 스토어 앱 웹뷰 주소도 localhost라 앱은 주소로 거르지 않는다.
 
