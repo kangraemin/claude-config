@@ -97,7 +97,8 @@ def baseline(vals):
 
 def section(cl, pid, name, day, path=None, skip=()):
     y, y2, w = str(day), str(day - dt.timedelta(days=1)), str(day - dt.timedelta(days=6))
-    if not run(cl, pid, str(day - dt.timedelta(days=29)), y, ['activeUsers'], path=path, skip=skip):
+    m30 = run(cl, pid, str(day - dt.timedelta(days=29)), y, ['activeUsers'], path=path, skip=skip)
+    if not m30:
         # 새 속성은 하루치 집계가 1~2일 늦다(먹맵 10/19 생성 → 실시간 103명인데 일별 0). 실시간이라도 있으면 보낸다.
         if path:
             return None
@@ -115,7 +116,7 @@ def section(cl, pid, name, day, path=None, skip=()):
     lines = [f'📊 {name}',
              f'어제 사용자 {cur[0]:.0f}{delta(cur[0], prev[0])} · 세션 {cur[1]:.0f} · 페이지뷰 {cur[2]:.0f}{delta(cur[2], prev[2])}',
              f'실제로 머문 방문 {cur[3]:.0f}{delta(cur[3], prev[3])}/{cur[1]:.0f}세션 · 1인 평균 {per:.0f}초',
-             f'7일 사용자 {week:.0f}']
+             f'7일 사용자 {week:.0f}', f'30일 사용자 {m30[0][1][0]:.0f}']
     hosts = run(cl, pid, y, y, ['activeUsers'], ['hostName'], 5, 'activeUsers', path=path, skip=skip)
     if len(hosts) > 1:
         lines.append('사이트: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in hosts))
@@ -134,7 +135,7 @@ def section(cl, pid, name, day, path=None, skip=()):
     src7 = run(cl, pid, w, y, ['sessions', 'engagedSessions'], ['sessionSource'], 6, 'sessions', path=path, skip=skip)
     data = {'8일 날짜별 [사용자, 참여세션, 총참여초]': {d[0]: v for d, v in sorted(days)},
             '7일 유입별 [세션, 참여세션]': {d[0]: v for d, v in src7}}
-    return {'name': name, 'users': cur[0], 'prev': prev[0], 'avg7': avg7, 'eavg7': eavg7, 'engaged': cur[3], 'per': per, 'new': False, 'src': src, 'hosts': [(d[0], v[0]) for d, v in hosts], 'pid': pid, 'path': path, 'skip': skip,
+    return {'name': name, 'users': cur[0], 'prev': prev[0], 'm30': m30[0][1][0], 'avg7': avg7, 'eavg7': eavg7, 'engaged': cur[3], 'per': per, 'new': False, 'src': src, 'hosts': [(d[0], v[0]) for d, v in hosts], 'pid': pid, 'path': path, 'skip': skip,
             'detail': '\n'.join(lines), 'data': data}
 
 
@@ -193,6 +194,9 @@ def sns_span():
 TOSS = Path.home() / '.cache/toss-stats'  # my-sns eodi-sns/scripts/toss_stats.py 가 6시간마다 쓴다
 
 
+TOSS_M30 = {}  # 앱 이름 → 토스앱 최근 30일 방문(하루 방문자 합). 어제 0명인 앱 목록에도 붙인다
+
+
 def toss_by_service(day):
     """앱인토스 콘솔 숫자(사용자 10/28 "토스에서 나온 지표들도 ga 분석기에 합쳐"). ({앱: (사용자, [줄])}, 0명 앱, 오류)."""
     files = sorted(TOSS.glob('*.json'))
@@ -211,6 +215,10 @@ def toss_by_service(day):
             rows[x['name']] = (0, ['- 못 읽음'])
             continue
         u, pu, n = x['au'].get(d, 0), x['au'].get(p, 0), x['new'].get(d, 0)
+        d30 = [str(day - dt.timedelta(days=k)) for k in range(30)]
+        if (cur.get('from') or d) <= d30[-1]:  # 30일을 다 담은 파일일 때만(11/6 이전 파일은 9일치뿐)
+            x['m30'] = sum(x['au'].get(k, 0) for k in d30)
+            TOSS_M30[short(x['name'])] = x['m30']
         if not u:
             zero.append(x['name'])
             continue
@@ -218,7 +226,7 @@ def toss_by_service(day):
         ref = sorted((x.get('referrer_by_day') or {}).get(d, {}).items(), key=lambda kv: -kv[1])[:3]
         if ref:
             lines.append('- ' + ' · '.join(f'{k} {v}' for k, v in ref))
-        rows[x['name']] = (u, lines)
+        rows[x['name']] = (u, lines, x.get('m30'))
     return rows, zero, None
 
 
@@ -672,6 +680,8 @@ def main():
             x = v['web']
             av = x.get('avg7')
             parts.append(f'웹 방문 {x["users"]:.0f}명' + (f' (평소 {av:.0f}명)' if av is not None else ''))
+            if x.get('m30') is not None:  # 사용자 11/6 "하루하루 오는 거 그 기준으로 30일치": 같은 웹 방문자 기준 최근 30일(어제 포함)
+                parts.append(f'최근 30일 웹 방문 {x["m30"]:,.0f}명')
             if x.get('engaged') is not None:
                 ea = x.get('eavg7')
                 parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 {ea:.0f}회)' if ea is not None else ''))
@@ -692,6 +702,8 @@ def main():
             av = x.get('eavg7')
             parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 {av:.0f}회)' if av is not None else ''))
             parts.append(f'전체 {x["users"]:,.0f}명은 자동 접속이 섞여 안 믿음')
+            if x.get('m30') is not None:
+                parts.append(f'최근 30일 웹 방문 {x["m30"]:,.0f}명(자동 접속 포함)')
             by = {}
             for d_, v_ in x.get('src') or []:
                 if channel(d_[0]) not in ('직접 접속', '출처 모름'):
@@ -704,6 +716,8 @@ def main():
             parts.append(f'구글 노출 {g[1][0]:,.0f}회, 클릭 {g[1][1]:,.0f}회 ({g[0]:%m/%d})')
         if 'toss' in v:
             parts.append(f'토스앱 방문 {v["toss"][0]:.0f}명')
+            if len(v['toss']) > 2 and v['toss'][2] is not None:  # 토스 콘솔은 하루 방문자만 줘서 30일은 하루 수를 더한 값
+                parts.append(f'토스앱 최근 30일 방문 {v["toss"][2]:,.0f}명(하루 방문자 더한 값)')
         for l in v.get('sns') or []:
             if max([int(m.replace(',', '')) for m in re.findall(r'([\d,]+)회', l.split(' (')[0])] or [0]) < 10:  # 한 자릿수 증감은 뺀다
                 continue
@@ -737,7 +751,7 @@ def main():
     out += ['', '좋아진 것'] + (good_n_txt or ['- 없음'])
     out += body
     zero = sorted(dead_names - shown - bot_names)
-    for title, names in ((f'웹 방문 1~4명', quiet), ('웹 방문 0명', zero), ('웹 없이 SNS·토스앱만 조금', other), ('토스앱 방문 0명', [short(t) for t in toss_zero])):
+    for title, names in ((f'웹 방문 1~4명', quiet), ('웹 방문 0명', zero), ('웹 없이 SNS·토스앱만 조금', other), ('토스앱 방문 0명', [short(t) + (f' (최근 30일 {TOSS_M30[short(t)]:,}명)' if short(t) in TOSS_M30 else '') for t in toss_zero])):
         if names:  # 사용자 11/1 "이건 장난해?": 개수만 말고 이름을 한 줄에 하나씩
             out += ['', title] + [f'- {x}' for x in names]
     note = []
