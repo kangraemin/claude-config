@@ -280,7 +280,7 @@ GSC = {'https://kangraemin.github.io/oneul-kkum/': '꿈해몽', 'https://kangrae
        'https://kangraemin.github.io/': '개발 블로그', 'https://geulmagam.vercel.app/': '글마감', 'https://xn--ob0butqet42c6pmgpe.kr/': '글마감',
        'https://eodimeok.kr/': '어디먹', 'https://mukmap.kr/': '먹맵', 'https://xn--zf0b677a.kr/': '상권.kr',
        'https://ssum-pandok.remin1994.workers.dev/': '썸 판독기', 'https://oguriworks.com/': '오구리웍스',
-       'https://eodisseot.pages.dev/': '어디썼', 'https://eodisseot.vercel.app/': '어디썼', 'sc-domain:paper-digest.app': 'ai-paper',
+       'https://eodisseot.pages.dev/': '어디썼', 'https://eodisseot.vercel.app/': '어디썼', 'sc-domain:paper-digest.app': 'AI 논문 요약',
        'https://koubonoshiori.com/': '公募の栞', 'https://threads-unfollow.pages.dev/': '스레드언팔확인',
        'https://kangraemin.github.io/bid-window-404/': '입찰 창구 404호', 'https://kangraemin.github.io/forge-survivor-play/': '강화 서바이버',
        'https://gooreum.github.io/ttuk-chiro-clinic/': '뚝 카이로 클리닉', 'https://tax-watcher.remin1994.workers.dev/': '법카로 본 서울'}  # 11/1 일본판·언팔확인 빠져 있던 것
@@ -457,11 +457,15 @@ def host_name(h):
     return HOST.get(h, '웹사이트')
 
 
+# 토스 콘솔에 있지만 아직 출시 안 된 앱(11/7 기준). 출시되면 toss_stats.py APPS로 옮긴다.
+TOSS_PREPARE = {'나사톡톡', '골골냥', '소라고동님', '뚝 카이로 클리닉', '썸 판독기', '오늘의 눈썰미', '강화 서바이버'}
+
+
 def short(name):
     """'제주 숙소 (jeju-stay)'·'Ram's tech blog - GA4' 같은 꼬리를 뗀다."""
     n = re.sub(r'\s*(\([^)]*\)|- GA4)$', '', name) or name
     n = re.sub(r'(?<=[가-힣])\s+[A-Za-z][\w-]*$', '', n)
-    return {'MukMap': '먹맵', "Ram's tech blog": '개발 블로그', '오늘꿈해몽': '꿈해몽', 'forge-survivor-app': '강화 서바이버 스토어 앱', 'claude inspector': '클로드 인스펙터', 'ai-paper': 'AI 논문 요약'}.get(n, n)
+    return {'MukMap': '먹맵', "Ram's tech blog": '개발 블로그', '오늘꿈해몽': '꿈해몽', 'forge-survivor-app': '강화 서바이버 스토어 앱', 'claude inspector': '클로드 인스펙터', 'screwtoktok-app': '나사톡톡 스토어 앱', 'ai-paper': 'AI 논문 요약'}.get(n, n)
 
 
 def channel(src):
@@ -539,7 +543,7 @@ def check(text):
             bad.append('뜻이 애매한 줄: ' + l)
     if '나빠진 것' not in text:
         bad.append('맨 위 나빠진 것 없음')
-    if len(text) > 7600:  # send()가 칸 단위로 나눠 보내므로 2통까지 허용(11/4 유입 줄 추가)
+    if len(text) > 12000:  # send()가 칸 단위로 나눠 보내므로 2통까지 허용(11/4 유입 줄 추가)
         bad.append(f'너무 김 {len(text)}자')
     return bad
 
@@ -590,8 +594,15 @@ def main():
     for x in live:
         x['botday'] = bot(x)
         svc.setdefault(short(x['name']), {})['web'] = x
+    # 사용자 11/7 "왤케 포맷이 다 달라": 0명인 곳도 따로 이름 목록에 빼지 않고 같은 칸·같은 줄로 보인다
+    for x in secs:
+        if x['users'] < 1:
+            x['botday'] = False
+            svc.setdefault(short(x['name']), {}).setdefault('web', x)
     for k in toss:
         svc.setdefault(k, {})['toss'] = toss[k]
+    for k in toss_zero:
+        svc.setdefault(k, {})['toss'] = (0, [], TOSS_M30.get(short(k)))
     for k in sns:
         svc.setdefault(k, {})['sns'] = sns[k]
     for k in game:
@@ -676,12 +687,23 @@ def main():
     body = []
     for name, v in sorted(svc.items(), key=lambda kv: -total(kv[1])):
         n, parts = notes.get(name, {}), []
+        # 사용자 11/7: 모든 서비스가 같은 네 줄로 시작한다(웹 어제·웹 30일·토스앱 어제·토스앱 30일). 없는 채널은 '없음'
+        fixed = []
+        wx = v.get('web') or v.get('botweb')
+        if wx:
+            av = wx.get('avg7')
+            fixed.append(f'웹 어제 {wx["users"]:,.0f}명' + (f' (평소 {av:.0f}명)' if av is not None else ''))
+            fixed.append(f'웹 최근 30일 {wx["m30"]:,.0f}명' if wx.get('m30') is not None else '웹 최근 30일 집계 전')
+        else:
+            fixed += ['웹 없음']
+        if 'toss' in v:
+            fixed.append(f'토스앱 어제 {v["toss"][0]:,.0f}명')
+            t30 = v['toss'][2] if len(v['toss']) > 2 else None
+            fixed.append(f'토스앱 최근 30일 {t30:,.0f}명' if t30 is not None else '토스앱 최근 30일 확인 안 됨')
+        else:
+            fixed += ['토스앱 출시 전' if short(name) in TOSS_PREPARE else '토스앱 없음']
         if 'web' in v:
             x = v['web']
-            av = x.get('avg7')
-            parts.append(f'웹 방문 {x["users"]:.0f}명' + (f' (평소 {av:.0f}명)' if av is not None else ''))
-            if x.get('m30') is not None:  # 사용자 11/6 "하루하루 오는 거 그 기준으로 30일치": 같은 웹 방문자 기준 최근 30일(어제 포함)
-                parts.append(f'최근 30일 웹 방문 {x["m30"]:,.0f}명')
             if x.get('engaged') is not None:
                 ea = x.get('eavg7')
                 parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 {ea:.0f}회)' if ea is not None else ''))
@@ -701,9 +723,7 @@ def main():
             x = v['botweb']
             av = x.get('eavg7')
             parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 {av:.0f}회)' if av is not None else ''))
-            parts.append(f'전체 {x["users"]:,.0f}명은 자동 접속이 섞여 안 믿음')
-            if x.get('m30') is not None:
-                parts.append(f'최근 30일 웹 방문 {x["m30"]:,.0f}명(자동 접속 포함)')
+            parts.append('웹 방문엔 자동 접속이 섞임 → 머문 방문으로 봄')
             by = {}
             for d_, v_ in x.get('src') or []:
                 if channel(d_[0]) not in ('직접 접속', '출처 모름'):
@@ -714,10 +734,6 @@ def main():
             parts += week_up[name]
         elif g and max(g[1][0], g[2][0]) >= 10 and name not in dropped:  # 줄어든 곳은 맨 위에 있다
             parts.append(f'구글 노출 {g[1][0]:,.0f}회, 클릭 {g[1][1]:,.0f}회 ({g[0]:%m/%d})')
-        if 'toss' in v:
-            parts.append(f'토스앱 방문 {v["toss"][0]:.0f}명')
-            if len(v['toss']) > 2 and v['toss'][2] is not None:  # 토스 콘솔은 하루 방문자만 줘서 30일은 하루 수를 더한 값
-                parts.append(f'토스앱 최근 30일 방문 {v["toss"][2]:,.0f}명(하루 방문자 더한 값)')
         for l in v.get('sns') or []:
             if max([int(m.replace(',', '')) for m in re.findall(r'([\d,]+)회', l.split(' (')[0])] or [0]) < 10:  # 한 자릿수 증감은 뺀다
                 continue
@@ -732,16 +748,9 @@ def main():
                 parts.append(g0)
         big_sns = any(int(m) >= 100 for p in parts for m in re.findall(r'조회 \+?([\d]+)회', p.replace(',', '')))
         if total(v) < 5 and not (g and g[1][1]) and not big_sns and name not in dropped:
-            if short(name) in bot_names or short(name) in dead_names:
-                pass
-            elif 'web' in v and v['web']['users'] >= 1:
-                quiet.append(short(name))
-            else:
-                other.append(short(name))
-            continue
+            parts = []  # 적은 곳은 고정 네 줄만
         shown.add(short(name))
-        if parts:
-            body += ['', short(name)] + [f'- {p}' for p in parts]
+        body += ['', short(name)] + [f'- {p}' for p in fixed + parts]
         eng = re.sub(r'(https?://|/)\S+|[\w.-]+\.(kr|com|app|io|dev)\S*', '', n.get('할일', ''))
         if name in dropped and re.search(r'검색|구글|순위', n.get('근거', '') + n.get('할일', '')):
             n = {}  # 구글 색인에서 빠진 곳은 다시 올리기가 먼저
@@ -751,15 +760,13 @@ def main():
     out += ['', '좋아진 것'] + (good_n_txt or ['- 없음'])
     out += body
     zero = sorted(dead_names - shown - bot_names)
-    for title, names in ((f'웹 방문 1~4명', quiet), ('웹 방문 0명', zero), ('웹 없이 SNS·토스앱만 조금', other), ('토스앱 방문 0명', [short(t) + (f' (최근 30일 {TOSS_M30[short(t)]:,}명)' if short(t) in TOSS_M30 else '') for t in toss_zero])):
-        if names:  # 사용자 11/1 "이건 장난해?": 개수만 말고 이름을 한 줄에 하나씩
-            out += ['', title] + [f'- {x}' for x in names]
     note = []
     if bots:
         note += [f'- 봇이라 뺌: {short(x["name"])} {x["users"]:.0f}명' for x in bots if short(x['name']) not in shown]
     span = sns_span()
     if span:
         note.append(f'- SNS 조회는 {span} 사이 증가')
+    note.append('- 웹 30일은 GA 순 방문자, 토스앱 30일은 하루 방문자를 더한 값')
     if gsc:
         note.append('- 검색 숫자는 이틀 늦게 확정돼 그 날짜로 적음')
     if toss_err:
@@ -778,7 +785,7 @@ def main():
         full += ['', name]
         if 'web' in v:
             x = v['web']
-            full.append(f'- 웹 방문자 {x["users"]:.0f}명 (전날 {x["prev"]:.0f}명)')
+            full.append(f'- 웹 방문자 {x["users"]:.0f}명' + (f' (전날 {x["prev"]:.0f}명)' if x.get('prev') is not None else ''))
             if x.get('src'):
                 full.append(src_line(x))
         full += v.get('gsc') or []
