@@ -120,10 +120,12 @@ def section(cl, pid, name, day, path=None, skip=()):
     days = run(cl, pid, str(day - dt.timedelta(days=7)), y, ['activeUsers', 'engagedSessions', 'userEngagementDuration'], ['date'], path=path, skip=skip)
     before = [v[0] for d, v in days if d[0] != day.strftime('%Y%m%d')]
     avg7 = sum(before) / 7 if days else None  # 어제 앞 7일 하루 평균(빠진 날은 0명)
+    # 11/6 "ga리포트 이전꺼랑 수치가 왤케 달라": 자동 접속이 몰린 날이 사용자 평균에 섞여 '평소'가 부풀고, 머문 방문을 사용자 평균과 비교했다 → 머문 방문은 머문 방문 평균과 비교
+    eavg7 = sum(v[1] for d, v in days if d[0] != day.strftime('%Y%m%d')) / 7 if days else None
     src7 = run(cl, pid, w, y, ['sessions', 'engagedSessions'], ['sessionSource'], 6, 'sessions', path=path, skip=skip)
     data = {'8일 날짜별 [사용자, 참여세션, 총참여초]': {d[0]: v for d, v in sorted(days)},
             '7일 유입별 [세션, 참여세션]': {d[0]: v for d, v in src7}}
-    return {'name': name, 'users': cur[0], 'prev': prev[0], 'avg7': avg7, 'engaged': cur[3], 'per': per, 'new': False, 'src': src, 'hosts': [(d[0], v[0]) for d, v in hosts], 'pid': pid, 'path': path, 'skip': skip,
+    return {'name': name, 'users': cur[0], 'prev': prev[0], 'avg7': avg7, 'eavg7': eavg7, 'engaged': cur[3], 'per': per, 'new': False, 'src': src, 'hosts': [(d[0], v[0]) for d, v in hosts], 'pid': pid, 'path': path, 'skip': skip,
             'detail': '\n'.join(lines), 'data': data}
 
 
@@ -660,6 +662,9 @@ def main():
             x = v['web']
             av = x.get('avg7')
             parts.append(f'웹 방문 {x["users"]:.0f}명' + (f' (평소 {av:.0f}명)' if av is not None else ''))
+            if x.get('engaged') is not None:
+                ea = x.get('eavg7')
+                parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 {ea:.0f}회)' if ea is not None else ''))
             hs = [(h, u) for h, u in x.get('hosts') or [] if h and h != '(not set)']
             if len(hs) > 1 or (hs and GAME_SVC in name):  # 사용자 11/1 "itch인지 뭐 다른데인지 이야기를 해줘야": 어느 사이트로 들어왔는지
                 parts += [f'{host_name(h)} {u:.0f}명' for h, u in hs]
@@ -672,8 +677,8 @@ def main():
             parts += [f'유입 {p}' for p in src_parts(x)] if x.get('src') else []  # 사용자 11/4 "들어온 채널도 적도록": 짧은 판에도 한 줄에 하나
         if 'botweb' in v:
             x = v['botweb']
-            av = x.get('avg7')
-            parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 하루 {av:.0f}명 방문)' if av is not None else ''))
+            av = x.get('eavg7')
+            parts.append(f'실제로 머문 방문 {x["engaged"]:.0f}회' + (f' (평소 {av:.0f}회)' if av is not None else ''))
             parts.append(f'전체 {x["users"]:,.0f}명은 자동 접속이 섞여 안 믿음')
             by = {}
             for d_, v_ in x.get('src') or []:
