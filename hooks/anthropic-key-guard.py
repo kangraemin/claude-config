@@ -18,7 +18,8 @@ ALLOW = {
     V + 'area-insight': {'AREA_INSIGHT_ANTHROPIC_API_KEY', 'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     V + 'ai-paper': {'AI_PAPER_GC_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     # 먹맵 번역: 민구형 키 (사용자 10/25 "먹맵번역에쓸거라구", "ㅇㅇ 그렇게해")
-    V + 'mukmap': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
+    # 11/06 회사 키 잔액 $194.89 11/8 만료 소진: 먹맵에서 회사 키도 허용 (사용자 11/06 "ai-paper-gc 이거 api key 다 써야하거든", "이거 말고 풀라고")
+    V + 'mukmap': {'MUKMAP_ANTHROPIC_API_KEY', 'AI_PAPER_GC_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     # 강화 서바이버 번역: 민구형 키 상한 $100 (사용자 10/30 "민구형 api key활용해서 번역해 100달러상한으로")
     V + 'defense-game': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     # 먹맵 추출·경제 요약(youtubeScript): 민구형 키 (사용자 10/31 "민구형꺼쑤", "api key로 다해 한도없어 이번엔 그냥다써야함")
