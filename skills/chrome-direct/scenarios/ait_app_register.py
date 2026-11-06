@@ -16,6 +16,8 @@
 - 검토 요청은 테스트 푸시를 보내고 테스터가 토스 앱에서 한 번 열어야 풀리던 적이 있다(오늘꿈해몽). 오늘타로는 푸시 직후 바로 됐다.
 - 왜 화면 조작인가: 콘솔에 공개 API가 없다. 로그인 쿠키가 있는 탭 안에서 XHR/폼을 쓴다.
   탭은 이미 workspace 탭이 열린 창에 연다(다른 프로필 창은 콘솔 로그아웃 상태).
+- MCP initial_review_submit 이 '등록되지 않은 요청입니다'로 막힐 때 이 meta --submit 으로 낸다(11/06 readreply·cheerspick 검토 중 확인).
+  성공해도 MSG 에 '검토 중'이 없어 CHECK_SCREEN 으로 끝날 수 있다 → miniapp_meta_status reviewState 로 확인.
 검증: 2026-10-22 oneul-tarot-card(오늘타로) 손으로 같은 순서 성공. son-calendar(손없는날 달력)로 스크립트 create·push·meta --submit 전체 성공(검토 중 확인).
   새 앱 첫 meta 는 1단계 글(영어 이름·부제·상세·이메일)이 빈 채 CHECK_SCREEN 으로 끝날 수 있다 → 같은 명령 재실행으로 해결(10/22 ireum-match).
   카테고리 이름이 틀리면 CATEGORY_NF 와 고를 수 있는 목록을 출력(10/22 2단계: 음식·음료|교육|건강|교통|공공·행정|소셜|편의|쇼핑|AI|비즈니스|콘텐츠|여행|일상|정보|재테크, 편의→도구|구독·렌탈|기타).
@@ -189,7 +191,7 @@ def cmd_meta(a):
         cur = lambda i: c.js_json(t, "var e=[...document.querySelectorAll('[role=combobox]')][%d];return e?e.innerText.trim():''" % i)
         # 2026-11-06 sora-godong: 3단계 칸은 고른 뒤 이름 대신 카테고리 ID(예 '663')를 보여 준다 → 숫자면 고른 것으로 본다
         ok = lambda i, label: (lambda v: v == label or (i == 2 and v.isdigit()))(cur(i) or '')
-        for i, label in enumerate(a.category.split('/')):
+        for i, label in enumerate(a.category.split('/', 2)):  # 3단계 이름에 '/'가 들어간다(뽑기/가챠, 11/06 cheerspick)
             for _ in range(2):  # 이미 골라져 있으면 건너뛴다(재실행). 드롭다운이 늦게 열리면 한 번 더
                 if ok(i, label):
                     break
@@ -321,6 +323,8 @@ ap.add_argument('--version')
 ap.add_argument('--notes')
 ap.add_argument('--to', help='push: 본인 말고 더 보낼 멤버 이름, 쉼표로(예: 손유정,서민구)')
 a = ap.parse_args()
+if a.app.isdigit():  # 11/06: miniAppId(90726)를 넣으면 draft API 가 None → appName 을 넣는다
+    sys.exit('RESULT: BAD_APP appName(예 readreply)을 넣어야 함, miniAppId 아님')
 # 백그라운드 셸이 Chrome Apple Events 권한(-1743)이 없으면 Ghostty에서 같은 명령을 다시 돌린다
 from _common import relay_if_denied
 relay_if_denied()
