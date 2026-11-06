@@ -104,10 +104,14 @@ def main():
             if el.tag == 'path' and el.get(A + 'pathData'):
                 if el.get(A + 'fillColor') in ('#00000000', '@android:color/transparent') and not el.get(A + 'strokeColor'):
                     return
-                for (x, y) in path_points(el.get(A + 'pathData')):
-                    for tx, ty, sx_, sy_, px, py in reversed(tf):
-                        x = (x - px) * sx_ + px + tx; y = (y - py) * sy_ + py + ty
-                    allp.append((x, y))
+                # 선(stroke)으로 그린 경로는 선 굵기의 절반만큼 바깥으로 더 그려진다
+                hw = (num_attr(el.get(A + 'strokeWidth')) or 0) / 2 if el.get(A + 'strokeColor') else 0
+                for (x0, y0) in path_points(el.get(A + 'pathData')):
+                    for dx, dy in ((0, 0),) if not hw else ((-hw, -hw), (hw, hw)):
+                        x, y = x0 + dx, y0 + dy
+                        for tx, ty, sx_, sy_, px, py in reversed(tf):
+                            x = (x - px) * sx_ + px + tx; y = (y - py) * sy_ + py + ty
+                        allp.append((x, y))
             for ch in el: walk(ch, tf)
         walk(root, [])
     else:  # svg
@@ -117,7 +121,9 @@ def main():
         for el in root.iter():
             t = el.tag.split('}')[-1]
             if t == 'path' and el.get('d'):
-                allp += path_points(el.get('d'))
+                hw = (num_attr(el.get('stroke-width')) or 0) / 2 if el.get('stroke') not in (None, 'none') else 0
+                for (x, y) in path_points(el.get('d')):
+                    allp += [(x - hw, y - hw), (x + hw, y + hw)] if hw else [(x, y)]
             elif t in ('rect',):
                 x, y, w, h = (float(el.get(k, 0)) for k in ('x', 'y', 'width', 'height')); allp += [(x, y), (x + w, y + h)]
             elif t in ('circle', 'ellipse'):
