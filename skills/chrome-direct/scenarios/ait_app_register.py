@@ -2,7 +2,7 @@
 """[제출] 앱인토스 콘솔 — 새 미니앱 만들기 / 테스트 푸시 / 첫 등록 정보 채우고 검토 요청. 출시는 절대 안 누름.
 
   ait_app_register.py create <appName> <표시이름> [--game] [--submit]
-  ait_app_register.py push   <appName> [--to 손유정,서민구] [--submit]                 # 버전 내역 첫 행 '테스트' → '푸시 보내기'
+  ait_app_register.py push   <appName> [--to 서민구] [--submit]                 # 버전 내역 첫 행 '테스트' → '푸시 보내기'
   ait_app_register.py meta   <appName> --deployment <id> --store <store-text.md> --icon <600png> --shots a.png,b.png,c.png[,d.png]
                              --category 생활/콘텐츠/운세 [--dark-icon png] [--submit]
   ait_app_register.py review <appName> --version 20261022-3 --notes "출시 노트" [--submit]   # 업데이트 버전 검토 요청
@@ -22,6 +22,7 @@
   새 앱 첫 meta 는 1단계 글(영어 이름·부제·상세·이메일)이 빈 채 CHECK_SCREEN 으로 끝날 수 있다 → 같은 명령 재실행으로 해결(10/22 ireum-match).
   카테고리 이름이 틀리면 CATEGORY_NF 와 고를 수 있는 목록을 출력(10/22 2단계: 음식·음료|교육|건강|교통|공공·행정|소셜|편의|쇼핑|AI|비즈니스|콘텐츠|여행|일상|정보|재테크, 편의→도구|구독·렌탈|기타).
   meta 재실행: 카테고리 이미 골라져 있으면 건너뜀, 스크린샷은 draft 에 0장일 때만 올림. 영어 이름 15자 초과면 '다음'이 조용히 막혀 사전 검사(TOO_LONG).
+  2026-11-06 콘솔 1단계 분류가 바뀌어 '생활'이 없다 → 예 --category '교육·학습/어학' (1단계: 건강|공공·행정|날씨|교육·학습|금융|사진·영상|디자인|소셜|앱테크|엔터테인먼트|도구|교통|자동차|여행|일상·생활|일·비즈니스|커머스·쇼핑|기타, hankuk 검토 요청 성공).
   영어 이름은 단어 첫 글자만 대문자(약어 'BMI'도 거절) → 사전 검사(BAD_CASE).
 """
 import argparse, base64, json, os, re, sys, time
@@ -321,7 +322,7 @@ ap.add_argument('--category', default='생활/콘텐츠/운세')
 ap.add_argument('--cs-from', default='oneul-kkum')
 ap.add_argument('--version')
 ap.add_argument('--notes')
-ap.add_argument('--to', help='push: 본인 말고 더 보낼 멤버 이름, 쉼표로(예: 손유정,서민구)')
+ap.add_argument('--to', help='push: 본인 말고 더 보낼 멤버 이름, 쉼표로(예: 서민구)')
 a = ap.parse_args()
 if a.app.isdigit():  # 11/06: miniAppId(90726)를 넣으면 draft API 가 None → appName 을 넣는다
     sys.exit('RESULT: BAD_APP appName(예 readreply)을 넣어야 함, miniAppId 아님')
