@@ -222,10 +222,13 @@ def main():
             print("APPROVE_ON_PHONE")
             a.keep_tab = True  # 승인 뒤 같은 탭에서 이어간다
             result("NEEDS_PHONE_APPROVAL", "카카오톡에서 인증 요청을 승인한 뒤 --approved 로 다시 실행")
-        tab = find_tab("plus.gov.kr/login") or find_tab("plus.gov.kr")
+        tab = find_tab("plus.gov.kr/login")
+        if tab:
+            finish_login(tab)
+        else:
+            tab = find_tab("plus.gov.kr")  # 이미 로그인돼 다른 화면으로 넘어간 경우
         if not tab:
             raise Fail("로그인 탭 없음 — --approved 없이 처음부터 다시 실행")
-        finish_login(tab)
         apply_form(tab)
         print_viewer(tab)
         result("OK", a.out)

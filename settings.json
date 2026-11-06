@@ -363,6 +363,15 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 /Users/ram/.claude/hooks/phone-approval-watch.py"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -419,6 +428,14 @@
             "command": "/Users/ram/.config/claude-accounts/personal/ai-bouncer/hooks/stop.sh",
             "args": [],
             "timeout": 1800
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 /Users/ram/.claude/hooks/phone-approval-watch.py"
           }
         ]
       }
@@ -530,7 +547,10 @@
     "figma@claude-plugins-official": false,
     "frontend-design@claude-plugins-official": true,
     "octo@nyldn-plugins": false,
-    "ait@apps-in-toss": true
+    "ait@apps-in-toss": true,
+    "marketing-skills@marketingskills": true,
+    "claude-seo@agricidaniel-claude-seo": true,
+    "openseo@openseo": true
   },
   "extraKnownMarketplaces": {
     "nyldn-plugins": {
@@ -543,6 +563,24 @@
       "source": {
         "source": "github",
         "repo": "toss/apps-in-toss-harness"
+      }
+    },
+    "marketingskills": {
+      "source": {
+        "source": "github",
+        "repo": "coreyhaines31/marketingskills"
+      }
+    },
+    "agricidaniel-claude-seo": {
+      "source": {
+        "source": "github",
+        "repo": "AgriciDaniel/claude-seo"
+      }
+    },
+    "openseo": {
+      "source": {
+        "source": "github",
+        "repo": "every-app/open-seo"
       }
     }
   },
