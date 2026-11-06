@@ -1,0 +1,8 @@
+{
+  "skill_name": "ui-size-audit",
+  "evals": [
+    {"id": 1, "prompt": "랭킹 화면 사람 아이콘 크기 아이폰이랑 같아? 코드로 봐", "expected_output": "iOS RankingView person.fill 글자 크기(size*0.6)를 코드에서 읽고 glyph.swift로 실제 그림 크기를 재 Android ic_user_mono 그림 크기와 수치로 비교한 보고서", "files": []},
+    {"id": 2, "prompt": "마이페이지 피그마랑 안드로이드 여백 라운드 아이콘 크기 다른 거 다 찾아서 보고서 줘", "expected_output": "Figma 노드 추출 + Android 코드 추출 → compare → report.md, ❌ 항목마다 양쪽 근거", "files": []},
+    {"id": 3, "prompt": "모든 화면 iOS랑 안드로이드 컴포넌트 수치 전부 비교해", "expected_output": "화면 쌍마다 extract_code 두 번 + compare, report.py 로 한 보고서에 합침", "files": []}
+  ]
+}
