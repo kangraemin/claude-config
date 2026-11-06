@@ -112,6 +112,7 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 | `asc_store_listing.sh [앱번호]` (= `asc_store_listing.py all` API + `asc_privacy.sh` Chrome) | ASC 출시 준비 일괄: TestFlight 내부 그룹·빌드·소유자 테스터, 인앱 상품(접두어 `forgesurvivor_`, 한/영·가격·심사 스샷), 스토어 정보 한/영·카테고리·연령 등급·무료·6.9"/iPad 스크린샷·빌드 연결, 앱 개인정보 게시. 심사 제출은 안 함. 전화번호는 `ASC_REVIEW_PHONE=+82..` | 생성 | 수동 검증 2026-10-31 |
 | `asc_dsa_trader.sh` | ASC 비즈니스 EU DSA 거래자 선언: 주소·전화·이메일 입력 → 이메일 코드(Gmail) 입력(iframe은 cliclick 클릭+rtype) → 문자 코드는 인자(EMAIL_CODE 환경변수로 이메일 코드) → 확인 문서 2건 사업자등록증 PDF 업로드 → 확인. 사용: asc_dsa_trader.sh <문자코드> | 생성 | 끝까지 검증 2026-10-31 |
 | `github_repo_delete.py owner/repo [--submit]` | Delete a private GitHub repo when the gh token lacks delete_repo. Dry-run by default, refuses public repos, stops BLOCKED at GitHub's sudo (password/passkey) screen | Submit | up to sudo screen (11/4) |
+| `ga_custom_dimension.py <계정ID> <속성ID> <param> <표시 이름> [--scope event|user]` | GA4 맞춤 측정기준 등록(서비스 계정은 뷰어라 API 403). 이름에 괄호 불가. 이미 있으면 EXISTS | Submit | yes (11/07) |
 | `page_check.py <url> --kw a --kw b [--name]` | Keyword lines and links on any page; own name (also masked forms) shown as `[이름]` | Read | yes |
 | `announce_check.py [--days N] [--only id]` | Opens result pages for contests in `_radar/announce.json` whose announce date has passed. Hints only | Read | yes |
 | `chatgpt_upgrade.py [100|200|500] [--pay]` | ChatGPT 요금제를 Pro 100/200/500으로 올린다. --pay 없으면 플랜 변경 확인 금액만 읽음. 세금 ID는 pay.openai.com 청구 정보에 미리 있어야 함 | Write (결제) | yes (11/01, Plus→Pro 100) |
