@@ -24,6 +24,7 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 | `travellerspoint_post.py --signup/--verify/--login` | Travellerspoint 가입(이메일·아이디·비번·약관). hCaptcha 체크박스에 막힘 → 사람 손 | Write | no (10/30 hCaptcha BLOCKED) |
 | `note_post.py --signup [--submit]` | note.com 이메일 가입. 제출 시 reCAPTCHA v2 체크박스 요구 → BLOCKED | Write | no (10/30 reCAPTCHA BLOCKED) |
 | `reddit_signup.py [--persona BIZ --profile "Profile 5" --id X --email Y] [--submit]` | 레딧 계정 가입(기본 먹맵 Profile 7, 페르소나별 sns.env `{P}_REDDIT_*`, 이메일 가입·reCAPTCHA·이메일 코드 `(\d{6}) is your Reddit`·패스키 시트 Esc·온보딩 건너뛰기, 멱등 EXISTS, 값 미출력, tmux -L gh) | Write | partial (10/30 mukmap_kr·oguriworks 가입 성공은 수동+임시 스크립트, 통합 실행 미검증) |
+| `figma_copy_to_team.py <file_key> [--folder id]` | 남의(Starter 팀) 피그마 파일을 내 팀 프로젝트로 복사 → 새 file key. Figma MCP 한도는 파일이 든 팀 플랜을 따르므로 사본을 MCP로 읽는다(내부 /api/multiplayer/<key>/copy, 보기 권한이면 됨, 같은 이름 '(복사)' 있으면 EXISTS). 노드 id는 사본에서 바뀜 | Write | yes (2026-11-06 RunnersHi → KfNEave9gJRFvLpFdqrxMc, 재실행 EXISTS) |
 | `google_account.py [--expect remin1994@gmail.com]` | Which Google account is signed in on this profile | Read | yes |
 | `gmail_search.py "<query>" [--limit N] [--open N] [--proof x.pdf]` | List search results / open one thread (`in:sent`, `in:spam` also work) | Read | yes |
 | `gmail_mailcheck.py [--days 5] [--out x.md] [--open-bodies]` | Contest-mail sweep (3 queries, ad/key classification, codes masked) | Read | yes |
