@@ -28,7 +28,8 @@ ALLOW = {
     # 오늘의 눈썰미 13개 언어 번역: 민구형 키 상한 $50 (사용자 10/31 "번역은전부민구형api key로", "오늘의눈썰미 저거 전부번역하자 13개언어로")
     V + 'spot-difference': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     V + 'threads-unfollow': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
-    V + 'youtubeScript': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
+    # 11/06 사용자 "써도 됨": 회사 키 만료(11/8) 전 먹맵 재매칭에 회사 키 사용
+    V + 'youtubeScript': {'MUKMAP_ANTHROPIC_API_KEY', 'AI_PAPER_GC_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     # my-sns 스레드 답글 생성: 민구형 키 (사용자 10/31 "댓글 생성하는거 claude -p 말고 api key로", "api 민구형꺼 다쓰면 그때 claude -p 로전환하자")
     V + 'my-sns': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     # 과학기록 사진 판독·수업일지·월간 보고서·공개 글 생성: 민구형 키 월 상한 $30 (사용자 10/31 "그 규칙 이것도써야지")
