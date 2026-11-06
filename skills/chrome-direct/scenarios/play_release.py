@@ -59,6 +59,10 @@ def status(tid):
       const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&/검토를 위해 변경사항 \\d+개 제출/.test(e.innerText));
       return {issues:m?+m[1]:0, btn:b?b.innerText.trim():'', on:!!(b&&!b.disabled&&b.getAttribute('aria-disabled')!='true')}""")
     print("issues", r["issues"], "| button", r["btn"] or "(none)", "| enabled", r["on"])
+    act = js(tid, """const x=document.body.innerText; const i=x.indexOf('제출 활동');
+      return i<0?'':x.slice(i,i+600)""") or ""
+    r["activity"] = act
+    print("ACTIVITY:", " / ".join(l.strip() for l in act.splitlines() if l.strip())[:500] or "(제출 활동 섹션 없음)")
     return r
 
 
