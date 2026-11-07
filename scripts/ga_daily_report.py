@@ -426,6 +426,8 @@ def ai_notes(svc):
                             '--strict-mcp-config', '--setting-sources', '', '--no-session-persistence', '--model', 'sonnet'],
                            capture_output=True, text=True, timeout=900, env=env, cwd='/tmp')
         out = r.stdout.strip()
+        if '{' not in out:  # 11/8 로그인 만료가 'Expecting value'로만 찍혀 원인을 몰랐다
+            raise RuntimeError((r.stderr or out or f'exit {r.returncode}').strip()[-200:])
         notes = json.loads(out[out.find('{'):out.rfind('}') + 1])
         return {k: v for k, v in notes.items() if isinstance(v, dict)}
     except Exception as e:
