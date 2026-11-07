@@ -130,6 +130,13 @@ def section(cl, pid, name, day, path=None, skip=()):
     if raw_users != cur[0]:
         lines.append(f'자동 접속 뺌 {raw_users - cur[0]:.0f}명 (' + ', '.join(f'{c} {u:.0f}' for c, u in botc.get(day.strftime('%Y%m%d'), [])) + ')')
     hosts = run(cl, pid, y, y, ['activeUsers'], ['hostName'], 5, 'activeUsers', path=path, skip=skip)
+    bad = {c for c, _ in botc.get(day.strftime('%Y%m%d'), [])}
+    if bad:  # 사이트별 숫자에서도 자동 접속 나라를 뺀다(11/8 웹사이트 160명이 그대로 보였음)
+        agg = {}
+        for d, v in run(cl, pid, y, y, ['activeUsers'], ['hostName', 'country'], 200, 'activeUsers', path=path, skip=skip):
+            if d[1] not in bad:
+                agg[d[0]] = agg.get(d[0], 0) + v[0]
+        hosts = [((h,), (u,)) for h, u in sorted(agg.items(), key=lambda kv: -kv[1])[:5]]
     if len(hosts) > 1:
         lines.append('사이트: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in hosts))
     src = run(cl, pid, y, y, ['sessions'], ['sessionSource'], 10, 'sessions', path=path, skip=skip)
