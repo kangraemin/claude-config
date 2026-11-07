@@ -121,6 +121,10 @@ def section(cl, pid, name, day, path=None, skip=()):
     cur[0] -= bsum(day)
     prev[0] -= bsum(day - dt.timedelta(days=1))
     week = (run(cl, pid, w, y, ['activeUsers'], path=path, skip=skip) or [([], [0])])[0][1][0]
+    # 11/8 '최근 30일 743명'에 자동 접속이 그대로 있었다 → 30일 칸도 같은 기준(외국 한 나라 5명 이상, 1인 평균 1초 미만)으로 뺀다
+    m30bot = sum(v[0] for d, v in run(cl, pid, str(day - dt.timedelta(days=29)), y, ['activeUsers', 'userEngagementDuration'], ['country'], path=path, skip=skip)
+                 if d[0] != 'South Korea' and v[0] >= 5 and v[1] / v[0] < 1)
+    m30[0][1][0] = max(0, m30[0][1][0] - m30bot)
     # GA4는 알려진 봇만 자동으로 뺀다. 우리 e2e·모르는 봇은 남는다 → '참여 세션'(10초+ 머묾·2페이지+·전환)을 사람에 가까운 수로 따로 보인다
     per = cur[4] / cur[0] if cur[0] else 0
     lines = [f'📊 {name}',
@@ -402,6 +406,9 @@ def why_drop(sites, start, end):
     return (len(top), out, raw)
 
 
+AI_ERR = []
+
+
 def ai_notes(svc):
     """claude -p(구독 로그인, API 키 아님)로 서비스별 검색 해석·종합 두 줄·할 일. 실패하면 {} → 숫자만 보낸다."""
     src = {}
@@ -432,6 +439,7 @@ def ai_notes(svc):
         return {k: v for k, v in notes.items() if isinstance(v, dict)}
     except Exception as e:
         print(f'AI 분석 실패: {str(e)[:120]}', file=sys.stderr)
+        AI_ERR[:] = [re.sub(r'\s+', ' ', str(e))[:80]]
         return {}
 
 
@@ -782,6 +790,8 @@ def main():
             n = {}  # 구글 색인에서 빠진 곳은 다시 올리기가 먼저
         if n.get('할일') and re.search(r'\d', n.get('근거', '')) and not re.search(r'[A-Za-z]{3,}', eng):
             todo.append(f'- {short(name)}: {n["할일"]}')
+    if not a.no_ai and not notes:  # 11/8 맨 끝 한 줄로만 적혀 며칠 동안 아무도 몰랐다 → 맨 위에 띄운다
+        out += ['', '⚠️ AI 분석 실패', f'- {AI_ERR[0] if AI_ERR else "원인 모름"}', '- 오늘 할 일은 숫자만 보고 정함']
     out += ['', '오늘 할 일'] + (todo or ['- 없음'])
     out += ['', '좋아진 것'] + (good_n_txt or ['- 없음'])
     out += body
