@@ -13,8 +13,8 @@ for CFG in /Users/ram/.config/claude-accounts/personal default; do
     CLAUDE_CONFIG_DIR="$CFG" "$EXE" "$@" > "$OUT" 2> "$ERR"
   fi
   RC=$?
-  if grep -qiE "hit your (weekly |session |usage |monthly spend )?limit|usage limit reached|spend limit" "$OUT" "$ERR"; then
-    echo "[claude-p] $CFG 한도 초과 → 다음 계정" >&2
+  if grep -qiE "hit your (weekly |session |usage |monthly spend )?limit|usage limit reached|spend limit|Failed to authenticate|OAuth session expired|Not logged in|Invalid API key" "$OUT" "$ERR"; then
+    echo "[claude-p] $CFG 한도·로그인 실패 → 다음 계정" >&2
     continue
   fi
   cat "$OUT"; grep -v "^Permission allow rule" "$ERR" >&2
