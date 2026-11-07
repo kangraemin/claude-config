@@ -110,6 +110,16 @@ def section(cl, pid, name, day, path=None, skip=()):
     m = ['activeUsers', 'sessions', 'screenPageViews', 'engagedSessions', 'userEngagementDuration']
     cur = (run(cl, pid, y, y, m, path=path, skip=skip) or [([], [0] * 5)])[0][1]
     prev = (run(cl, pid, y2, y2, m, path=path, skip=skip) or [([], [0] * 5)])[0][1]
+    # 사용자 11/8 "그걸 왜 ga 통계 때 안 걸러": 어디먹 11/5~7 중국 직접 접속 419명(머문 시간 합 9초)이 '어제 N명'에 그대로 들어갔다.
+    # 서비스 통째가 아니라 나라 단위로 뺀다: 외국 한 나라가 하루 5명 이상인데 1인 평균 1초 미만이면 자동 접속으로 보고 사용자 수에서 뺀다.
+    botc = {}
+    for d, v in run(cl, pid, str(day - dt.timedelta(days=7)), y, ['activeUsers', 'userEngagementDuration'], ['date', 'country'], path=path, skip=skip):
+        if d[1] != 'South Korea' and v[0] >= 5 and v[1] / v[0] < 1:
+            botc.setdefault(d[0], []).append((d[1], v[0]))
+    bsum = lambda d: sum(u for _, u in botc.get(d.strftime('%Y%m%d'), []))
+    raw_users = cur[0]
+    cur[0] -= bsum(day)
+    prev[0] -= bsum(day - dt.timedelta(days=1))
     week = (run(cl, pid, w, y, ['activeUsers'], path=path, skip=skip) or [([], [0])])[0][1][0]
     # GA4는 알려진 봇만 자동으로 뺀다. 우리 e2e·모르는 봇은 남는다 → '참여 세션'(10초+ 머묾·2페이지+·전환)을 사람에 가까운 수로 따로 보인다
     per = cur[4] / cur[0] if cur[0] else 0
@@ -117,6 +127,8 @@ def section(cl, pid, name, day, path=None, skip=()):
              f'어제 사용자 {cur[0]:.0f}{delta(cur[0], prev[0])} · 세션 {cur[1]:.0f} · 페이지뷰 {cur[2]:.0f}{delta(cur[2], prev[2])}',
              f'실제로 머문 방문 {cur[3]:.0f}{delta(cur[3], prev[3])}/{cur[1]:.0f}세션 · 1인 평균 {per:.0f}초',
              f'7일 사용자 {week:.0f}', f'30일 사용자 {m30[0][1][0]:.0f}']
+    if raw_users != cur[0]:
+        lines.append(f'자동 접속 뺌 {raw_users - cur[0]:.0f}명 (' + ', '.join(f'{c} {u:.0f}' for c, u in botc.get(day.strftime('%Y%m%d'), [])) + ')')
     hosts = run(cl, pid, y, y, ['activeUsers'], ['hostName'], 5, 'activeUsers', path=path, skip=skip)
     if len(hosts) > 1:
         lines.append('사이트: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in hosts))
@@ -127,7 +139,7 @@ def section(cl, pid, name, day, path=None, skip=()):
     if pages:
         lines.append('페이지: ' + ', '.join(f'{d[0][:40]} {v[0]:.0f}' for d, v in pages))
     days = run(cl, pid, str(day - dt.timedelta(days=7)), y, ['activeUsers', 'engagedSessions', 'userEngagementDuration'], ['date'], path=path, skip=skip)
-    before = [v[0] for d, v in days if d[0] != day.strftime('%Y%m%d')]
+    before = [v[0] - sum(u for _, u in botc.get(d[0], [])) for d, v in days if d[0] != day.strftime('%Y%m%d')]
     # 11/6 "기준을 왔다갔다 안 하게": '평소' = 어제 앞 7일의 중앙값(빠진 날은 0). 평균은 자동 접속 하루(꿈해몽 11/4 1,806명)에 337명으로 부풀었다
     ebefore = [v[1] for d, v in days if d[0] != day.strftime('%Y%m%d')]
     avg7 = baseline(before) if days else None
@@ -135,7 +147,7 @@ def section(cl, pid, name, day, path=None, skip=()):
     src7 = run(cl, pid, w, y, ['sessions', 'engagedSessions'], ['sessionSource'], 6, 'sessions', path=path, skip=skip)
     data = {'8일 날짜별 [사용자, 참여세션, 총참여초]': {d[0]: v for d, v in sorted(days)},
             '7일 유입별 [세션, 참여세션]': {d[0]: v for d, v in src7}}
-    return {'name': name, 'users': cur[0], 'prev': prev[0], 'm30': m30[0][1][0], 'avg7': avg7, 'eavg7': eavg7, 'engaged': cur[3], 'per': per, 'new': False, 'src': src, 'hosts': [(d[0], v[0]) for d, v in hosts], 'pid': pid, 'path': path, 'skip': skip,
+    return {'name': name, 'users': cur[0], 'raw_users': raw_users, 'botc': botc.get(day.strftime('%Y%m%d'), []), 'prev': prev[0], 'm30': m30[0][1][0], 'avg7': avg7, 'eavg7': eavg7, 'engaged': cur[3], 'per': per, 'new': False, 'src': src, 'hosts': [(d[0], v[0]) for d, v in hosts], 'pid': pid, 'path': path, 'skip': skip,
             'detail': '\n'.join(lines), 'data': data}
 
 
@@ -696,6 +708,8 @@ def main():
         if wx:
             av = wx.get('avg7')
             web_l.append(f'어제 {wx["users"]:,.0f}명' + (f' (평소 {av:.0f}명)' if av is not None else ''))
+            if wx.get('botc'):
+                web_l.append(f'자동 접속 {wx["raw_users"] - wx["users"]:,.0f}명은 뺌')
             web_l.append(f'최근 30일 {wx["m30"]:,.0f}명' if wx.get('m30') is not None else '최근 30일 집계 전')
             if wx.get('engaged') is not None:
                 ea = wx.get('eavg7')
