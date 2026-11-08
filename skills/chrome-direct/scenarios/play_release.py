@@ -49,7 +49,10 @@ def out(s):
 
 def show(tid, wait=8):
     time.sleep(wait)
-    c.shot(tid, PNG)
+    try:
+        c.shot(tid, PNG)  # 캡처는 화면을 앞으로 띄우는 용도. 실패해도(탭 색인 오류 등) 이미 누른 동작은 되돌리지 않고 이어 간다
+    except Exception as e:
+        print(f"shot skipped: {e}", file=sys.stderr)
     time.sleep(3)
 
 

@@ -1,0 +1,26 @@
+name: PopupKiller
+options: { bundleIdPrefix: com.oguriworks.popupkiller }
+settings:
+  base:
+    DEVELOPMENT_TEAM: 7LZK6PGS47
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "Apple Development"
+    PROVISIONING_PROFILE_SPECIFIER: popupkiller-dev
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    GENERATE_INFOPLIST_FILE: YES
+targets:
+  Host:
+    type: application
+    platform: iOS
+    sources: [Host]
+    settings: { base: { PRODUCT_BUNDLE_IDENTIFIER: com.oguriworks.popupkiller.host } }
+  UIT:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UIT]
+    dependencies: [{ target: Host }]
+    settings: { base: { PRODUCT_BUNDLE_IDENTIFIER: com.oguriworks.popupkiller.uit, TEST_TARGET_NAME: Host } }
+schemes:
+  UIT:
+    build: { targets: { Host: all, UIT: [test] } }
+    test: { targets: [UIT] }
