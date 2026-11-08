@@ -188,7 +188,14 @@ def submitted_evidence(cid):
             hits.append(f"{p.name}: {t.strip()[:80]}")
     hd = JOBS / "handled"
     if hd.is_dir():
-        hits += [f"handled/{p.name}" for p in hd.glob(f"{cid}*") if "submit" in p.name]
+        # 이름에 submit이 있어도 BLOCKED(안 냄) 기록은 제외 — 11/08 hy 오판. 내용에 제출 증거가 있을 때만.
+        for p in hd.glob(f"{cid}*"):
+            if "submit" not in p.name:
+                continue
+            t = p.read_text(errors="ignore")[:500].strip()
+            if t.startswith("BLOCKED"):
+                continue
+            hits.append(f"handled/{p.name}: {t[:80]}")
     f = DB / "contests" / f"{cid}.json"
     if f.exists():
         d = json.loads(f.read_text())
