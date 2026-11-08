@@ -4,6 +4,7 @@ answers.json: {"items": [
   {"q": "^1\\.", "choose": "유의사항을 확인"},          # checkbox/radio by option label (regex)
   {"q": "^2\\.", "choose": "^동의합니다"},
   {"q": "^3\\.", "text": "권리나루"},                    # first visible textarea/input in that question
+  {"q": "^2\\.", "file": "/abs/sample.jpg"},           # 사진 첨부 칸(질문 안 input[type=file]) — '1/1'+미리보기 뜰 때까지 대기
   {"ph": "이름을 입력", "text": "{name}"},               # input by placeholder (respondent fields)
   {"ph": "연락처를 입력", "text": "{phone_digits}"}]}
 `q` is matched against each question's title line (the line starting with 'N.'), `{placeholders}`
@@ -15,6 +16,7 @@ completion screen. --marker f: refuse if f exists (already sent), write it after
 --lock-held: the contest lock was taken by the caller; check submit evidence but do not mkdir.
 --proof x.png: screenshot of the completion screen.
 --add-response: the form remembers this browser ('이미 참여한 설문입니다') — press '설문 추가 참여' for the next entry.
+type=email 칸·aria-checked 동의 칸이 있는 폼은 여기서 안 된다(11/03 KIND: insertText·실제 ⌘V도 불안정) → naver_form_submit_pw.py.
 """
 import json, re, sys, time
 from datetime import datetime
@@ -53,7 +55,7 @@ var __setv=(e,v)=>{e.focus();const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.
  Object.getOwnPropertyDescriptor(p,'value').set.call(e,v);e.dispatchEvent(new Event('input',{bubbles:true}));
  e.dispatchEvent(new Event('change',{bubbles:true}));e.dispatchEvent(new Event('keyup',{bubbles:true}));e.blur();return e.value===v};
 var __items=()=>[...document.querySelectorAll('.nsv_survey_item')].filter(__vis);
-var __title=it=>{const l=(it.innerText||'').split('\n').map(s=>s.trim()).find(s=>/^\d+\.\s/.test(s));return l||''};
+var __title=it=>{const l=(it.innerText||'').split('\n').map(s=>s.trim()).find(s=>/^Q?\d+\.\s/.test(s));return l||''};  // 'Q1. 성명' 형식 폼도 있음(10/28 과기부)
 """
 
 def step(msg):
@@ -66,12 +68,13 @@ DONE_RE = r"제출되었습니다|제출 완료|응답이 (제출|완료)|참여
 def fill_page(tid, items, info):
     """Fill what is on the current page in ONE js call (each call costs ~5s with many tabs open).
     Returns list of (key, status) for items present on this page."""
-    spec = [{**it, "text": expand(it["text"], info)} if "text" in it else it for it in items]
+    files = [it for it in items if "file" in it]
+    spec = [{**it, "text": expand(it["text"], info)} if "text" in it else it for it in items if "file" not in it]
     r = js(tid, HELP + f"""const spec={json.dumps(spec, ensure_ascii=False)};const res=[];
 for(const it of spec){{const key=it.q||it.ph;let r;
  if('text' in it){{let e;
   if(it.q){{const q=__items().find(i=>new RegExp(it.q).test(__title(i)));
-   e=q?[...q.querySelectorAll('textarea,input[type=text],input[type=tel],input:not([type])')].filter(__vis)[0]:null;}}
+   e=q?[...q.querySelectorAll('textarea,input[type=text],input[type=tel],input[type=email],input:not([type])')].filter(__vis)[0]:null;}}
   else e=[...document.querySelectorAll('textarea,input')].filter(x=>__vis(x)&&(x.placeholder||'').includes(it.ph))[0];
   if(!e)continue; r=__setv(e,it.text)?'OK':'MISMATCH:'+e.value.length;}}
  else{{const q=__items().find(i=>new RegExp(it.q).test(__title(i)));if(!q)continue;
@@ -83,6 +86,27 @@ return res;""", 40)
     for key, st in r:
         if st != "OK":
             raise RuntimeError(f"{key}: {st}")
+    for it in files:  # 사진 첨부 칸: 그 질문 안의 input[type=file]에 표시를 달고 chromectl.upload_file로 넣는다(11/08 hy)
+        mark = js(tid, HELP + f"""const q=__items().find(i=>new RegExp({json.dumps(it['q'])}).test(__title(i)));if(!q)return 'noq';
+const f=q.querySelector('input[type=file]');if(!f)return 'nofile';
+if(/\\b1\\s*\\/\\s*1\\b/.test(q.innerText))return 'already';f.setAttribute('data-cdup','1');return 'ok';""")
+        if mark == "noq":
+            continue
+        if mark == "already":
+            r.append([it["q"], "OK(already)"]); continue
+        if mark != "ok":
+            raise RuntimeError(f"{it['q']}: {mark}")
+        step(f"upload {Path(it['file']).name}")
+        up = c.upload_file(tid, it["file"], selector="input[data-cdup='1']")
+        if not str(up).startswith("ok"):
+            raise RuntimeError(f"{it['q']}: upload {up}")
+        try:
+            poll(tid, HELP + f"""const q=__items().find(i=>new RegExp({json.dumps(it['q'])}).test(__title(i)));
+return q&&/\\b1\\s*\\/\\s*1\\b/.test(q.innerText)&&!!q.querySelector('img')""", 60, 2)
+        except Exception:
+            err = js(tid, HELP + f"""const q=__items().find(i=>new RegExp({json.dumps(it['q'])}).test(__title(i)));return q?q.innerText.slice(0,300):''""")
+            raise RuntimeError(f"{it['q']}: upload not shown ({err!r})")
+        r.append([it["q"], "OK"])
     return r
 
 
@@ -121,13 +145,17 @@ def main():
             out["pages"].append({"page": f"{cur}/{total}", "filled": [k for k, _ in got]})
             nxt = js(tid, HELP + "const b=[...document.querySelectorAll('button')].filter(__vis).find(b=>b.innerText.trim()==='다음');return !!b")
             if nxt:
-                js(tid, HELP + "__press([...document.querySelectorAll('button')].filter(__vis).find(b=>b.innerText.trim()==='다음'));return 1")
                 after = cur
-                for _w in range(12):  # 다음 쪽이 그려질 때까지(빈 값·같은 쪽이면 더 기다림)
-                    time.sleep(1.5)
-                    after, _t = page_no(tid)
+                for _try in range(2):  # 사진 업로드 직후엔 첫 '다음'이 안 먹을 때가 있다(11/08 hy) → 한 번 더 누른다('다음'이라 중복 위험 없음)
+                    js(tid, HELP + "__press([...document.querySelectorAll('button')].filter(__vis).find(b=>b.innerText.trim()==='다음'));return 1")
+                    for _w in range(12):  # 다음 쪽이 그려질 때까지(빈 값·같은 쪽이면 더 기다림)
+                        time.sleep(1.5)
+                        after, _t = page_no(tid)
+                        if after and after != cur:
+                            break
                     if after and after != cur:
                         break
+                    step(f"page {cur} did not advance — press 다음 again")
                 if not after or after == cur:
                     err = js(tid, HELP + "return [...document.querySelectorAll('[class*=error],[class*=alert],[class*=warning]')].filter(__vis).map(e=>e.innerText.trim()).filter(Boolean).join(' | ').slice(0,300)")
                     raise RuntimeError(f"page {cur} did not advance: {err}")
@@ -137,7 +165,7 @@ def main():
         if not sub:
             raise RuntimeError("no 제출 button on last page")
         # values check on the last page (lengths only — never print personal values)
-        out["last_page_check"] = js(tid, HELP + "return [...document.querySelectorAll('textarea,input[type=text],input[type=tel]')].filter(__vis).map(e=>e.value.length)")
+        out["last_page_check"] = js(tid, HELP + "return [...document.querySelectorAll('textarea,input[type=text],input[type=tel],input[type=email]')].filter(__vis).map(e=>e.value.length)")
         if not args.submit:
             emit(out, "DRY_RUN", f"filled {len(out['pages'])} pages, 제출 not pressed")
             return
