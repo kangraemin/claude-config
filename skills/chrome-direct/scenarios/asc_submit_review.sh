@@ -12,6 +12,7 @@
 #    - 인앱 '심사에 추가' 팝오버는 거절된 제출을 고를 수 없고 'iOS 제출 초안'만 보인다. API reviewSubmissionItems에는 인앱 관계가 없다.
 #    - API로 거절 제출의 항목 삭제·취소는 409. 화면 제출 상세의 '제출 취소' → 대화상자 '확인'으로 취소(CANCELING→COMPLETE, 수십 초).
 #    - 그다음 이 스크립트를 다시 돌리면 버전을 초안에 넣고 인앱 전부를 '심사에 추가'한 뒤 제출한다. 회신 글은 옛 제출에 남는다.
+#    - 출시 방식: RELEASE_TYPE=AFTER_APPROVAL(승인 즉시 출시), 기본 MANUAL.
 #    - REVIEW_NOTES를 안 주면 Forge Survivor 기본 메모로 덮어쓴다 — 다른 앱은 반드시 REVIEW_NOTES를 넘기거나 prep 단계를 건너뛴다.
 APP=${1:-6829073185}
 set -a; source ~/.claude/.env; set +a
@@ -31,7 +32,7 @@ if step == "prep":
     d = call("GET", f"/v1/appStoreVersions/{V}/appStoreReviewDetail")["data"]["id"]
     notes = os.environ.get("REVIEW_NOTES") or ("Forge Survivor is a single-player action roguelite: forge weapons and survive waves of monsters. No login or demo account needed. Rewarded video ads (AdMob) are optional and grant in-game rewards. In-app purchases are in the lobby Shop tab; purchases can be restored from Settings. The in-app purchases are submitted together with this first version.")
     call("PATCH", f"/v1/appStoreReviewDetails/{d}", {"data": {"type": "appStoreReviewDetails", "id": d, "attributes": {"notes": notes}}})
-    call("PATCH", f"/v1/appStoreVersions/{V}", {"data": {"type": "appStoreVersions", "id": V, "attributes": {"releaseType": "MANUAL"}}})
+    call("PATCH", f"/v1/appStoreVersions/{V}", {"data": {"type": "appStoreVersions", "id": V, "attributes": {"releaseType": os.environ.get("RELEASE_TYPE", "MANUAL")}}})
     subs = [s for s in call("GET", f"/v1/apps/{APP}/reviewSubmissions")["data"] if s["attributes"]["state"] == "READY_FOR_REVIEW"]
     if subs: S = subs[0]["id"]
     else: S = call("POST", "/v1/reviewSubmissions", {"data": {"type": "reviewSubmissions", "attributes": {"platform": "IOS"}, "relationships": {"app": {"data": {"type": "apps", "id": APP}}}}})["data"]["id"]

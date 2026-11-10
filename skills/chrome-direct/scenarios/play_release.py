@@ -140,10 +140,14 @@ def upload(tid):
     except Exception:
         out("FAIL aab가 zip이 아님")
     show(tid)
-    js(tid, CK + "const b=bt('새 버전 만들기'); if(b) ck(b); return !!b")
+    js(tid, CK + "const b=bt('새 버전 만들기')||bt('버전 수정'); if(b) ck(b); return !!b")  # 임시 출시가 있으면 '버전 수정'
     show(tid, 9)
     if "/prepare" not in js(tid, "return location.href"):
         out("FAIL 새 버전 화면이 안 열림")
+    for _ in range(12):  # 첫 출시 화면은 파일 칸이 몇 초 늦게 붙는다(2026-11-10 어디먹 noinput)
+        if js(tid, "return document.querySelectorAll('input[type=file]').length"):
+            break
+        time.sleep(3)
     print(big_upload(tid, os.path.abspath(a.aab)))
     code = None
     for _ in range(36):
