@@ -162,6 +162,8 @@ h1{font-size:20px;font-weight:700;margin:0}
 .row{display:grid;grid-template-columns:1fr 64px 76px 12px;align-items:center;gap:10px;min-height:56px;padding:6px 8px;margin:0 -8px;border-bottom:1px solid var(--line);border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .row:hover,.row:active{background:var(--soft)}
 .row .go{color:var(--sub);font-size:20px;line-height:1;text-align:right}
+.cw{position:relative;padding-top:30px}.cw .chart{touch-action:pan-y;cursor:crosshair}.chart .cur{stroke:var(--sub);stroke-width:1;stroke-dasharray:2 2}
+.tt{position:absolute;top:0;background:var(--ink);color:var(--bg);font-size:14px;font-weight:600;padding:4px 10px;border-radius:8px;white-space:nowrap;pointer-events:none}
 .tip{font-size:13px;color:var(--sub);margin:4px 0 2px}
 .row .nm{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .ds{font-size:13px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -216,16 +218,25 @@ function chart(keys,vals,hi){const W=340,H=150,L=34,B=20,n=vals.length,m=Math.ma
   {const ok=vals.filter((v,i)=>v!=null&&keys[i]!='live');if(ok.length>1){const av=ok.reduce((a,b)=>a+b,0)/ok.length,y=((H-B)-av/top*(H-B-6)).toFixed(1);  // 사용자 11/10 "평균 빨간선 가로로"
     g+=`<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--avg)" stroke-width="1.5" stroke-dasharray="5 3"/>`;leg=`<div class="leg"><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--avg)" stroke-width="2" stroke-dasharray="5 3"/></svg>평균 ${f(Math.round(av))}명</div>`}}  // 11/10 "글자가 안 보여": 막대 위에 겹치던 글자를 차트 위 범례로
   [0,Math.floor((n-1)/2),n-1].filter((x,i,a)=>a.indexOf(x)==i).forEach(i=>{g+=`<text x="${(i==0?L:i==n-1?W:L+i*bw+bw/2).toFixed(1)}" y="${H-4}" text-anchor="${i==0?'start':i==n-1?'end':'middle'}">${esc(lab(keys[i]))}</text>`});
-  return`${leg}<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`}
+  const c=CH.push({k:keys,v:vals})-1;  // 사용자 11/11 "봉을 클릭하면 몇명인지 주식차트처럼"
+  return`${leg}<div class="cw" data-c="${c}"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}<line class="cur" y1="0" y2="${H-B}" style="display:none"/></svg><div class="tt" hidden></div></div>`}
+const CH=[];
+function chTap(e){const w=e.target.closest&&e.target.closest('.cw');if(!w)return;const c=CH[w.dataset.c],sv=w.querySelector('svg'),r=sv.getBoundingClientRect();
+  const n=c.v.length,bw=(340-34)/n,x=(e.clientX-r.left)/r.width*340;const i=Math.max(0,Math.min(n-1,Math.floor((x-34)/bw)));
+  const cx=34+i*bw+bw/2,cur=w.querySelector('.cur'),t=w.querySelector('.tt');cur.setAttribute('x1',cx);cur.setAttribute('x2',cx);cur.style.display='';
+  t.hidden=false;t.textContent=`${lab(c.k[i])}  ${c.v[i]==null?'기록 없음':f(c.v[i])+'명'}`;const px=cx/340*r.width;t.style.left=Math.max(0,Math.min(r.width-t.offsetWidth,px-t.offsetWidth/2))+'px'}
+document.addEventListener('pointerdown',chTap);document.addEventListener('pointermove',e=>{if(e.pointerType=='mouse'||e.buttons)chTap(e)});
 const byKey={};days.forEach(k=>byKey[k.key]=k);
 const lab=key=>key=='live'?'지금':(d=>`${+d[1]}/${+d[2]}`)(key.split('-'));
 let MODE='d',IDX=0,SORT='v',OPEN=null;
 try{MODE=localStorage.getItem('ga-mode')||'d';const j=days.findIndex(k=>k.key==localStorage.getItem('ga-day'));if(j>=0)IDX=j}catch(e){}
 function ctx(){ // 지금 보는 기간: keys(차트·스파크라인 줄), 값, 비교값
   if(MODE=='d'){const k=days[IDX],live=k.key=='live';const fi=live?full.length:full.findIndex(x=>x.key==k.key);
-    const keys=full.slice(Math.max(0,fi-13),fi).map(x=>x.key).concat(live?['live']:[k.key]);
+    // 사용자 11/11 "날짜가 바뀌면 미래 값이 왜 없어져, 하이라이트만 바뀌면 되잖아" — 차트 칸은 최근 14칸 고정, 고른 날만 진하게
+    const all=full.map(x=>x.key).concat(D.live?['live']:[]),pos=live?all.length-1:fi;
+    const st=Math.max(0,pos>=all.length-14?all.length-14:pos-13),keys=all.slice(st,st+14);
     const prev=full[fi-1]||null;
-    return{keys,hi:[keys.length-1],when:k.label+(live?' '+k.range.split('~ ')[1]+'까지':''),live,
+    return{keys,hi:[pos-st],when:k.label+(live?' '+k.range.split('~ ')[1]+'까지':''),live,
       cur:n=>val(n,k.key),prev:n=>prev?val(n,prev.key):null,cmp:live?'어제 하루':'전날 대비',lbl:live?'오늘 지금까지 웹 방문':'웹 방문 합계',
       tot:webTot(k.key),ptot:prev?webTot(prev.key):null,doc:k.doc}}
   const n=+MODE,c=full.slice(-n),p=full.slice(-2*n,-n);const pv=p.length==n?p:null;
