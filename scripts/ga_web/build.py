@@ -12,6 +12,9 @@ import html
 import json
 import re
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+import ga_daily_report as G  # short()·channel(): 리포트와 같은 이름·같은 길 구분
 
 SRC = Path.home() / '.cache/ga-daily'
 TAIL = {'전부 0인 곳', '참고', '거의 안 들어온 곳'}
@@ -72,6 +75,32 @@ def summary(svc):
     return out
 
 
+def sources(key):
+    """<날짜>-detail.txt의 '유입:' 줄 → {서비스: {길: 방문수}}. 적힌 것 밖은 '그 밖'(세션 합 - 적힌 합)."""
+    f = SRC / f'{key}-detail.txt'
+    if not f.exists():
+        return {}
+    out = {}
+    for sec in f.read_text().split('\n\n'):
+        L = sec.strip().split('\n')
+        if not L or not L[0].startswith('📊 '):
+            continue
+        name = G.short(L[0][2:].strip())
+        tot = next((num(m.group(1)) for l in L if (m := re.search(r'세션 ([\d,]+)', l))), None)
+        line = next((l[4:] for l in L if l.startswith('유입: ')), '')
+        by = {}
+        for part in line.split(', '):
+            m = re.match(r'(.+) (\d+)$', part.strip())
+            if m:
+                c = G.channel(m.group(1))
+                by[c] = by.get(c, 0) + int(m.group(2))
+        if tot and tot > sum(by.values()):
+            by['그 밖'] = tot - sum(by.values())
+        if by:
+            out[name] = by
+    return out
+
+
 def load():
     days = []
     for f in sorted(SRC.glob('20[0-9][0-9]-[0-9][0-9]-[0-9][0-9].txt'), reverse=True):
@@ -81,7 +110,7 @@ def load():
         doc = parse(f.read_text())
         days.append({'key': f.stem, 'label': f'{d.month}/{d.day} ({"월화수목금토일"[d.weekday()]})',
                      'range': f'{d.month}/{d.day} 0시 ~ {(d + dt.timedelta(days=1)).month}/{(d + dt.timedelta(days=1)).day} 0시',
-                     'doc': doc, 'sum': [summary(s) for s in doc['svcs']]})
+                     'doc': doc, 'sum': [summary(s) for s in doc['svcs']], 'src': sources(f.stem)})
     live = None
     lj, lt = SRC / 'live.json', SRC / 'live.txt'
     if lj.exists() and lt.exists():
@@ -98,9 +127,9 @@ def load():
 PAGE = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>방문 리포트</title>
 <style>
-:root{--bg:#fff;--ink:#16181d;--sub:#555b66;--line:#eceef1;--soft:#f4f5f7;--bar:#c9ced6;--up:#d6302a;--down:#2860d8}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#121417;--ink:#eef0f3;--sub:#9aa2ad;--line:#262a30;--soft:#1c1f24;--bar:#454b55;--up:#ff6b5f;--down:#6d97ff}}
-:root[data-theme=dark]{--bg:#121417;--ink:#eef0f3;--sub:#9aa2ad;--line:#262a30;--soft:#1c1f24;--bar:#454b55;--up:#ff6b5f;--down:#6d97ff}
+:root{--bg:#fff;--ink:#16181d;--sub:#555b66;--line:#eceef1;--soft:#f4f5f7;--bar:#c9ced6;--up:#d6302a;--down:#2860d8;--avg:#e5322d}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#121417;--ink:#eef0f3;--sub:#9aa2ad;--line:#262a30;--soft:#1c1f24;--bar:#454b55;--up:#ff6b5f;--down:#6d97ff;--avg:#ff6b5f}}
+:root[data-theme=dark]{--bg:#121417;--ink:#eef0f3;--sub:#9aa2ad;--line:#262a30;--soft:#1c1f24;--bar:#454b55;--up:#ff6b5f;--down:#6d97ff;--avg:#ff6b5f}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",sans-serif;-webkit-font-smoothing:antialiased}
 .wrap{max-width:640px;margin:0 auto;padding:12px 16px 48px}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;min-height:44px}
@@ -121,6 +150,11 @@ h1{font-size:20px;font-weight:700;margin:0}
 .chg{font-size:13px;color:var(--sub)}.up{color:var(--up)}.down{color:var(--down)}
 .chart{display:block;width:100%;height:auto;margin:8px 0 0}
 .chart text{font-size:13px;fill:var(--sub)}
+.leg{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:13px;font-weight:600;color:var(--avg);margin:10px 0 -2px}
+.src{margin:18px 0 4px}.src h2{font-size:15px;font-weight:600;margin:0 0 2px}.src .lb{font-size:13px;color:var(--sub);margin-bottom:6px}
+.sr{display:grid;grid-template-columns:96px 1fr 92px;align-items:center;gap:10px;min-height:30px}
+.sr .k{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sr .b{height:12px;border-radius:3px;background:var(--soft)}
+.sr .b i{display:block;height:100%;border-radius:3px;background:var(--ink)}.sr .n{text-align:right;font-size:14px;white-space:nowrap}.sr .n b{font-weight:600}.sr .n span{color:var(--sub);font-size:13px;margin-left:4px}
 .sort{display:flex;gap:6px;margin:14px 0 2px}
 .sort button{min-height:34px;padding:0 12px;border-radius:17px;border:1px solid var(--line);font-size:13px;color:var(--sub)}
 .sort button.on{border-color:var(--ink);color:var(--ink);font-weight:600}
@@ -173,10 +207,12 @@ function pc(a,b){if(a==null||b==null)return{t:'-',c:'',r:0};if(!b)return a?{t:'�
 function spark(vs){const w=64,h=24,m=Math.max(...vs.map(v=>v||0),1),n=vs.length;if(n<2)return'';const pt=(v,i)=>[(i/(n-1)*(w-4)+2).toFixed(1),(h-3-(v||0)/m*(h-6)).toFixed(1)];
   const p=vs.map((v,i)=>pt(v,i).join(',')).join(' ');const [x,y]=pt(vs[n-1],n-1);return`<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${p}"/><circle cx="${x}" cy="${y}" r="2"/></svg>`}
 function chart(keys,vals,hi){const W=340,H=150,L=34,B=20,n=vals.length,m=Math.max(...vals.map(v=>v||0),1);const top=Math.ceil(m/(m>100?50:10))*(m>100?50:10);
-  const bw=(W-L)/n;let g='';[0,.5,1].forEach(t=>{const y=(H-B)-(H-B-6)*t;g+=`<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-6}" y="${y+4}" text-anchor="end">${f(top*t)}</text>`});
+  const bw=(W-L)/n;let g='',leg='';[0,.5,1].forEach(t=>{const y=(H-B)-(H-B-6)*t;g+=`<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-6}" y="${y+4}" text-anchor="end">${f(top*t)}</text>`});
   vals.forEach((v,i)=>{const bh=Math.max((v||0)/top*(H-B-6),v?2:0);g+=`<rect x="${(L+i*bw+bw*.15).toFixed(1)}" y="${(H-B-bh).toFixed(1)}" width="${(bw*.7).toFixed(1)}" height="${bh.toFixed(1)}" rx="1.5" fill="${hi.includes(i)?'var(--ink)':'var(--bar)'}"/>`});
+  {const ok=vals.filter((v,i)=>v!=null&&keys[i]!='live');if(ok.length>1){const av=ok.reduce((a,b)=>a+b,0)/ok.length,y=((H-B)-av/top*(H-B-6)).toFixed(1);  // 사용자 11/10 "평균 빨간선 가로로"
+    g+=`<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--avg)" stroke-width="1.5" stroke-dasharray="5 3"/>`;leg=`<div class="leg"><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--avg)" stroke-width="2" stroke-dasharray="5 3"/></svg>평균 ${f(Math.round(av))}명</div>`}}  // 11/10 "글자가 안 보여": 막대 위에 겹치던 글자를 차트 위 범례로
   [0,Math.floor((n-1)/2),n-1].filter((x,i,a)=>a.indexOf(x)==i).forEach(i=>{g+=`<text x="${(i==0?L:i==n-1?W:L+i*bw+bw/2).toFixed(1)}" y="${H-4}" text-anchor="${i==0?'start':i==n-1?'end':'middle'}">${esc(lab(keys[i]))}</text>`});
-  return`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`}
+  return`${leg}<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`}
 const byKey={};days.forEach(k=>byKey[k.key]=k);
 const lab=key=>key=='live'?'지금':(d=>`${+d[1]}/${+d[2]}`)(key.split('-'));
 let MODE='d',IDX=0,SORT='v',OPEN=null;
@@ -192,6 +228,12 @@ function ctx(){ // 지금 보는 기간: keys(차트·스파크라인 줄), 값,
   return{keys:c.map(x=>x.key),hi:c.map((x,i)=>i),when:`${c[0].label} ~ ${c[c.length-1].label}`,live:false,
     cur:nm=>sum(c.map(x=>val(nm,x.key))),prev:nm=>pv?sum(pv.map(x=>val(nm,x.key))):null,cmp:`앞 ${n}일 대비`,lbl:`${n}일 동안 웹 방문 합계`,
     tot:sum(c.map(x=>webTot(x.key))),ptot:pv?sum(pv.map(x=>webTot(x.key))):null,days:c.length,doc:null}}
+function srcBox(keys,names){ // 사용자 11/10 "방문 경로별로 비율도 숫자도, 한눈에" — 방문 횟수 기준, 많은 순 6개 + 나머지
+  const by={};keys.forEach(k=>{const d=byKey[k];if(!d||!d.src)return;names.forEach(n=>{const x=d.src[n];if(x)Object.entries(x).forEach(([c,v])=>by[c]=(by[c]||0)+v)})});
+  let e=Object.entries(by).filter(x=>x[1]>0).sort((a,b)=>(a[0]=='그 밖')-(b[0]=='그 밖')||b[1]-a[1]);const tot=e.reduce((t,x)=>t+x[1],0);if(!tot)return'';
+  if(e.length>7){const r=e.slice(6).reduce((t,x)=>t+x[1],0);e=e.slice(0,6).concat([['그 밖',r]])}
+  const mx=Math.max(...e.map(x=>x[1]));
+  return`<div class="src"><h2>어디서 들어왔나</h2><div class="lb">방문 ${f(tot)}번 기준</div>${e.map(([c,v])=>`<div class="sr"><div class="k">${esc(c)}</div><div class="b"><i style="width:${(v/mx*100).toFixed(1)}%${c=='그 밖'?';background:var(--bar)':''}"></i></div><div class="n"><b>${f(v)}번</b><span>${Math.round(v/tot*100)}%</span></div></div>`).join('')}</div>`}
 function render(){
   try{localStorage.setItem('ga-mode',MODE);localStorage.setItem('ga-day',days[IDX].key)}catch(e){}
   document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.m==MODE));
@@ -199,11 +241,11 @@ function render(){
   const C=ctx();$('when').textContent=C.when;$('prev').disabled=MODE!='d'||IDX>=days.length-1;$('next').disabled=MODE!='d'||IDX<=0;
   $('prev').style.visibility=$('next').style.visibility=MODE=='d'?'':'hidden';
   const tp=C.live?{t:'',c:''}:pc(C.tot,C.ptot);
-  $('sum').innerHTML=`<div class="lb">${C.lbl}</div><div class="big">${f(C.tot)}명</div>${MODE!='d'?`<div class="lb">하루 평균 ${f(C.tot/C.days)}명</div>`:''}<div class="chg ${tp.c}">${C.live?`어제 하루 ${f(C.ptot)}명`:(C.ptot==null?'비교할 앞 기간 없음':`${C.cmp} ${tp.t}`)}</div>${chart(C.keys,C.keys.map(webTot),C.hi)}`;
+  $('sum').innerHTML=`<div class="lb">${C.lbl}</div><div class="big">${f(C.tot)}명</div>${MODE!='d'?`<div class="lb">하루 평균 ${f(C.tot/C.days)}명</div>`:''}<div class="chg ${tp.c}">${C.live?`어제 하루 ${f(C.ptot)}명`:(C.ptot==null?'비교할 앞 기간 없음':`${C.cmp} ${tp.t}`)}</div>${chart(C.keys,C.keys.map(webTot),C.hi)}`+srcBox(C.keys.filter((k,i)=>C.hi.includes(i)),order.filter(n=>useWeb[n]));
   const rows=[],zero=[];
   order.forEach(n=>{const v=C.cur(n);if(v==null)return;const sv=C.keys.map(k=>val(n,k));if(!v&&!sv.some(x=>x)){zero.push(n);return}
     const p=pc(v,C.prev(n));const e=MODE=='d'&&S[n][days[IDX].key]?S[n][days[IDX].key].eng:null;
-    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div><div class="ds">${useWeb[n]?'웹':'토스'}${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:e!=null?` · 머문 방문 ${f(e)}회`:''}</div></div>${spark(sv)}<div><div class="v">${f(v)}</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div></li>`})});
+    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div><div class="ds">${useWeb[n]?'웹':'토스'}${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:e!=null?` · 그중 10초 넘게 본 방문 ${f(e)}번`:''}</div></div>${spark(sv)}<div><div class="v">${f(v)}명</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div></li>`})});
   rows.sort(SORT=='v'?(a,b)=>b.v-a.v:SORT=='up'?(a,b)=>b.p.r-a.p.r||b.v-a.v:(a,b)=>a.p.r-b.p.r||b.v-a.v);
   $('list').innerHTML=rows.map(r=>r.h).join('');
   document.querySelectorAll('#list .row').forEach(r=>r.onclick=()=>detail(r.dataset.n));
@@ -219,7 +261,7 @@ function detail(n){OPEN=n;const C=ctx();const keys=full.slice(-30).map(x=>x.key)
   const raw=svc?svc.blocks.filter(b=>!(b.items.length==1&&b.items[0]=='없음')):[];
   $('det').innerHTML=`<button class="back" id="back">‹ 목록으로</button><div class="sum"><div class="lb">${esc(n)} · ${MODE=='d'?esc(C.when):esc(C.when)+' 합계, 하루 평균 '+fa(v/C.days)+'명'}</div><div class="big">${f(v)}명</div>
     <div class="chg ${C.live?'':p.c}">${C.live?`어제 하루 ${f(pv)}명`:(pv==null?'비교할 앞 기간 없음':`${C.cmp} ${p.t}, ${MODE=='d'?'전날':'앞 기간'} ${f(pv)}명`)}</div>
-    ${chart(keys,vs,hi)}</div><h2>날짜별 ${useWeb[n]?'웹':'토스'} 방문</h2><table><tr><th>날짜</th><th>방문</th><th>전날 대비</th><th>머문 방문</th></tr>${rows}</table>
+    ${chart(keys,vs,hi)}</div>${srcBox(C.keys.filter((k,i)=>C.hi.includes(i)),[n])}<h2>날짜별 ${useWeb[n]?'웹':'토스'} 방문</h2><table><tr><th>날짜</th><th>방문</th><th>전날 대비</th><th>10초 넘게 본 방문</th></tr>${rows}</table>
     ${raw.length?`<details><summary>그날 리포트 원문</summary>${raw.map(b=>`${b.t?`<h2>${esc(b.t)}</h2>`:''}<ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</details>`:''}`;
   $('main').hidden=true;$('det').hidden=false;window.scrollTo(0,0);$('back').onclick=()=>{OPEN=null;$('det').hidden=true;$('main').hidden=false}}
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{MODE=b.dataset.m;render()});

@@ -145,7 +145,7 @@ def section(cl, pid, name, day, path=None, skip=()):
         lines.append('사이트: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in hosts))
     src = run(cl, pid, y, y, ['sessions'], ['sessionSource'], 10, 'sessions', path=path, skip=skip)
     if src:
-        lines.append('유입: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in src[:3]))
+        lines.append('유입: ' + ', '.join(f'{d[0]} {v[0]:.0f}' for d, v in src))  # 11/10 웹 '어디서 들어왔나' 막대용으로 10개 전부(파일에만 씀)
     pages = run(cl, pid, y, y, ['screenPageViews'], ['pagePath'], 3, 'screenPageViews', path=path, skip=skip)
     if pages:
         lines.append('페이지: ' + ', '.join(f'{d[0][:40]} {v[0]:.0f}' for d, v in pages))
@@ -505,7 +505,7 @@ def channel(src):
     for keys, name in [(('(direct)',), '직접 접속'), (('(not set)',), '출처 모름'),
                        (('chatgpt', 'openai'), 'ChatGPT'), (('perplexity',), '퍼플렉시티'), (('claude.ai',), '클로드'), (('gemini',), '제미나이'), (('copilot',), '코파일럿'),  # 11/5 "AI 답변 어딘진 모름?": 묶지 않는다
                        
-                       (('kin.naver',), '지식iN'), (('cafe.naver', 'blog.naver'), '네이버 카페·블로그'),
+                       (('kin.naver',), '지식iN'), (('cafe.naver', 'blog.naver', 'naver_blog'), '네이버 카페·블로그'),
                        (('naver',), '네이버 검색'), (('google',), '구글 검색'), (('bing', 'daum', 'duckduckgo'), '다른 검색'),
                        (('threads',), '스레드'), (('instagram',), '인스타'), (('youtube',), '유튜브'), (('t.co', 'x.com', 'twitter'), 'X'),
                        (('kangraemin.github.io',), '개발 블로그'), (('toss',), '토스')]:
