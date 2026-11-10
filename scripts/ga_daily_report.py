@@ -255,20 +255,21 @@ def toss_by_service(day):
 
 GAME = HOME / '.cache/game-stats'  # 포털판 게임 숫자(itch API 스냅샷)
 GAME_SVC = '강화 서바이버'  # GA 속성 이름과 같은 칸에 붙인다(웹판 GA4 = 561399106)
-ITCH_GAME = 5265293  # kangraemin.itch.io/wait-it-worked. itch판은 GA를 안 보내 API 누적값만 있다(브라우저 플레이는 downloads에 안 잡힘)
+ITCH_GAME = 5314438  # oguriworks.itch.io/survive-by-luck (11/7 사업자 계정으로 옮김, 옛 kangraemin 5265293은 Draft). itch판은 GA를 안 보내 API 누적값만 있다(브라우저 플레이는 downloads에 안 잡힘)
 CRAZY_STATUS = '심사 중(공개 전)'  # 공개되면 developer.crazygames.com 대시보드 숫자로 바꾼다(API 없음, 로그인 CRAZYGAMES_EMAIL/PASSWORD)
 
 
 def game_by_service(day):
     """사용자 10/31 "매일아침에 ga에 그것들도오는지 … 안오면오게해": itch 조회·다운로드(전날 스냅샷 대비)와 CrazyGames 상태. ({서비스: [줄]}, 오류)."""
-    key = env('ITCH_API_KEY')
+    sns = Path.home() / '.claude/sns.env'  # oguriworks 키는 sns.env BIZ_ITCH_API_KEY
+    key = next((l.split('=', 1)[1].strip().strip('"') for l in sns.read_text().splitlines() if l.startswith('BIZ_ITCH_API_KEY=')), None) if sns.exists() else None
     lines = []
     if key:
         r = json.load(urllib.request.urlopen(f'https://itch.io/api/1/{key}/my-games', timeout=20))
         g = next((x for x in r.get('games', []) if x['id'] == ITCH_GAME), None)
         if g:
             cur = {'views': g.get('views_count', 0), 'downloads': g.get('downloads_count', 0)}
-            d = GAME / 'itch'
+            d = GAME / 'itch-oguri'
             d.mkdir(parents=True, exist_ok=True)
             (d / f'{day + dt.timedelta(days=1)}.json').write_text(json.dumps(cur))  # 리포트 날(오늘 아침) 기준 누적
             prev = sorted(f for f in d.glob('*.json') if f.stem < str(day + dt.timedelta(days=1)))
@@ -439,7 +440,8 @@ def ai_notes(svc):
         return {k: v for k, v in notes.items() if isinstance(v, dict)}
     except Exception as e:
         print(f'AI 분석 실패: {str(e)[:120]}', file=sys.stderr)
-        AI_ERR[:] = [re.sub(r'\s+', ' ', str(e))[:80]]
+        m = str(e)  # 11/10 원문 오류(경로 포함)가 '너무 긴 줄' 점검에 걸려 리포트가 통째로 안 갔다 → 짧은 사유만 싣는다
+        AI_ERR[:] = ['claude -p 한도 초과' if '한도' in m or 'limit' in m else 'claude -p 로그인 실패' if '로그인' in m or 'auth' in m.lower() else re.sub(r'\s+', ' ', m)[:30]]
         return {}
 
 
@@ -474,7 +476,7 @@ def send(text):
             fp.write(f'GA_TG_CHAT_ID={cid}\n')
 
 
-HOST = {'kangraemin.github.io': '깃허브 웹판', 'kangraemin.itch.io': 'itch.io'}
+HOST = {'kangraemin.github.io': '깃허브 웹판', 'kangraemin.itch.io': 'itch.io(옛)', 'oguriworks.itch.io': 'itch.io'}
 
 
 def host_name(h):
