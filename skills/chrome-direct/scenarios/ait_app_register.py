@@ -238,7 +238,8 @@ def cmd_meta(a):
                       "e.focus();__setv(e,%s);['keydown','keypress','keyup'].forEach(t=>e.dispatchEvent(new KeyboardEvent(t,{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true})));return 1" % json.dumps(k))
             time.sleep(0.5)
         if a.submit:
-            c.js_json(t, "document.querySelectorAll('input[type=checkbox]').forEach(e=>{if(!e.checked)e.click()});return 1")
+            # 확인 체크만 켠다. '웹보드 게임이에요' 칸까지 켜면 3단계 게임 등급에서 스토어 링크가 막힌다(11/10 spot-difference-daily)
+            c.js_json(t, "document.querySelectorAll('input[type=checkbox]').forEach(e=>{let p=e;for(let i=0;i<4;i++)p=p.parentElement;if(!e.checked&&!p.innerText.includes('웹보드'))e.click()});return 1")
         click_text(t, '임시저장'); time.sleep(3)
         d = xhr(t, 'GET', base + a.app)['success']['draft']
         state = {'titleEn': d['titleEn'], 'desc': d['description'], 'detail': len(d['detailDescription'] or ''), 'cs': bool(d['csEmail']),

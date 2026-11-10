@@ -15,8 +15,15 @@
   "등급분류일자를 입력해 주세요. / 등급분류번호를 입력해 주세요." 로 막힌다. 번호는 플레이 IARC 인증 ID(콘솔 '콘텐츠 등급')가
   '-' 인 동안(스토어 미공개)엔 없고, 게임물관리위원회 자체등급분류 게임물 조회(SelfRateGameStatistics.aspx)에도 안 나온다.
   하위 카테고리 미선택도 같은 순간에 "하위 카테고리를 선택해 주세요." 로 막힌다(2단계).
-- 미검증: 등급분류일자 날짜 선택 창, 내용정보 '해당 없음' 선택(눌러도 '선택하기'로 남음). 번호가 생기면 이 두 칸부터 확인.
-검증: 2026-11-06 golgol-nyang — 텍스트·서명·주요화면 4장·확약·하위 카테고리·임시저장 성공, 검토 요청은 위 오류로 막힘.
+- 날짜: 달력 창(트리거에 pointer 이벤트)에서 날짜 버튼 → '확인'. 내용정보 '해당 없음'은 menu_pick 으로 된다(2026-11-10 골골냥 검토 요청 성공).
+- 함정: 2단계 '웹보드 게임' 체크가 켜지면 '스토어 링크'가 비활성이라 유형이 '등급분류증명서'로 남는다 → 스크립트가 끈다.
+함정(2026-11-10 spot-difference-daily):
+- 임시저장(PUT /draft)은 빠진 값을 '그대로 둠'으로 본다. 웹보드(specialCategory)는 임시저장으로 못 지운다.
+  같은 탭에서 웹보드를 끈 채로 바로 '검토 요청하기'를 눌러야 검토본에서 빠진다(combined-review는 폼 값 그대로).
+- '필수 값을 입력해 주세요.'만 뜨고 아무 요청이 안 나가면 앞 단계 빈칸이다. '이전'으로 가서 빨간 글(예: 2단계 가로 썸네일 1932x828)을 찾는다.
+- 자체등급분류사업자명은 '구글'/'애플'. 숨은그림 게임 하위 카테고리 이름은 '숨은그림·차이찾기'.
+- 다른 세션이 같은 Chrome 창 탭을 닫을 수 있다. 실제 마우스 클릭 대신 JS로, 한 번 실행 안에서 끝낸다.
+검증: 2026-11-10 golgol-nyang; 2026-11-10 spot-difference-daily — 웹보드 해제·썸네일 보충 후 검토 요청 성공(검토 중) — 스토어 링크(플레이)·IARC 번호·날짜·해당 없음으로 검토 요청 성공(검토 중).
 """
 import argparse, base64, json, os, re, sys, time
 sys.path.insert(0, os.path.expanduser('~/.claude/skills/chrome-direct'))
@@ -87,7 +94,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('app'); ap.add_argument('--deployment', required=True); ap.add_argument('--store-url', required=True)
     ap.add_argument('--sign', required=True); ap.add_argument('--pairs', required=True)
-    ap.add_argument('--subcat', default=''); ap.add_argument('--agency', default='Google LLC'); ap.add_argument('--grade', default='전체 이용가')
+    ap.add_argument('--subcat', default=''); ap.add_argument('--agency', default='구글'); ap.add_argument('--grade', default='전체 이용가')
     ap.add_argument('--rating-number', default=''); ap.add_argument('--rating-date', default='')
     ap.add_argument('--ws', type=int, default=WS); ap.add_argument('--submit', action='store_true')
     a = ap.parse_args()
@@ -96,8 +103,11 @@ def main():
     if a.subcat:
         s1, s2 = a.subcat.split('/')
         print('subcat', menu_pick(t, 1, s1)); time.sleep(2); print('subcat2', menu_pick(t, 2, s2))
+    # 웹보드 체크가 켜져 있으면 3단계 '스토어 링크'가 비활성(aria-disabled)이 된다 → 끈다(2026-11-10 골골냥)
+    print('webboard', c.js_json(t, "const x=[...document.querySelectorAll('input[type=checkbox]')].find(x=>{let p=x;for(let i=0;i<4;i++)p=p.parentElement;return p.innerText.includes('웹보드')});if(!x)return 'none';if(x.checked)x.click();return 'off'"))
     btn(t, '임시저장'); time.sleep(2)
     btn(t, '다음'); time.sleep(5)
+    print('type', menu_pick(t, 0, '스토어 링크')); time.sleep(3)
     biz, name, addr, phone = biz_info()
     V = {'step3.bizName': biz, 'step3.representativeName': name, 'step3.address': addr, 'step3.phoneNumber': phone,
          'step3.registrantName': biz, 'step3.ratingAgencyName': a.agency}
@@ -107,7 +117,21 @@ def main():
                         "const s=[...document.querySelectorAll('input')].find(x=>x.placeholder&&x.placeholder.startsWith('앱스토어, 플레이'));if(s)sv(s,%s);"
                         "return JSON.stringify([...document.querySelectorAll('input[name^=step3]')].map(x=>[x.name,x.value.length]))" % (json.dumps(V, ensure_ascii=False), json.dumps(a.store_url))))
     if a.rating_date:
-        print('WARN: 등급분류일자 날짜 창은 미검증 — 화면에서 확인', a.rating_date)
+        # 날짜 칸(spinbutton)에 키를 넣으면 화면엔 보여도 폼 값이 안 들어간다 → 달력 창에서 날을 누르고 '확인'
+        y, m, d = a.rating_date.split('-')
+        P = "const f=E=>{for(const n of ['pointerdown','mousedown','pointerup','mouseup','click'])E.dispatchEvent(new PointerEvent(n,{bubbles:true,cancelable:true,button:0,pointerType:'mouse'}))};"
+        c.js_json(t, P + "f(document.querySelector('[data-tds-data-picker-trigger]'));return 1"); time.sleep(2)
+        for _ in range(24):
+            head = c.js_json(t, "const d=document.getElementById(document.querySelector('[data-tds-data-picker-trigger]').getAttribute('aria-controls'));return d?d.innerText.split('\\n')[0]:''")
+            hy, hm = [int(x) for x in re.findall(r'\d+', head)[:2]] if head else (0, 0)
+            if (hy, hm) == (int(y), int(m)) or not head:
+                break
+            lab = '이전' if (hy, hm) > (int(y), int(m)) else '다음'
+            c.js_json(t, P + "const d=document.getElementById(document.querySelector('[data-tds-data-picker-trigger]').getAttribute('aria-controls'));const b=[...d.querySelectorAll('button')].find(x=>(x.getAttribute('aria-label')||'').includes(%s));if(b)f(b);return 1" % json.dumps(lab)); time.sleep(1)
+        print('date', c.js_json(t, P + "const d=document.getElementById(document.querySelector('[data-tds-data-picker-trigger]').getAttribute('aria-controls'));if(!d)return 'nodlg';"
+                                 "const E=[...d.querySelectorAll('button')].find(x=>x.innerText.trim()==%s);if(!E)return 'noday';f(E);const ok=[...d.querySelectorAll('button')].find(x=>x.innerText.trim()=='확인');if(ok)f(ok);return 'ok'" % json.dumps(str(int(d)))))
+        time.sleep(2)
+        print('date shown', c.js_json(t, "return [...document.querySelectorAll('[data-tds-data-picker-trigger] [role=spinbutton]')].map(x=>x.innerText).join('.')"))
     if c.js_json(t, "return [...document.querySelectorAll('input[type=file]')].filter(x=>x.offsetParent).length") >= 5:
         file_first(t, os.path.expanduser(a.sign))
         for pr in a.pairs.split(','):
@@ -115,10 +139,13 @@ def main():
                 file_first(t, os.path.expanduser(p))
     else:
         print('files: 이미 올라가 있음 — 건너뜀')
-    grade_idx = c.js_json(t, "return [...document.querySelectorAll('[aria-haspopup=menu]')].filter(x=>x.offsetParent).findIndex(x=>x.innerText.trim()=='선택하기')")
-    if grade_idx >= 0:
-        print('grade', menu_pick(t, grade_idx, a.grade))
-    print(c.js_json(t, "const cb=[...document.querySelectorAll('input[type=checkbox]')];let n=0;for(const x of cb){if(!x.checked){x.click();n++}}return 'pledges '+cb.filter(x=>x.checked).length+'/'+cb.length"))
+    # 이용등급 → 내용정보 순으로 '선택하기'가 남아 있으면 고른다(내용정보는 IARC 항목이 없으면 '해당 없음')
+    for want in (a.grade, '해당 없음'):
+        idx = c.js_json(t, "return [...document.querySelectorAll('[aria-haspopup=menu]')].filter(x=>x.offsetParent).findIndex(x=>x.innerText.trim()=='선택하기')")
+        if idx < 0:
+            break
+        print('pick', want, menu_pick(t, idx, want)); time.sleep(2)
+    print(c.js_json(t, "const lab=x=>{let p=x;for(let i=0;i<4;i++)p=p.parentElement;return p.innerText};const cb=[...document.querySelectorAll('input[type=checkbox]')].filter(x=>!lab(x).includes('웹보드'));for(const x of cb){if(!x.checked)x.click()}return 'pledges '+cb.filter(x=>x.checked).length+'/'+cb.length"))
     btn(t, '임시저장'); time.sleep(3)
     if not a.submit:
         print('RESULT: DRAFT_SAVED'); return
