@@ -446,3 +446,8 @@
 - `~/.claude/skills/apps-in-toss-release-kit/scripts/store_images.py` — 스토어 이미지 생성.
 - `VC/cat-petting/art/store/build_store.py`, `validate_store.py` — 스토어 이미지 생성·검증.
 - 목록 표: `~/.claude/skills/chrome-direct/SKILL.md` 75~124행.
+
+## H. 스토어 출시 뒤 앱인토스 게임 등급(IARC·스토어 등급으로 검토 요청)
+- 등급 칸: 공개된 플레이 주소, 구글, IARC 메일 날짜, IARC 번호, 전체 이용가, 내용정보 해당 없음(11/10 골골냥·눈썰미).
+- 검토 요청이 막히면: '웹보드 게임' 칸이 켜져 있는지, 가로 썸네일이 올라가 있는지 먼저 본다(11/10 눈썰미 둘 다 원인).
+- 게임물관리위원회 조회에 아직 안 나오면 IARC 번호·메일 날짜로 대신 넣는다. 반려될 수 있다(결과 확인 전).
