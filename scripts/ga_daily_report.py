@@ -854,7 +854,7 @@ def main():
             send(f'방문 리포트 {day:%m/%d}: 보내기 전 점검에 걸려 안 보냈어요\n' + '\n'.join(f'- {x}' for x in bad))
             print('RESULT: FAIL 점검')
             sys.exit(1)
-        send(text)
+        send(text + '\n\n웹으로 보기\n- https://ga-report.remin1994.workers.dev')  # 11/10 사용자 "캘린더처럼 별개의 웹으로"
         sent.write_text(dt.datetime.now().strftime('%m/%d %H:%M'))
     print(f'RESULT: OK {len(secs)}')
 
