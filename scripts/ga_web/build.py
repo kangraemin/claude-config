@@ -182,8 +182,9 @@ h1{font-size:20px;font-weight:700;margin:0}
 .sort button{min-height:34px;padding:0 12px;border-radius:17px;border:1px solid var(--line);font-size:13px;color:var(--sub)}
 .sort button.on{border-color:var(--ink);color:var(--ink);font-weight:600}
 .list{margin:0;padding:0;list-style:none}
-.row{display:grid;grid-template-columns:1fr 64px 76px 12px;align-items:center;gap:10px;min-height:56px;padding:6px 8px;margin:0 -8px;border-bottom:1px solid var(--line);border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.row{display:grid;grid-template-columns:1fr 12px;align-items:center;gap:10px;min-height:56px;padding:6px 8px;margin:0 -8px;border-bottom:1px solid var(--line);border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .row:hover,.row:active{background:var(--soft)}
+.row .ln{display:grid;grid-template-columns:1fr 64px 84px;align-items:center;gap:10px;min-height:40px}
 .row .go{color:var(--sub);font-size:20px;line-height:1;text-align:right}
 .cw{position:relative;padding-top:30px}.cw,.cw .chart{touch-action:manipulation;cursor:crosshair;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}.chart .cur{stroke:var(--sub);stroke-width:1;stroke-dasharray:2 2}
 .tt{position:absolute;top:0;background:var(--ink);color:var(--bg);font-size:14px;font-weight:600;padding:4px 10px;border-radius:8px;white-space:nowrap;pointer-events:none}
@@ -212,7 +213,7 @@ td,th{text-align:right;padding:7px 2px;border-bottom:1px solid var(--line)}td:fi
 <div class="nav" id="nav"><button id="prev" aria-label="이전">‹</button><label class="pk"><span id="when"></span><input type="date" id="pick" aria-label="날짜 고르기"></label><button id="next" aria-label="다음">›</button></div>
 <div class="sum" id="sum"></div>
 <div class="sort" id="sort"><button data-s="v" class="on">방문 많은 순</button><button data-s="up">늘어난 순</button><button data-s="down">줄어든 순</button></div>
-<p class="tip">서비스를 누르면 날짜별 방문·유입 경로를 볼 수 있어요</p>
+<p class="tip">서비스를 누르면 날짜별 방문·유입 경로를 볼 수 있어요<br>구글 검색 노출은 구글 검색 결과에 우리 사이트가 뜬 횟수예요. 구글이 2~3일 늦게 알려 줘서 2~3일 전 숫자예요</p>
 <ul class="list" id="list"></ul>
 <div id="notes" class="notes"></div><div id="zero"></div>
 </div>
@@ -251,7 +252,11 @@ function chTap(e){const w=e.target.closest&&e.target.closest('.cw');if(!w)return
   t.hidden=false;t.textContent=`${lab(c.k[i])}  ${c.v[i]==null?'기록 없음':f(c.v[i])+c.u}`;const px=cx/340*r.width;t.style.left=Math.max(0,Math.min(r.width-t.offsetWidth,px-t.offsetWidth/2))+'px'}
 document.addEventListener('pointerdown',chTap);document.addEventListener('pointermove',e=>{if(e.pointerType=='mouse'||e.buttons)chTap(e)});
 const GS=D.gsc||{};  // 사용자 11/11 "리스트 아이템에 방문자랑 서치콘솔 수치 두 개 표시"
-function gLast(n,end){const g=GS[n];if(!g)return null;const ks=Object.keys(g).filter(k=>k<=end).sort();return ks.length?{k:ks[ks.length-1],v:g[ks[ks.length-1]]}:null}
+// 구글 줄: 구글은 2~3일 늦게 알려 줘서, 보는 날까지 나온 마지막 날(하루) 또는 마지막 N일(7일·30일) 숫자를 쓴다
+function gRow(n,C){const g=GS[n];if(!g)return null;const end=C.keys[C.keys.length-1]=='live'?today:C.keys[C.keys.length-1];
+  const ks=Object.keys(g).filter(k=>k<=end).sort();if(!ks.length)return null;const w=MODE=='d'?1:+MODE;
+  const cur=ks.slice(-w),pre=ks.slice(-2*w,-w);const v=sum(cur.map(k=>g[k])),pv=pre.length==w?sum(pre.map(k=>g[k])):null;
+  return{v,p:pc(v,pv),sv:ks.slice(-Math.max(14,w)).map(k=>g[k]),last:ks[ks.length-1]}}
 const byKey={};days.forEach(k=>byKey[k.key]=k);
 const lab=key=>key=='live'?'지금':(d=>`${+d[1]}/${+d[2]}`)(key.split('-'));
 let MODE='d',IDX=0,SORT='v',OPEN=null,SH=0;
@@ -287,7 +292,11 @@ function render(){
   const rows=[],zero=[];
   order.forEach(n=>{const v=C.cur(n);if(v==null)return;const sv=C.keys.map(k=>val(n,k));if(!v&&!sv.some(x=>x)){zero.push(n);return}
     const p=pc(v,C.prev(n));const e=MODE=='d'&&S[n][days[IDX].key]?S[n][days[IDX].key].eng:null;
-    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div><div class="ds">${useWeb[n]?'웹':'토스'}${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:e!=null?` · 그중 10초 넘게 본 방문 ${f(e)}번`:''}</div>${(g=>g?`<div class="ds">구글 노출 ${f(g.v)}회 · ${lab(g.k)}</div>`:'')(gLast(n,C.keys[C.keys.length-1]=='live'?today:C.keys[C.keys.length-1]))}</div>${spark(sv)}<div><div class="v">${f(v)}명</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div><div class="go" aria-hidden="true">›</div></li>`})});
+    const g=gRow(n,C);  // 사용자 11/11 "아이템마다 두 줄로, 한 줄은 지금처럼 손님, 한 줄은 서치콘솔, 그래프도 두 개"
+    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div>
+      <div class="ln"><div class="ds">${useWeb[n]?'웹':'토스'} 손님${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:''}</div>${spark(sv)}<div><div class="v">${f(v)}명</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div></div>
+      ${g?`<div class="ln"><div class="ds">구글 검색 노출</div>${spark(g.sv)}<div><div class="v">${f(g.v)}회</div><div class="c ${g.p.c}">${g.p.t}</div></div></div>`:''}
+      </div><div class="go" aria-hidden="true">›</div></li>`})});
   rows.sort(SORT=='v'?(a,b)=>b.v-a.v:SORT=='up'?(a,b)=>b.p.r-a.p.r||b.v-a.v:(a,b)=>a.p.r-b.p.r||b.v-a.v);
   $('list').innerHTML=rows.map(r=>r.h).join('');
   document.querySelectorAll('#list .row').forEach(r=>r.onclick=()=>detail(r.dataset.n));
