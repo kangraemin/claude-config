@@ -101,6 +101,28 @@ def sources(key):
     return out
 
 
+def gsc():
+    """모든 <날짜>-detail.txt의 '🔎 <서비스> 구글 검색' 칸 → {서비스: {날짜: 구글 노출}}. 서치콘솔은 2~3일 늦어 리포트 날짜가 아니라 적힌 날짜로 둔다."""
+    out = {}
+    for f in sorted(SRC.glob('20[0-9][0-9]-[0-9][0-9]-[0-9][0-9]-detail.txt')):
+        fy, fm = int(f.stem[:4]), int(f.stem[5:7])
+        for sec in f.read_text().split('\n\n'):
+            L = sec.strip().split('\n')
+            if not L or not L[0].startswith('🔎 ') or ' 구글 검색' not in L[0]:
+                continue
+            name = G.short(L[0][2:].split(' 구글 검색')[0].strip())
+            for l in L:
+                m = re.search(r'구글 검색 (\d+)/(\d+) 하루: 노출 ([\d,]+)(?: \(전날 ([\d,]+)\))?', l)
+                if not m:
+                    continue
+                d = dt.date(fy - (int(m.group(1)) > fm), int(m.group(1)), int(m.group(2)))
+                o = out.setdefault(name, {})
+                o[d.isoformat()] = num(m.group(3))  # 나중 리포트 값이 더 정확하다
+                if m.group(4) is not None:
+                    o.setdefault((d - dt.timedelta(days=1)).isoformat(), num(m.group(4)))
+    return out
+
+
 def load():
     days = []
     for f in sorted(SRC.glob('20[0-9][0-9]-[0-9][0-9]-[0-9][0-9].txt'), reverse=True):
@@ -214,20 +236,22 @@ const avg=a=>{a=a.filter(x=>x!=null);return a.length?a.reduce((x,y)=>x+y,0)/a.le
 function pc(a,b){if(a==null||b==null)return{t:'-',c:'',r:0};if(!b)return a?{t:'새로',c:'up',r:1e9}:{t:'-',c:'',r:0};const r=Math.round((a-b)/b*100);return{t:(r>0?'▲ ':r<0?'▼ ':'')+Math.abs(r)+'%',c:r>0?'up':r<0?'down':'',r}}
 function spark(vs){const w=64,h=24,m=Math.max(...vs.map(v=>v||0),1),n=vs.length;if(n<2)return'';const pt=(v,i)=>[(i/(n-1)*(w-4)+2).toFixed(1),(h-3-(v||0)/m*(h-6)).toFixed(1)];
   const p=vs.map((v,i)=>pt(v,i).join(',')).join(' ');const [x,y]=pt(vs[n-1],n-1);return`<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${p}"/><circle cx="${x}" cy="${y}" r="2"/></svg>`}
-function chart(keys,vals,hi){const W=340,H=150,L=34,B=20,n=vals.length,m=Math.max(...vals.map(v=>v||0),1);const top=Math.ceil(m/(m>100?50:10))*(m>100?50:10);
+function chart(keys,vals,hi,u='명'){const W=340,H=150,B=20,n=vals.length,m=Math.max(...vals.map(v=>v||0),1);const top=Math.ceil(m/(m>100?50:10))*(m>100?50:10),L=Math.max(34,f(top).length*8+8);  // 노출처럼 네 자리면 왼쪽 숫자가 잘려서 칸을 넓힌다
   const bw=(W-L)/n;let g='',leg='';[0,.5,1].forEach(t=>{const y=(H-B)-(H-B-6)*t;g+=`<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-6}" y="${y+4}" text-anchor="end">${f(top*t)}</text>`});
   vals.forEach((v,i)=>{const bh=Math.max((v||0)/top*(H-B-6),v?2:0);g+=`<rect x="${(L+i*bw+bw*.15).toFixed(1)}" y="${(H-B-bh).toFixed(1)}" width="${(bw*.7).toFixed(1)}" height="${bh.toFixed(1)}" rx="1.5" fill="${hi.includes(i)?'var(--ink)':'var(--bar)'}"/>`});
   {const ok=vals.filter((v,i)=>v!=null&&keys[i]!='live');if(ok.length>1){const av=ok.reduce((a,b)=>a+b,0)/ok.length,y=((H-B)-av/top*(H-B-6)).toFixed(1);  // 사용자 11/10 "평균 빨간선 가로로"
-    g+=`<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--avg)" stroke-width="1.5" stroke-dasharray="5 3"/>`;leg=`<div class="leg"><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--avg)" stroke-width="2" stroke-dasharray="5 3"/></svg>평균 ${f(Math.round(av))}명</div>`}}  // 11/10 "글자가 안 보여": 막대 위에 겹치던 글자를 차트 위 범례로
+    g+=`<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--avg)" stroke-width="1.5" stroke-dasharray="5 3"/>`;leg=`<div class="leg"><svg width="22" height="8"><line x1="0" x2="22" y1="4" y2="4" stroke="var(--avg)" stroke-width="2" stroke-dasharray="5 3"/></svg>평균 ${f(Math.round(av))}${u}</div>`}}  // 11/10 "글자가 안 보여": 막대 위에 겹치던 글자를 차트 위 범례로
   [0,Math.floor((n-1)/2),n-1].filter((x,i,a)=>a.indexOf(x)==i).forEach(i=>{g+=`<text x="${(i==0?L:i==n-1?W:L+i*bw+bw/2).toFixed(1)}" y="${H-4}" text-anchor="${i==0?'start':i==n-1?'end':'middle'}">${esc(lab(keys[i]))}</text>`});
-  const c=CH.push({k:keys,v:vals})-1;  // 사용자 11/11 "봉을 클릭하면 몇명인지 주식차트처럼"
+  const c=CH.push({k:keys,v:vals,u,L})-1;  // 사용자 11/11 "봉을 클릭하면 몇명인지 주식차트처럼"
   return`${leg}<div class="cw" data-c="${c}"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}<line class="cur" y1="0" y2="${H-B}" style="display:none"/></svg><div class="tt" hidden></div></div>`}
 const CH=[];
 function chTap(e){const w=e.target.closest&&e.target.closest('.cw');if(!w)return;const c=CH[w.dataset.c],sv=w.querySelector('svg'),r=sv.getBoundingClientRect();
-  const n=c.v.length,bw=(340-34)/n,x=(e.clientX-r.left)/r.width*340;const i=Math.max(0,Math.min(n-1,Math.floor((x-34)/bw)));
-  const cx=34+i*bw+bw/2,cur=w.querySelector('.cur'),t=w.querySelector('.tt');cur.setAttribute('x1',cx);cur.setAttribute('x2',cx);cur.style.display='';
-  t.hidden=false;t.textContent=`${lab(c.k[i])}  ${c.v[i]==null?'기록 없음':f(c.v[i])+'명'}`;const px=cx/340*r.width;t.style.left=Math.max(0,Math.min(r.width-t.offsetWidth,px-t.offsetWidth/2))+'px'}
+  const n=c.v.length,bw=(340-c.L)/n,x=(e.clientX-r.left)/r.width*340;const i=Math.max(0,Math.min(n-1,Math.floor((x-c.L)/bw)));
+  const cx=c.L+i*bw+bw/2,cur=w.querySelector('.cur'),t=w.querySelector('.tt');cur.setAttribute('x1',cx);cur.setAttribute('x2',cx);cur.style.display='';
+  t.hidden=false;t.textContent=`${lab(c.k[i])}  ${c.v[i]==null?'기록 없음':f(c.v[i])+c.u}`;const px=cx/340*r.width;t.style.left=Math.max(0,Math.min(r.width-t.offsetWidth,px-t.offsetWidth/2))+'px'}
 document.addEventListener('pointerdown',chTap);document.addEventListener('pointermove',e=>{if(e.pointerType=='mouse'||e.buttons)chTap(e)});
+const GS=D.gsc||{};  // 사용자 11/11 "리스트 아이템에 방문자랑 서치콘솔 수치 두 개 표시"
+function gLast(n,end){const g=GS[n];if(!g)return null;const ks=Object.keys(g).filter(k=>k<=end).sort();return ks.length?{k:ks[ks.length-1],v:g[ks[ks.length-1]]}:null}
 const byKey={};days.forEach(k=>byKey[k.key]=k);
 const lab=key=>key=='live'?'지금':(d=>`${+d[1]}/${+d[2]}`)(key.split('-'));
 let MODE='d',IDX=0,SORT='v',OPEN=null,SH=0;
@@ -263,7 +287,7 @@ function render(){
   const rows=[],zero=[];
   order.forEach(n=>{const v=C.cur(n);if(v==null)return;const sv=C.keys.map(k=>val(n,k));if(!v&&!sv.some(x=>x)){zero.push(n);return}
     const p=pc(v,C.prev(n));const e=MODE=='d'&&S[n][days[IDX].key]?S[n][days[IDX].key].eng:null;
-    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div><div class="ds">${useWeb[n]?'웹':'토스'}${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:e!=null?` · 그중 10초 넘게 본 방문 ${f(e)}번`:''}</div></div>${spark(sv)}<div><div class="v">${f(v)}명</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div><div class="go" aria-hidden="true">›</div></li>`})});
+    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div><div class="ds">${useWeb[n]?'웹':'토스'}${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:e!=null?` · 그중 10초 넘게 본 방문 ${f(e)}번`:''}</div>${(g=>g?`<div class="ds">구글 노출 ${f(g.v)}회 · ${lab(g.k)}</div>`:'')(gLast(n,C.keys[C.keys.length-1]=='live'?today:C.keys[C.keys.length-1]))}</div>${spark(sv)}<div><div class="v">${f(v)}명</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div><div class="go" aria-hidden="true">›</div></li>`})});
   rows.sort(SORT=='v'?(a,b)=>b.v-a.v:SORT=='up'?(a,b)=>b.p.r-a.p.r||b.v-a.v:(a,b)=>a.p.r-b.p.r||b.v-a.v);
   $('list').innerHTML=rows.map(r=>r.h).join('');
   document.querySelectorAll('#list .row').forEach(r=>r.onclick=()=>detail(r.dataset.n));
@@ -279,9 +303,15 @@ function detail(n){OPEN=n;const C=ctx();const keys=full.slice(-30).map(x=>x.key)
   const raw=svc?svc.blocks.filter(b=>!(b.items.length==1&&b.items[0]=='없음')):[];
   $('det').innerHTML=`<button class="back" id="back">‹ 목록으로</button><div class="sum"><div class="lb">${esc(n)} · ${MODE=='d'?esc(C.when):esc(C.when)+' 합계, 하루 평균 '+fa(v/C.days)+'명'}</div><div class="big">${f(v)}명</div>
     <div class="chg ${C.live?'':p.c}">${C.live?`어제 하루 ${f(pv)}명`:(pv==null?'비교할 앞 기간 없음':`${C.cmp} ${p.t}, ${MODE=='d'?'전날':'앞 기간'} ${f(pv)}명`)}</div>
-    ${chart(keys,vs,hi)}</div>${srcBox(C.keys.filter((k,i)=>C.hi.includes(i)),[n])}<h2>날짜별 ${useWeb[n]?'웹':'토스'} 방문</h2><table><tr><th>날짜</th><th>방문</th><th>전날 대비</th><th>10초 넘게 본 방문</th></tr>${rows}</table>
+    ${chart(keys,vs,hi)}</div>${srcBox(C.keys.filter((k,i)=>C.hi.includes(i)),[n])}${(()=>{const g=GS[n];if(!g)return'';const gk=full.slice(-30).map(x=>x.key),gv=gk.map(k=>g[k]==null?null:g[k]);if(gv.every(x=>x==null))return'';
+      const end=C.keys[C.keys.length-1]=='live'?today:C.keys[C.keys.length-1],gh=gk.map((k,i)=>k<=end&&C.keys.includes(k)?i:-1).filter(i=>i>=0);
+      return`<h2>구글 검색 노출</h2><div class="sum">${chart(gk,gv,gh,'회')}<div class="ds">서치콘솔은 2~3일 늦게 들어와서 최근 며칠은 비어 있어요</div></div>`})()}<h2>날짜별 ${useWeb[n]?'웹':'토스'} 방문</h2><table><tr><th>날짜</th><th>방문</th><th>전날 대비</th><th>10초 넘게 본 방문</th></tr>${rows}</table>
     ${raw.length?`<details><summary>그날 리포트 원문</summary>${raw.map(b=>`${b.t?`<h2>${esc(b.t)}</h2>`:''}<ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</details>`:''}`;
-  $('main').hidden=true;$('det').hidden=false;window.scrollTo(0,0);$('back').onclick=()=>{OPEN=null;$('det').hidden=true;$('main').hidden=false}}
+  // 사용자 11/11 "상세갓다가 뒤로가기 스와이프로 뒤로가기가 안되네" — 상세를 열 때 방문 기록을 남겨 브라우저 뒤로가기·스와이프로 목록에 돌아온다
+  if(!(history.state&&history.state.det)){LY=window.scrollY;history.pushState({det:n},'')}else history.replaceState({det:n},'');
+  $('main').hidden=true;$('det').hidden=false;window.scrollTo(0,0);$('back').onclick=()=>history.back()}
+let LY=0;function closeDet(){OPEN=null;$('det').hidden=true;$('main').hidden=false;window.scrollTo(0,LY)}
+window.addEventListener('popstate',e=>{if(e.state&&e.state.det)detail(e.state.det);else if(OPEN!=null||!$('det').hidden)closeDet()});
 document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{MODE=b.dataset.m;SH=0;BK.length=0;render()});
 document.querySelectorAll('#sort button').forEach(b=>b.onclick=()=>{SORT=b.dataset.s;render()});
 const BK=[];  // 30일 끝에서 덜 밀린 경우에도 › 가 원래 자리로 돌아오게
@@ -308,7 +338,7 @@ def main():
     days, live = load()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    data = json.dumps({'days': days, 'live': live}, ensure_ascii=False).replace('</', '<\\/')
+    data = json.dumps({'days': days, 'live': live, 'gsc': gsc()}, ensure_ascii=False).replace('</', '<\\/')
     page = PAGE.replace('__DATA__', data).replace('__LIVEAT__', str(live['at'] if live else 0))
     (out / 'index.html').write_text(page)
     (out / 'live.json').write_text(json.dumps({'at': live['at'] if live else 0}))
