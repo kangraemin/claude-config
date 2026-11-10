@@ -159,7 +159,10 @@ h1{font-size:20px;font-weight:700;margin:0}
 .sort button{min-height:34px;padding:0 12px;border-radius:17px;border:1px solid var(--line);font-size:13px;color:var(--sub)}
 .sort button.on{border-color:var(--ink);color:var(--ink);font-weight:600}
 .list{margin:0;padding:0;list-style:none}
-.row{display:grid;grid-template-columns:1fr 64px 76px;align-items:center;gap:10px;min-height:56px;padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.row{display:grid;grid-template-columns:1fr 64px 76px 12px;align-items:center;gap:10px;min-height:56px;padding:6px 8px;margin:0 -8px;border-bottom:1px solid var(--line);border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.row:hover,.row:active{background:var(--soft)}
+.row .go{color:var(--sub);font-size:20px;line-height:1;text-align:right}
+.tip{font-size:13px;color:var(--sub);margin:4px 0 2px}
 .row .nm{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .ds{font-size:13px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .v{text-align:right;font-size:17px;font-weight:600;line-height:1.2}
@@ -184,6 +187,7 @@ td,th{text-align:right;padding:7px 2px;border-bottom:1px solid var(--line)}td:fi
 <div class="nav" id="nav"><button id="prev" aria-label="이전">‹</button><span id="when"></span><button id="next" aria-label="다음">›</button></div>
 <div class="sum" id="sum"></div>
 <div class="sort" id="sort"><button data-s="v" class="on">방문 많은 순</button><button data-s="up">늘어난 순</button><button data-s="down">줄어든 순</button></div>
+<p class="tip">서비스를 누르면 날짜별 방문·유입 경로를 볼 수 있어요</p>
 <ul class="list" id="list"></ul>
 <div id="notes" class="notes"></div><div id="zero"></div>
 </div>
@@ -245,7 +249,7 @@ function render(){
   const rows=[],zero=[];
   order.forEach(n=>{const v=C.cur(n);if(v==null)return;const sv=C.keys.map(k=>val(n,k));if(!v&&!sv.some(x=>x)){zero.push(n);return}
     const p=pc(v,C.prev(n));const e=MODE=='d'&&S[n][days[IDX].key]?S[n][days[IDX].key].eng:null;
-    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div><div class="ds">${useWeb[n]?'웹':'토스'}${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:e!=null?` · 그중 10초 넘게 본 방문 ${f(e)}번`:''}</div></div>${spark(sv)}<div><div class="v">${f(v)}명</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div></li>`})});
+    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div><div class="ds">${useWeb[n]?'웹':'토스'}${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:e!=null?` · 그중 10초 넘게 본 방문 ${f(e)}번`:''}</div></div>${spark(sv)}<div><div class="v">${f(v)}명</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div><div class="go" aria-hidden="true">›</div></li>`})});
   rows.sort(SORT=='v'?(a,b)=>b.v-a.v:SORT=='up'?(a,b)=>b.p.r-a.p.r||b.v-a.v:(a,b)=>a.p.r-b.p.r||b.v-a.v);
   $('list').innerHTML=rows.map(r=>r.h).join('');
   document.querySelectorAll('#list .row').forEach(r=>r.onclick=()=>detail(r.dataset.n));
