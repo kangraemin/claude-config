@@ -167,6 +167,7 @@ days.slice().reverse().forEach(k=>k.doc.svcs.forEach((sv,j)=>{const m=k.sum[j];i
 const useWeb={};order.forEach(n=>useWeb[n]=Object.values(S[n]).some(v=>v.web>0));
 const val=(n,key)=>{const v=S[n][key];return v?(useWeb[n]?v.web:v.toss):null};
 const webTot=key=>order.reduce((t,n)=>t+(useWeb[n]?(val(n,key)||0):0),0);
+const sum=a=>{a=a.filter(x=>x!=null);return a.length?a.reduce((x,y)=>x+y,0):null};
 const avg=a=>{a=a.filter(x=>x!=null);return a.length?a.reduce((x,y)=>x+y,0)/a.length:null};
 function pc(a,b){if(a==null||b==null)return{t:'-',c:'',r:0};if(!b)return a?{t:'새로',c:'up',r:1e9}:{t:'-',c:'',r:0};const r=Math.round((a-b)/b*100);return{t:(r>0?'▲ ':r<0?'▼ ':'')+Math.abs(r)+'%',c:r>0?'up':r<0?'down':'',r}}
 function spark(vs){const w=64,h=24,m=Math.max(...vs.map(v=>v||0),1),n=vs.length;if(n<2)return'';const pt=(v,i)=>[(i/(n-1)*(w-4)+2).toFixed(1),(h-3-(v||0)/m*(h-6)).toFixed(1)];
@@ -189,8 +190,8 @@ function ctx(){ // 지금 보는 기간: keys(차트·스파크라인 줄), 값,
       tot:webTot(k.key),ptot:prev?webTot(prev.key):null,doc:k.doc}}
   const n=+MODE,c=full.slice(-n),p=full.slice(-2*n,-n);const pv=p.length==n?p:null;
   return{keys:c.map(x=>x.key),hi:c.map((x,i)=>i),when:`${c[0].label} ~ ${c[c.length-1].label}`,live:false,
-    cur:nm=>avg(c.map(x=>val(nm,x.key))),prev:nm=>pv?avg(pv.map(x=>val(nm,x.key))):null,cmp:`앞 ${n}일 대비`,lbl:'하루 평균 웹 방문',
-    tot:avg(c.map(x=>webTot(x.key))),ptot:pv?avg(pv.map(x=>webTot(x.key))):null,doc:null}}
+    cur:nm=>sum(c.map(x=>val(nm,x.key))),prev:nm=>pv?sum(pv.map(x=>val(nm,x.key))):null,cmp:`앞 ${n}일 대비`,lbl:`${n}일 동안 웹 방문 합계`,
+    tot:sum(c.map(x=>webTot(x.key))),ptot:pv?sum(pv.map(x=>webTot(x.key))):null,days:c.length,doc:null}}
 function render(){
   try{localStorage.setItem('ga-mode',MODE);localStorage.setItem('ga-day',days[IDX].key)}catch(e){}
   document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.m==MODE));
@@ -198,11 +199,11 @@ function render(){
   const C=ctx();$('when').textContent=C.when;$('prev').disabled=MODE!='d'||IDX>=days.length-1;$('next').disabled=MODE!='d'||IDX<=0;
   $('prev').style.visibility=$('next').style.visibility=MODE=='d'?'':'hidden';
   const tp=C.live?{t:'',c:''}:pc(C.tot,C.ptot);
-  $('sum').innerHTML=`<div class="lb">${C.lbl}</div><div class="big">${f(C.tot)}명</div><div class="chg ${tp.c}">${C.live?`어제 하루 ${f(C.ptot)}명`:(C.ptot==null?'비교할 앞 기간 없음':`${C.cmp} ${tp.t}`)}</div>${chart(C.keys,C.keys.map(webTot),C.hi)}`;
+  $('sum').innerHTML=`<div class="lb">${C.lbl}</div><div class="big">${f(C.tot)}명</div>${MODE!='d'?`<div class="lb">하루 평균 ${f(C.tot/C.days)}명</div>`:''}<div class="chg ${tp.c}">${C.live?`어제 하루 ${f(C.ptot)}명`:(C.ptot==null?'비교할 앞 기간 없음':`${C.cmp} ${tp.t}`)}</div>${chart(C.keys,C.keys.map(webTot),C.hi)}`;
   const rows=[],zero=[];
   order.forEach(n=>{const v=C.cur(n);if(v==null)return;const sv=C.keys.map(k=>val(n,k));if(!v&&!sv.some(x=>x)){zero.push(n);return}
     const p=pc(v,C.prev(n));const e=MODE=='d'&&S[n][days[IDX].key]?S[n][days[IDX].key].eng:null;
-    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div><div class="ds">${useWeb[n]?'웹':'토스'}${MODE!='d'?' · 하루 평균':e!=null?` · 머문 방문 ${f(e)}회`:''}</div></div>${spark(sv)}<div><div class="v">${fa(v)}</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div></li>`})});
+    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div><div class="ds">${useWeb[n]?'웹':'토스'}${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:e!=null?` · 머문 방문 ${f(e)}회`:''}</div></div>${spark(sv)}<div><div class="v">${f(v)}</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div></li>`})});
   rows.sort(SORT=='v'?(a,b)=>b.v-a.v:SORT=='up'?(a,b)=>b.p.r-a.p.r||b.v-a.v:(a,b)=>a.p.r-b.p.r||b.v-a.v);
   $('list').innerHTML=rows.map(r=>r.h).join('');
   document.querySelectorAll('#list .row').forEach(r=>r.onclick=()=>detail(r.dataset.n));
@@ -216,8 +217,8 @@ function detail(n){OPEN=n;const C=ctx();const keys=full.slice(-30).map(x=>x.key)
     return`<tr><td>${esc(byKey[k]?byKey[k].label:k)}</td><td>${f(x)}</td><td class="${d>0?'up':d<0?'down':''}">${d==null?'-':(d>0?'+':'')+f(d)}</td><td>${useWeb[n]&&e!=null?f(e):'-'}</td></tr>`}).reverse().join('');
   const k=MODE=='d'?days[IDX]:null;const svc=k?k.doc.svcs.find(s=>s.name==n):null;
   const raw=svc?svc.blocks.filter(b=>!(b.items.length==1&&b.items[0]=='없음')):[];
-  $('det').innerHTML=`<button class="back" id="back">‹ 목록으로</button><div class="sum"><div class="lb">${esc(n)} · ${MODE=='d'?esc(C.when):'하루 평균, '+esc(C.when)}</div><div class="big">${fa(v)}명</div>
-    <div class="chg ${C.live?'':p.c}">${C.live?`어제 하루 ${f(pv)}명`:(pv==null?'비교할 앞 기간 없음':`${C.cmp} ${p.t}, ${MODE=='d'?'전날':'앞 기간'} ${fa(pv)}명`)}</div>
+  $('det').innerHTML=`<button class="back" id="back">‹ 목록으로</button><div class="sum"><div class="lb">${esc(n)} · ${MODE=='d'?esc(C.when):esc(C.when)+' 합계, 하루 평균 '+fa(v/C.days)+'명'}</div><div class="big">${f(v)}명</div>
+    <div class="chg ${C.live?'':p.c}">${C.live?`어제 하루 ${f(pv)}명`:(pv==null?'비교할 앞 기간 없음':`${C.cmp} ${p.t}, ${MODE=='d'?'전날':'앞 기간'} ${f(pv)}명`)}</div>
     ${chart(keys,vs,hi)}</div><h2>날짜별 ${useWeb[n]?'웹':'토스'} 방문</h2><table><tr><th>날짜</th><th>방문</th><th>전날 대비</th><th>머문 방문</th></tr>${rows}</table>
     ${raw.length?`<details><summary>그날 리포트 원문</summary>${raw.map(b=>`${b.t?`<h2>${esc(b.t)}</h2>`:''}<ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</details>`:''}`;
   $('main').hidden=true;$('det').hidden=false;window.scrollTo(0,0);$('back').onclick=()=>{OPEN=null;$('det').hidden=true;$('main').hidden=false}}
