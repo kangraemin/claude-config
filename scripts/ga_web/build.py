@@ -236,7 +236,7 @@ function ctx(){ // 지금 보는 기간: keys(차트·스파크라인 줄), 값,
   if(MODE=='d'){const k=days[IDX],live=k.key=='live';const fi=live?full.length:full.findIndex(x=>x.key==k.key);
     // 사용자 11/11 "날짜가 바뀌면 미래 값이 왜 없어져, 하이라이트만 바뀌면 되잖아" — 차트 칸은 최근 14칸 고정, 고른 날만 진하게
     const all=full.map(x=>x.key).concat(D.live?['live']:[]),pos=live?all.length-1:fi;
-    const st=Math.max(0,pos>=all.length-14?all.length-14:pos-13),keys=all.slice(st,st+14);
+    const st=Math.max(0,pos>=all.length-14?all.length-14:pos-13),keys=all.slice(st,st+14).filter(x=>x!='live'||live);  // 사용자 11/11 "그래프가 좀 이상한데" — 지난 날을 볼 땐 반나절짜리 '지금' 칸을 그래프 끝에 붙이지 않는다
     const prev=full[fi-1]||null;
     return{keys,hi:[pos-st],when:k.label+(live?' '+k.range.split('~ ')[1]+'까지':''),live,
       cur:n=>val(n,k.key),prev:n=>prev?val(n,prev.key):null,cmp:live?'어제 하루':'전날 대비',lbl:live?'오늘 지금까지 웹 방문':'웹 방문 합계',
