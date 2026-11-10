@@ -185,6 +185,7 @@ h1{font-size:20px;font-weight:700;margin:0}
 .row{display:grid;grid-template-columns:1fr 12px;align-items:center;gap:10px;min-height:56px;padding:6px 8px;margin:0 -8px;border-bottom:1px solid var(--line);border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .row:hover,.row:active{background:var(--soft)}
 .row .ln{display:grid;grid-template-columns:1fr 64px 84px;align-items:center;gap:10px;min-height:40px}
+.row .ln+.ln{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}  /* 사용자 11/11 "구글 검색 노출이랑 방문자 수 너무 딱 붙어 있어서 패딩 좀" */
 .row .go{color:var(--sub);font-size:20px;line-height:1;text-align:right}
 .cw{position:relative;padding-top:30px}.cw,.cw .chart{touch-action:manipulation;cursor:crosshair;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}.chart .cur{stroke:var(--sub);stroke-width:1;stroke-dasharray:2 2}
 .tt{position:absolute;top:0;background:var(--ink);color:var(--bg);font-size:14px;font-weight:600;padding:4px 10px;border-radius:8px;white-space:nowrap;pointer-events:none}
