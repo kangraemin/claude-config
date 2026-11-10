@@ -119,15 +119,18 @@ def cmd_create(a):
 def cmd_push(a):
     t = console_tab(f'https://apps-in-toss.toss.im/workspace/{a.ws}/mini-app/{a.app}/app-build')
     try:
-        for _ in range(15):
+        c.shot(t, '/tmp/ait_push_front.png')  # 뒤에 깔린 탭은 '테스트' 창이 안 그려져 PUSH_NOT_SEEN이 난다(2026-11-10). 앞으로 띄운다
+        # 목록이 늦게 그려지거나 눌러도 창이 안 뜰 때가 있다 → 창이 뜰 때까지 다시 누른다(최대 40초)
+        HAS = "return [...document.querySelectorAll('[role=dialog]')].some(x=>x.innerText.includes('푸시 보내기'))"
+        for _ in range(20):
             try:
                 click_text(t, '테스트')
-                break
             except RuntimeError:
-                time.sleep(1)
-        else:
-            click_text(t, '테스트')
-        time.sleep(3)
+                time.sleep(2); continue
+            time.sleep(2)
+            if c.js_json(t, HAS):
+                break
+        time.sleep(1)
         dlg = c.js_json(t, "var d=[...document.querySelectorAll('[role=dialog]')].filter(x=>x.innerText.includes('푸시 보내기')).pop();return d?d.innerText:''")
         link = re.search(r'intoss-private://\S+', dlg)
         print('LINK', link.group(0) if link else '')
