@@ -9,7 +9,8 @@ URL=https://ga-report.remin1994.workers.dev
 LOCK=$HOME/.cache/ga-web.lock
 mkdir "$LOCK" 2>/dev/null || { [ $(( $(date +%s) - $(stat -f %m "$LOCK") )) -gt 1200 ] && rm -rf "$LOCK" && mkdir "$LOCK"; } || exit 0
 trap 'rm -rf "$LOCK"' EXIT
-REQ=$(curl -s -m 10 "$URL/api/state" | python3 -c 'import sys,json;print(json.load(sys.stdin)["req"])' 2>/dev/null || echo 0)
+KEY=$(grep "^PRIVATE_WEB_KEY=" $HOME/.claude/.env | cut -d= -f2)
+REQ=$(curl -s -m 10 -H "cookie: pk=$KEY" "$URL/api/state" | python3 -c 'import sys,json;print(json.load(sys.stdin)["req"])' 2>/dev/null || echo 0)
 DONE=$(cat "$C/live.req" 2>/dev/null || echo 0)
 if [ "$REQ" -gt "$DONE" ]; then
   echo "== $(date '+%F %T') live req=$REQ" >> "$LOG"
@@ -25,7 +26,8 @@ if [ -z "$(find "$C" -maxdepth 1 \( -name '20*.txt' -o -name 'live.json' \) -new
 python3 "$D/build.py" --out "$SITE/public" >> "$LOG" 2>&1 || exit 1
 cat > "$SITE/wrangler.jsonc" <<J
 {"name":"ga-report","main":"$D/worker.js","compatibility_date":"2026-10-01",
- "assets":{"directory":"$SITE/public","binding":"ASSETS","run_worker_first":["/api/*"]},
+ "assets":{"directory":"$SITE/public","binding":"ASSETS","run_worker_first":true},
+ "vars":{"PRIVATE_KEY":"$KEY"},
  "kv_namespaces":[{"binding":"ga_report","id":"ef600102d151469f8de3d5d01505bf3a"}]}
 J
 cd /tmp

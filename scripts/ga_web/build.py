@@ -123,14 +123,27 @@ button:disabled{opacity:.5}
 .card .more{display:none;border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
 .card.open .more{display:block}
 .more h4{font-size:14px;margin:8px 0 2px;color:var(--sub)}.more ul{margin:0;padding-left:18px;font-size:15px}
+.seg{display:flex;gap:6px;margin:0 0 12px}.seg button{flex:1}.seg button.on{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:600}
+.bars{display:flex;align-items:flex-end;gap:2px;height:56px;margin:10px 0 2px}.bars i{flex:1;background:var(--line);border-radius:2px 2px 0 0;min-height:2px}.bars i.last{background:var(--sub)}
+.axis{display:flex;justify-content:space-between;color:var(--sub);font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}td,th{text-align:right;padding:4px 2px;border-bottom:1px solid var(--line)}td:first-child,th:first-child{text-align:left}th{color:var(--sub);font-weight:400}
+.up,.card .ln.up{color:var(--up)}.down,.card .ln.down{color:var(--down)}
 details{margin:16px 0 0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 16px}
 summary{cursor:pointer;font-weight:600;min-height:28px}details ul{margin:6px 0;padding-left:18px}
 </style></head><body><div class="wrap">
 <h1>방문 리포트</h1><p class="range" id="range"></p>
+<div class="seg"><button id="vDay" class="on">하루씩</button><button id="vTrend">흐름·증감</button></div>
+<div id="dayView">
 <div class="bar"><button id="prev" aria-label="이전 날">‹</button><select id="day"></select><button id="next" aria-label="다음 날">›</button></div>
 <div class="bar"><button class="go" id="refresh">지금 숫자로 갱신</button></div>
 <p class="msg" id="msg"></p>
 <div id="top"></div><div class="grid" id="grid"></div><div id="tail"></div>
+</div>
+<div id="trendView" hidden>
+<div class="seg" id="per"><button data-n="7" class="on">최근 7일</button><button data-n="14">14일</button><button data-n="30">30일</button></div>
+<p class="range" id="trange"></p>
+<div class="top" id="tsum"></div><div class="grid" id="tgrid"></div><div id="ttail"></div>
+</div>
 </div>
 <script>
 const D=__DATA__;const LIVE_AT=__LIVEAT__;
@@ -147,19 +160,50 @@ function show(i){
     if(!web&&!toss&&!m.web30&&!m.toss30){zero.push(s.name);return}
     const main=web?`<div class="big">${f(web)}명</div><div class="ln">웹 방문${m.web_usual!=null&&!live?` · 평소 ${f(m.web_usual)}명`:''}</div>`:`<div class="big">${f(toss)}명</div><div class="ln">토스 방문</div>`;
     const lines=[];if(web&&!live)lines.push(chg(m.eng??web,m.eng_usual??m.web_usual));
+    const pd=live?null:days[i+1];if(pd&&pd.key!='live'){const pj=pd.doc.svcs.findIndex(x=>x.name==s.name);const pv=pj>=0?(web?pd.sum[pj].web:pd.sum[pj].toss):null;if(pv!=null){const dv=(web||toss)-pv;lines.push(`<div class="ln ${dv>0?'up':dv<0?'down':''}">전날보다 ${dv>0?'+':''}${f(dv)}명</div>`)}}
     if(m.eng!=null)lines.push(`<div class="ln">실제로 머문 방문 ${f(m.eng)}회${m.eng_usual!=null&&!live?` · 평소 ${f(m.eng_usual)}회`:''}</div>`);
     if(web&&m.toss!=null)lines.push(`<div class="ln">토스 ${f(m.toss)}명</div>`);
     const blocks=s.blocks.filter(b=>!(b.items.length==1&&b.items[0]=='없음'));
     cards.push(`<div class="card"><div class="nm">${esc(s.name)}</div>${main}${lines.join('')}<div class="more">${blocks.map(b=>`<h4>${esc(b.t)}</h4><ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</div></div>`)});
   $('grid').innerHTML=cards.join('');
   $('tail').innerHTML=(zero.length?`<details><summary>방문 0인 곳 ${zero.length}개</summary><ul>${zero.map(z=>`<li>${esc(z)}</li>`).join('')}</ul></details>`:'')+k.doc.tail.filter(b=>b.t!='전부 0인 곳').map(b=>`<details><summary>${esc(b.t)}</summary><ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`).join('');
-  document.querySelectorAll('.card').forEach(c=>c.onclick=()=>c.classList.toggle('open'));
+  document.querySelectorAll('#grid .card').forEach(c=>c.onclick=()=>c.classList.toggle('open'));
   $('prev').disabled=i>=days.length-1;$('next').disabled=i<=0;
 }
+const full=D.days.slice().reverse();// 오래된 날 → 최근 날, 하루 다 끝난 날만
+const series={};full.forEach((k,di)=>k.doc.svcs.forEach((sv,j)=>{const m=k.sum[j];(series[sv.name]=series[sv.name]||{})[k.key]={web:m.web||0,eng:m.eng,toss:m.toss||0}}));
+const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
+const pct=(a,b)=>{if(a==null||b==null)return'<span class="ln">앞 기간 자료 없음</span>';if(!b)return a?'<span class="up">새로 생김</span>':'';const r=Math.round((a-b)/b*100);return`<span class="${r>0?'up':r<0?'down':''}">앞 기간보다 ${r>0?'+':''}${r}%</span>`};
+let PER=7;
+function trend(){
+  const n=Math.min(PER,full.length),cur=full.slice(-n),prev=full.slice(-2*n,-n);const pv=prev.length==n?prev:null;
+  $('trange').textContent=`${cur[0].label} ~ ${cur[n-1].label}, 하루 평균으로 봐요`+(pv?` (앞 기간 ${pv[0].label} ~ ${pv[n-1].label})`:'');
+  const val=(nm,k,f2)=>{const v=(series[nm]||{})[k.key];return v?f2(v):0};
+  let T=0,TP=0;const cards=[],zero=[];
+  Object.keys(series).forEach(nm=>{
+    const useWeb=cur.some(k=>val(nm,k,v=>v.web)>0);const g=v=>useWeb?v.web:v.toss;
+    const vals=cur.map(k=>val(nm,k,g)),pvals=pv?pv.map(k=>val(nm,k,g)):null;
+    const a=avg(vals),b=pvals?avg(pvals):null;if(useWeb){T+=a;TP+=b||0}
+    if(!vals.some(x=>x)){zero.push(nm);return}
+    const mx=Math.max(...vals,1);
+    const rows=cur.map((k,ii)=>{const v=vals[ii],p0=ii?vals[ii-1]:(pvals?pvals[n-1]:null),d=p0==null?'':v-p0;const e=val(nm,k,v=>v.eng);
+      return`<tr><td>${esc(k.label)}</td><td>${f(v)}</td><td class="${d>0?'up':d<0?'down':''}">${d===''?'-':(d>0?'+':'')+f(d)}</td><td>${useWeb&&e!=null?f(e):'-'}</td></tr>`}).reverse().join('');
+    cards.push({a,html:`<div class="card"><div class="nm">${esc(nm)}</div><div class="big">${f(Math.round(a))}명</div><div class="ln">하루 평균 ${useWeb?'웹':'토스'} 방문</div><div class="chg">${pct(a,b)}</div>
+      <div class="bars">${vals.map((v,ii)=>`<i class="${ii==n-1?'last':''}" style="height:${Math.max(4,Math.round(v/mx*100))}%"></i>`).join('')}</div><div class="axis"><span>${esc(cur[0].label)}</span><span>${esc(cur[n-1].label)}</span></div>
+      <div class="more"><table><tr><th>날짜</th><th>방문</th><th>전날 대비</th><th>머문 방문</th></tr>${rows}</table></div></div>`})});
+  cards.sort((x,y)=>y.a-x.a);
+  $('tsum').innerHTML=`<h3>전체 웹 방문 하루 평균 ${f(Math.round(T))}명</h3><ul><li>${pv?pct(T,TP):'앞 기간 자료가 아직 없어요'}</li><li>카드를 누르면 날짜별 숫자와 전날 대비가 나와요</li></ul>`;
+  $('tgrid').innerHTML=cards.map(c=>c.html).join('');
+  $('ttail').innerHTML=zero.length?`<details><summary>이 기간 방문 0인 곳 ${zero.length}개</summary><ul>${zero.map(z=>`<li>${esc(z)}</li>`).join('')}</ul></details>`:'';
+  document.querySelectorAll('#tgrid .card').forEach(c=>c.onclick=()=>c.classList.toggle('open'));
+}
+document.querySelectorAll('#per button').forEach(b=>b.onclick=()=>{PER=+b.dataset.n;document.querySelectorAll('#per button').forEach(x=>x.classList.toggle('on',x==b));trend()});
+function view(t){$('dayView').hidden=t;$('range').hidden=t;$('trendView').hidden=!t;$('vDay').classList.toggle('on',!t);$('vTrend').classList.toggle('on',t);try{localStorage.setItem('ga-view',t?'t':'d')}catch(e){};if(t)trend()}
+$('vDay').onclick=()=>view(false);$('vTrend').onclick=()=>view(true);
 $('day').innerHTML=days.map((k,i)=>`<option value="${i}">${esc(k.label)}${k.key=='live'?' '+esc(k.range.split('~ ')[1]):''}</option>`).join('');
 $('day').onchange=e=>show(+e.target.value);$('prev').onclick=()=>show(+$('day').value+1);$('next').onclick=()=>show(+$('day').value-1);
 let start=0;try{const s=localStorage.getItem('ga-day');const j=days.findIndex(k=>k.key==s);if(j>=0)start=j}catch(e){}
-show(start);
+show(start);try{if(localStorage.getItem('ga-view')=='t')view(true)}catch(e){}
 async function poll(req){for(let n=0;n<60;n++){await new Promise(r=>setTimeout(r,10000));
   try{const l=await (await fetch('live.json?'+Date.now(),{cache:'no-store'})).json();if(l.at>=req){try{localStorage.setItem('ga-day','live')}catch(e){};location.reload();return}}catch(e){}
   $('msg').textContent=`갱신 중이에요. 보통 4~5분 걸려요 (${(n+1)*10}초 지남)`}

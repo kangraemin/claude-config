@@ -12,8 +12,14 @@ s = build.summary(d['svcs'][0])
 assert s == {'web': 120, 'web_usual': 100, 'web30': 3000, 'eng': 80, 'eng_usual': 70, 'toss': 5}, s
 assert d['tail'][0]['t'] == '전부 0인 곳'
 P
-test "$(curl -s -o /dev/null -w '%{http_code}' https://ga-report.remin1994.workers.dev/)" = 200
-curl -s https://ga-report.remin1994.workers.dev/api/state | grep -q '"req"'
-curl -s https://ga-report.remin1994.workers.dev/live.json | grep -q '"at"'
+K=$(grep '^PRIVATE_WEB_KEY=' ~/.claude/.env | cut -d= -f2); U=https://ga-report.remin1994.workers.dev
+test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' $U/)" = 404          # 키 없으면 못 봄
+test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' $U/api/state)" = 404
+test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' -H "cookie: pk=$K" $U/)" = 200
+curl -s -m 20 -H "cookie: pk=$K" $U/api/state | grep -q '"req"'
+curl -s -m 20 -H "cookie: pk=$K" $U/live.json | grep -q '"at"'
+curl -s -m 20 -H "cookie: pk=$K" $U/ | grep -q '흐름·증감'
+test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' https://sns-calendar.remin1994.workers.dev/)" = 404
+test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' -H "cookie: pk=$K" https://sns-calendar.remin1994.workers.dev/)" = 200
 python3 -c "import ast;ast.parse(open('/Users/ram/.claude/scripts/ga_daily_report.py').read())"
 echo PASS
