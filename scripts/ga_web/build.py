@@ -178,7 +178,7 @@ h1{font-size:20px;font-weight:700;margin:0}
 .sr{display:grid;grid-template-columns:96px 1fr 92px;align-items:center;gap:10px;min-height:30px}
 .sr .k{font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.sr .b{height:12px;border-radius:3px;background:var(--soft)}
 .sr .b i{display:block;height:100%;border-radius:3px;background:var(--ink)}.sr .n{text-align:right;font-size:14px;white-space:nowrap}.sr .n b{font-weight:600}.sr .n span{color:var(--sub);font-size:13px;margin-left:4px}
-.sort{display:flex;gap:6px;margin:14px 0 2px}
+.sort{display:flex;gap:6px;margin:18px 0 10px}
 .sort button{min-height:34px;padding:0 12px;border-radius:17px;border:1px solid var(--line);font-size:13px;color:var(--sub)}
 .sort button.on{border-color:var(--ink);color:var(--ink);font-weight:600}
 .list{margin:0;padding:0;list-style:none}
@@ -188,7 +188,8 @@ h1{font-size:20px;font-weight:700;margin:0}
 .row .go{color:var(--sub);font-size:20px;line-height:1;text-align:right}
 .cw{position:relative;padding-top:30px}.cw,.cw .chart{touch-action:manipulation;cursor:crosshair;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}.chart .cur{stroke:var(--sub);stroke-width:1;stroke-dasharray:2 2}
 .tt{position:absolute;top:0;background:var(--ink);color:var(--bg);font-size:14px;font-weight:600;padding:4px 10px;border-radius:8px;white-space:nowrap;pointer-events:none}
-.tip{font-size:13px;color:var(--sub);margin:4px 0 2px}
+.tip{font-size:13px;color:var(--sub);margin:0 0 12px}
+.cap{font-size:15px;font-weight:600;margin:0 0 6px}
 .row .nm{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .ds{font-size:13px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .row .v{text-align:right;font-size:17px;font-weight:600;line-height:1.2}
@@ -213,7 +214,7 @@ td,th{text-align:right;padding:7px 2px;border-bottom:1px solid var(--line)}td:fi
 <div class="nav" id="nav"><button id="prev" aria-label="이전">‹</button><label class="pk"><span id="when"></span><input type="date" id="pick" aria-label="날짜 고르기"></label><button id="next" aria-label="다음">›</button></div>
 <div class="sum" id="sum"></div>
 <div class="sort" id="sort"><button data-s="v" class="on">방문 많은 순</button><button data-s="up">늘어난 순</button><button data-s="down">줄어든 순</button></div>
-<p class="tip">서비스를 누르면 날짜별 방문·유입 경로를 볼 수 있어요<br>구글 검색 노출은 구글 검색 결과에 우리 사이트가 뜬 횟수예요. 구글이 2~3일 늦게 알려 줘서 2~3일 전 숫자예요</p>
+<p class="cap" id="cap"></p><p class="tip">서비스를 누르면 날짜별 방문·유입 경로를 볼 수 있어요<br>구글 검색 노출은 구글 검색 결과에 우리 사이트가 뜬 횟수예요. 구글이 2~3일 늦게 알려 줘서 2~3일 전 숫자예요</p>
 <ul class="list" id="list"></ul>
 <div id="notes" class="notes"></div><div id="zero"></div>
 </div>
@@ -291,13 +292,17 @@ function render(){
   $('sum').innerHTML=`<div class="lb">${C.lbl}</div><div class="big">${f(C.tot)}명</div>${MODE!='d'?`<div class="lb">하루 평균 ${f(C.tot/C.days)}명</div>`:''}<div class="chg ${tp.c}">${C.live?`어제 하루 ${f(C.ptot)}명`:(C.ptot==null?'비교할 앞 기간 없음':`${C.cmp} ${tp.t}`)}</div>${chart(C.keys,C.keys.map(webTot),C.hi)}`+srcBox(C.keys.filter((k,i)=>C.hi.includes(i)),order.filter(n=>useWeb[n]));
   const rows=[],zero=[];
   order.forEach(n=>{const v=C.cur(n);if(v==null)return;const sv=C.keys.map(k=>val(n,k));if(!v&&!sv.some(x=>x)){zero.push(n);return}
-    const p=pc(v,C.prev(n));const e=MODE=='d'&&S[n][days[IDX].key]?S[n][days[IDX].key].eng:null;
+    const p=pc(v,C.prev(n)),pv=C.prev(n),dd=C.live||pv==null?null:v-pv;const e=MODE=='d'&&S[n][days[IDX].key]?S[n][days[IDX].key].eng:null;
     const g=gRow(n,C);  // 사용자 11/11 "아이템마다 두 줄로, 한 줄은 지금처럼 손님, 한 줄은 서치콘솔, 그래프도 두 개"
-    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div>
-      <div class="ln"><div class="ds">${useWeb[n]?'웹':'토스'} 손님${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:''}</div>${spark(sv)}<div><div class="v">${f(v)}명</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div></div>
+    rows.push({n,v,p,dd,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div>
+      <div class="ln"><div class="ds">${useWeb[n]?'웹':'토스'} 손님${MODE!='d'?` · 하루 평균 ${fa(v/C.days)}`:''}</div>${spark(sv)}<div><div class="v">${f(v)}명</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):SORT!='v'&&dd!=null?(dd>0?'+':'')+f(dd)+'명':p.t}</div></div></div>
       ${g?`<div class="ln"><div class="ds">구글 검색 노출</div>${spark(g.sv)}<div><div class="v">${f(g.v)}회</div><div class="c ${g.p.c}">${g.p.t}</div></div></div>`:''}
       </div><div class="go" aria-hidden="true">›</div></li>`})});
-  rows.sort(SORT=='v'?(a,b)=>b.v-a.v:SORT=='up'?(a,b)=>b.p.r-a.p.r||b.v-a.v:(a,b)=>a.p.r-b.p.r||b.v-a.v);
+  // 사용자 11/11 "늘어난 순 줄어든 순 클릭했을 때 이 리스트 뭐고 싶음" — 무엇을 견준 순서인지 제목으로, 퍼센트 대신 늘어난·줄어든 사람 수로 줄 세운다(0→1명이 '새로'로 맨 위에 오던 것)
+  const vs=C.live?'어제 하루':MODE=='d'?'전날':`앞 ${MODE}일`,S2=C.live?'v':SORT;
+  $('cap').textContent=S2=='v'?(C.live&&SORT!='v'?'오늘은 하루가 안 끝나서 늘어남·줄어듦을 못 견줘요. 손님 많은 순이에요':'웹 손님이 많은 곳부터'):S2=='up'?`${vs}보다 손님이 많이 늘어난 곳부터`:`${vs}보다 손님이 많이 줄어든 곳부터`;
+  const dk=(r,sg)=>r.dd==null?-1e9:sg*r.dd;
+  rows.sort(S2=='v'?(a,b)=>b.v-a.v:S2=='up'?(a,b)=>dk(b,1)-dk(a,1)||b.v-a.v:(a,b)=>dk(b,-1)-dk(a,-1)||b.v-a.v);
   $('list').innerHTML=rows.map(r=>r.h).join('');
   document.querySelectorAll('#list .row').forEach(r=>r.onclick=()=>detail(r.dataset.n));
   const top=C.doc?C.doc.top.filter(b=>b.t&&b.items.length&&!(b.items.length==1&&b.items[0]=='없음')):[];
