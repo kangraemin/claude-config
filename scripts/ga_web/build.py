@@ -143,6 +143,7 @@ h1{font-size:20px;font-weight:700;margin:0}
 .nav{display:flex;align-items:center;justify-content:space-between}
 .nav button{width:44px;font-size:20px;color:var(--sub)}.nav button:disabled{opacity:.25}
 .nav span{font-size:15px;font-weight:600;text-align:center}
+.pk{position:relative;flex:1;display:flex;justify-content:center;cursor:pointer}.pk span{border-bottom:1px dashed var(--sub)}.pk input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
 .msg{font-size:13px;color:var(--sub);margin:0;min-height:0}
 .sum{padding:8px 0 4px}
 .sum .lb{font-size:13px;color:var(--sub)}
@@ -186,7 +187,7 @@ td,th{text-align:right;padding:7px 2px;border-bottom:1px solid var(--line)}td:fi
 <p class="msg" id="msg"></p>
 <div id="main">
 <div class="seg" id="mode"><button data-m="d" class="on">하루</button><button data-m="7">7일</button><button data-m="30">30일</button></div>
-<div class="nav" id="nav"><button id="prev" aria-label="이전">‹</button><span id="when"></span><button id="next" aria-label="다음">›</button></div>
+<div class="nav" id="nav"><button id="prev" aria-label="이전">‹</button><label class="pk"><span id="when"></span><input type="date" id="pick" aria-label="날짜 고르기"></label><button id="next" aria-label="다음">›</button></div>
 <div class="sum" id="sum"></div>
 <div class="sort" id="sort"><button data-s="v" class="on">방문 많은 순</button><button data-s="up">늘어난 순</button><button data-s="down">줄어든 순</button></div>
 <p class="tip">서비스를 누르면 날짜별 방문·유입 경로를 볼 수 있어요</p>
@@ -201,7 +202,8 @@ const $=s=>document.getElementById(s);const esc=s=>String(s).replace(/[&<>]/g,c=
 const f=n=>n==null?'-':Math.round(n).toLocaleString('ko-KR');
 const fa=n=>n!=null&&n<10&&n%1?(Math.round(n*10)/10).toString():f(n);
 const days=(D.live?[D.live]:[]).concat(D.days);           // 최근 → 예전, 하루 탐색용
-const full=D.days.slice().reverse();                       // 예전 → 최근, 하루가 다 끝난 날만
+const full=D.days.slice().reverse();
+const today=(()=>{const t=new Date(Date.now()+9*3600e3);return t.toISOString().slice(0,10)})();  // 한국 날짜                       // 예전 → 최근, 하루가 다 끝난 날만
 const S={},order=[];
 days.slice().reverse().forEach(k=>k.doc.svcs.forEach((sv,j)=>{const m=k.sum[j];if(!S[sv.name]){S[sv.name]={};order.push(sv.name)}S[sv.name][k.key]={web:m.web||0,eng:m.eng,toss:m.toss||0}}));
 const useWeb={};order.forEach(n=>useWeb[n]=Object.values(S[n]).some(v=>v.web>0));
@@ -228,7 +230,7 @@ function chTap(e){const w=e.target.closest&&e.target.closest('.cw');if(!w)return
 document.addEventListener('pointerdown',chTap);document.addEventListener('pointermove',e=>{if(e.pointerType=='mouse'||e.buttons)chTap(e)});
 const byKey={};days.forEach(k=>byKey[k.key]=k);
 const lab=key=>key=='live'?'지금':(d=>`${+d[1]}/${+d[2]}`)(key.split('-'));
-let MODE='d',IDX=0,SORT='v',OPEN=null;
+let MODE='d',IDX=0,SORT='v',OPEN=null,SH=0;
 try{MODE=localStorage.getItem('ga-mode')||'d';const j=days.findIndex(k=>k.key==localStorage.getItem('ga-day'));if(j>=0)IDX=j}catch(e){}
 function ctx(){ // 지금 보는 기간: keys(차트·스파크라인 줄), 값, 비교값
   if(MODE=='d'){const k=days[IDX],live=k.key=='live';const fi=live?full.length:full.findIndex(x=>x.key==k.key);
@@ -239,7 +241,8 @@ function ctx(){ // 지금 보는 기간: keys(차트·스파크라인 줄), 값,
     return{keys,hi:[pos-st],when:k.label+(live?' '+k.range.split('~ ')[1]+'까지':''),live,
       cur:n=>val(n,k.key),prev:n=>prev?val(n,prev.key):null,cmp:live?'어제 하루':'전날 대비',lbl:live?'오늘 지금까지 웹 방문':'웹 방문 합계',
       tot:webTot(k.key),ptot:prev?webTot(prev.key):null,doc:k.doc}}
-  const n=+MODE,c=full.slice(-n),p=full.slice(-2*n,-n);const pv=p.length==n?p:null;
+  // 사용자 11/11 "7일·30일은 왜 전후 클릭이 안 돼" — SH일만큼 끝을 앞당긴 기간
+  const n=+MODE;SH=Math.max(0,Math.min(SH,full.length-n));const e=full.length-SH,c=full.slice(Math.max(0,e-n),e),p=full.slice(Math.max(0,e-2*n),e-n);const pv=p.length==n?p:null;
   return{keys:c.map(x=>x.key),hi:c.map((x,i)=>i),when:`${c[0].label} ~ ${c[c.length-1].label}`,live:false,
     cur:nm=>sum(c.map(x=>val(nm,x.key))),prev:nm=>pv?sum(pv.map(x=>val(nm,x.key))):null,cmp:`앞 ${n}일 대비`,lbl:`${n}일 동안 웹 방문 합계`,
     tot:sum(c.map(x=>webTot(x.key))),ptot:pv?sum(pv.map(x=>webTot(x.key))):null,days:c.length,doc:null}}
@@ -253,8 +256,8 @@ function render(){
   try{localStorage.setItem('ga-mode',MODE);localStorage.setItem('ga-day',days[IDX].key)}catch(e){}
   document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.m==MODE));
   document.querySelectorAll('#sort button').forEach(b=>b.classList.toggle('on',b.dataset.s==SORT));
-  const C=ctx();$('when').textContent=C.when;$('prev').disabled=MODE!='d'||IDX>=days.length-1;$('next').disabled=MODE!='d'||IDX<=0;
-  $('prev').style.visibility=$('next').style.visibility=MODE=='d'?'':'hidden';
+  const C=ctx();$('when').textContent=C.when;$('prev').disabled=MODE=='d'?IDX>=days.length-1:SH>=full.length-+MODE;$('next').disabled=MODE=='d'?IDX<=0:SH<=0;
+  const pk=$('pick');pk.min=full[0].key;pk.max=days[0].key=='live'?today:full[full.length-1].key;pk.value=MODE=='d'?(days[IDX].key=='live'?today:days[IDX].key):C.keys[C.keys.length-1];
   const tp=C.live?{t:'',c:''}:pc(C.tot,C.ptot);
   $('sum').innerHTML=`<div class="lb">${C.lbl}</div><div class="big">${f(C.tot)}명</div>${MODE!='d'?`<div class="lb">하루 평균 ${f(C.tot/C.days)}명</div>`:''}<div class="chg ${tp.c}">${C.live?`어제 하루 ${f(C.ptot)}명`:(C.ptot==null?'비교할 앞 기간 없음':`${C.cmp} ${tp.t}`)}</div>${chart(C.keys,C.keys.map(webTot),C.hi)}`+srcBox(C.keys.filter((k,i)=>C.hi.includes(i)),order.filter(n=>useWeb[n]));
   const rows=[],zero=[];
@@ -279,9 +282,14 @@ function detail(n){OPEN=n;const C=ctx();const keys=full.slice(-30).map(x=>x.key)
     ${chart(keys,vs,hi)}</div>${srcBox(C.keys.filter((k,i)=>C.hi.includes(i)),[n])}<h2>날짜별 ${useWeb[n]?'웹':'토스'} 방문</h2><table><tr><th>날짜</th><th>방문</th><th>전날 대비</th><th>10초 넘게 본 방문</th></tr>${rows}</table>
     ${raw.length?`<details><summary>그날 리포트 원문</summary>${raw.map(b=>`${b.t?`<h2>${esc(b.t)}</h2>`:''}<ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</details>`:''}`;
   $('main').hidden=true;$('det').hidden=false;window.scrollTo(0,0);$('back').onclick=()=>{OPEN=null;$('det').hidden=true;$('main').hidden=false}}
-document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{MODE=b.dataset.m;render()});
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{MODE=b.dataset.m;SH=0;BK.length=0;render()});
 document.querySelectorAll('#sort button').forEach(b=>b.onclick=()=>{SORT=b.dataset.s;render()});
-$('prev').onclick=()=>{IDX++;render()};$('next').onclick=()=>{IDX--;render()};
+const BK=[];  // 30일 끝에서 덜 밀린 경우에도 › 가 원래 자리로 돌아오게
+$('prev').onclick=()=>{if(MODE=='d')IDX++;else{BK.push(SH);SH+=+MODE}render()};$('next').onclick=()=>{if(MODE=='d')IDX--;else SH=BK.length?BK.pop():Math.max(0,SH-MODE);render()};
+// 사용자 11/11 "가운데 날짜 누르면 캘린더" — 하루는 그날로, 7일·30일은 그날로 끝나는 기간으로
+$('pick').onclick=e=>{try{e.target.showPicker()}catch(_){}};
+$('pick').onchange=e=>{const v=e.target.value;if(!v)return;if(MODE=='d'){const j=days.findIndex(k=>(k.key=='live'?today:k.key)==v);if(j>=0)IDX=j}
+  else{const j=full.findIndex(x=>x.key==v);SH=j<0?0:full.length-1-j;BK.length=0}render()};
 render();
 async function poll(req){for(let n=0;n<60;n++){await new Promise(r=>setTimeout(r,10000));
   try{const l=await (await fetch('live.json?'+Date.now(),{cache:'no-store'})).json();if(l.at>=req){try{localStorage.setItem('ga-day','live');localStorage.setItem('ga-mode','d')}catch(e){};location.reload();return}}catch(e){}
