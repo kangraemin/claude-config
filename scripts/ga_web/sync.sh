@@ -15,10 +15,15 @@ DONE=$(cat "$C/live.req" 2>/dev/null || echo 0)
 if [ "$REQ" -gt "$DONE" ]; then
   echo "== $(date '+%F %T') live req=$REQ" >> "$LOG"
   T=$(date +%F); NOW=$(python3 -c 'import time;print(int(time.time()*1000))')
-  [ -f "$C/$T.txt" ] && cp "$C/$T.txt" "$C/.today-backup.txt"
+  # 갱신 버튼판은 하루 중간 숫자다. <오늘>.txt에 남기면 다음 날 아침 확정판이 덮어써 같은 날 숫자가 바뀐 것처럼 보인다(사용자 11/11 "11/10 데이터가 왜 바뀜").
+  # 그래서 돌린 뒤 live.txt로만 옮기고 날짜 파일은 원래대로 되돌린다.
+  B="$C/.live-bak"; rm -rf "$B"; mkdir -p "$B"
+  for s in "" -full -detail; do [ -f "$C/$T$s.txt" ] && cp -p "$C/$T$s.txt" "$B/"; done
   if python3 "$HOME/.claude/scripts/ga_daily_report.py" --day "$T" --dry-run --no-ai --force >> "$LOG" 2>&1 && [ -f "$C/$T.txt" ]; then
     cp "$C/$T.txt" "$C/live.txt"; echo "{\"at\": $NOW}" > "$C/live.json"
   else echo "live FAIL" >> "$LOG"; fi
+  for s in "" -full -detail; do rm -f "$C/$T$s.txt"; [ -f "$B/$T$s.txt" ] && cp -p "$B/$T$s.txt" "$C/"; done
+  rm -rf "$B"
   echo "$REQ" > "$C/live.req"
 fi
 STAMP=$HOME/.cache/ga-web.deployed
