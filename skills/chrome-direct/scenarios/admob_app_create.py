@@ -23,6 +23,8 @@ ap.add_argument("--platform", action="append", choices=["Android", "iOS"], requi
 ap.add_argument("--unit", default="hint_rewarded")
 ap.add_argument("--reward-item", default="hint")
 ap.add_argument("--reward-amount", default="1")
+ap.add_argument("--formats", default="", help="banner,interstitial 처럼 쉼표로. 주면 --unit 대신 이 형식 단위를 앱당 만든다(단위 이름은 <앱영문>_<형식>)")
+ap.add_argument("--unit-prefix", default="tu", help="--formats 단위 이름 앞부분")
 ap.add_argument("--dry-run", action="store_true")
 a = ap.parse_args()
 png = tempfile.gettempdir() + "/admob_app_create.png"
@@ -46,11 +48,11 @@ def apps(tid):
     return {(m[0], m[1]): m[2] for m in re.findall(r"\n([^\n]+)\n(Android|iOS)\ncontent_copy\n" + PUB + r"~\n(\d+)\n", "\n" + t)}
 
 
-def unit(tid, app_id):
+def unit(tid, app_id, name=None):
     c.goto(tid, f"https://admob.google.com/v2/apps/{app_id}/adunits/list")
     time.sleep(3)
     front(tid, 9)
-    m = re.search(re.escape(a.unit) + r"\n(" + PUB + r"/\d+)", c.page_text(tid))
+    m = re.search(re.escape(name or a.unit) + r"\n(" + PUB + r"/\d+)", c.page_text(tid))
     return m.group(1) if m else None
 
 
@@ -82,6 +84,31 @@ with tab("https://admob.google.com/v2/home", a) as tid:
                 print("RESULT: FAILED app create"); raise SystemExit(1)
             app_id = apps(tid).get((a.name, pf))
             print(f"APP {a.name} {pf} {PUB}~{app_id} (CREATED)")
+        if a.formats:
+            card = {"banner": "배너", "interstitial": "전면"}
+            for fmt in a.formats.split(","):
+                uname = f"{a.unit_prefix}_{pf.lower()}_{fmt}"
+                uid = unit(tid, app_id, uname)
+                if uid:
+                    print(f"UNIT {pf} {uname} {uid} (EXISTS)"); continue
+                if a.dry_run:
+                    print(f"DRY_RUN would create unit {uname}"); continue
+                c.goto(tid, f"https://admob.google.com/v2/apps/{app_id}/adunits/create")
+                time.sleep(3)
+                front(tid)
+                got = js(tid, "const want=%r; const bs=[...document.querySelectorAll('button,material-button,[role=button]')].filter(x=>x.textContent.trim()=='선택');"
+                         "for(const b of bs){let e=b;for(let i=0;i<5&&e;i++){e=e.parentElement; if(e&&e.textContent.trim().startsWith(want)&&e.textContent.length<400){b.click();return e.textContent.slice(0,60)}}} return 0" % card[fmt])
+                print("CARD", fmt, got)
+                time.sleep(4)
+                c.fill(tid, "input", uname)
+                time.sleep(1)
+                click_btn(tid, "광고 단위 만들기")
+                time.sleep(5)
+                uid = unit(tid, app_id, uname)
+                if not uid:
+                    c.shot(tid, png); print("RESULT: FAILED unit create", fmt, png); raise SystemExit(1)
+                print(f"UNIT {pf} {uname} {uid} (CREATED)")
+            continue
         uid = unit(tid, app_id)
         if uid:
             print(f"UNIT {pf} {a.unit} {uid} (EXISTS)")
@@ -96,7 +123,12 @@ with tab("https://admob.google.com/v2/home", a) as tid:
             c.fill(tid, "input", a.unit)
             c.fill(tid, "textarea", a.reward_item)
             if a.reward_amount != "1":
-                c.fill(tid, "input[type=text]:nth-of-type(2)", a.reward_amount)
+                # 수량 칸은 nth-of-type로 안 잡힌다(11/10 NOTFOUND). 보이는 숫자 input 중 마지막을 쓴다
+                js(tid, "const v=[...document.querySelectorAll('input')].filter(e=>e.offsetParent&&(e.type=='number'||/^\\d+$/.test(e.value)));if(v.length)v[v.length-1].id='rw_amt';return v.length")
+                try:
+                    c.fill(tid, "#rw_amt", a.reward_amount)
+                except RuntimeError as e:
+                    print("WARN reward amount not set, left 1:", e)
             time.sleep(1)
             click_btn(tid, "광고 단위 만들기")
             time.sleep(5)
