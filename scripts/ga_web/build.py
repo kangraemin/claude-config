@@ -124,13 +124,13 @@ def load():
     return days, live
 
 
-PAGE = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+PAGE = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <title>방문 리포트</title>
 <style>
 :root{--bg:#fff;--ink:#16181d;--sub:#555b66;--line:#eceef1;--soft:#f4f5f7;--bar:#c9ced6;--up:#d6302a;--down:#2860d8;--avg:#e5322d}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#121417;--ink:#eef0f3;--sub:#9aa2ad;--line:#262a30;--soft:#1c1f24;--bar:#454b55;--up:#ff6b5f;--down:#6d97ff;--avg:#ff6b5f}}
 :root[data-theme=dark]{--bg:#121417;--ink:#eef0f3;--sub:#9aa2ad;--line:#262a30;--soft:#1c1f24;--bar:#454b55;--up:#ff6b5f;--down:#6d97ff;--avg:#ff6b5f}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",sans-serif;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}html{touch-action:manipulation;-webkit-text-size-adjust:100%}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",sans-serif;-webkit-font-smoothing:antialiased}
 .wrap{max-width:640px;margin:0 auto;padding:12px 16px 48px}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;min-height:44px}
 .head{display:flex;justify-content:space-between;align-items:center}
@@ -143,7 +143,7 @@ h1{font-size:20px;font-weight:700;margin:0}
 .nav{display:flex;align-items:center;justify-content:space-between}
 .nav button{width:44px;font-size:20px;color:var(--sub)}.nav button:disabled{opacity:.25}
 .nav span{font-size:15px;font-weight:600;text-align:center}
-.pk{position:relative;flex:1;display:flex;justify-content:center;cursor:pointer}.pk span{border-bottom:1px dashed var(--sub)}.pk input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
+.pk{position:relative;flex:1;display:flex;justify-content:center;cursor:pointer}.pk span{border-bottom:1px dashed var(--sub)}.pk input{font-size:16px;position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
 .msg{font-size:13px;color:var(--sub);margin:0;min-height:0}
 .sum{padding:8px 0 4px}
 .sum .lb{font-size:13px;color:var(--sub)}
@@ -163,7 +163,7 @@ h1{font-size:20px;font-weight:700;margin:0}
 .row{display:grid;grid-template-columns:1fr 64px 76px 12px;align-items:center;gap:10px;min-height:56px;padding:6px 8px;margin:0 -8px;border-bottom:1px solid var(--line);border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .row:hover,.row:active{background:var(--soft)}
 .row .go{color:var(--sub);font-size:20px;line-height:1;text-align:right}
-.cw{position:relative;padding-top:30px}.cw .chart{touch-action:pan-y;cursor:crosshair}.chart .cur{stroke:var(--sub);stroke-width:1;stroke-dasharray:2 2}
+.cw{position:relative;padding-top:30px}.cw,.cw .chart{touch-action:manipulation;cursor:crosshair;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}.chart .cur{stroke:var(--sub);stroke-width:1;stroke-dasharray:2 2}
 .tt{position:absolute;top:0;background:var(--ink);color:var(--bg);font-size:14px;font-weight:600;padding:4px 10px;border-radius:8px;white-space:nowrap;pointer-events:none}
 .tip{font-size:13px;color:var(--sub);margin:4px 0 2px}
 .row .nm{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
