@@ -18,7 +18,7 @@ test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' $U/api/state)" = 404
 test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' -H "cookie: pk=$K" $U/)" = 200
 curl -s -m 20 -H "cookie: pk=$K" $U/api/state | grep -q '"req"'
 curl -s -m 20 -H "cookie: pk=$K" $U/live.json | grep -q '"at"'
-curl -s -m 20 -H "cookie: pk=$K" $U/ | grep -q '흐름·증감'
+curl -s -m 20 -H "cookie: pk=$K" $U/ | grep -q 'data-m="30"'
 test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' https://sns-calendar.remin1994.workers.dev/)" = 404
 test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' -H "cookie: pk=$K" https://sns-calendar.remin1994.workers.dev/)" = 200
 python3 -c "import ast;ast.parse(open('/Users/ram/.claude/scripts/ga_daily_report.py').read())"

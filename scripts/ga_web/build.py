@@ -98,114 +98,135 @@ def load():
 PAGE = r'''<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>방문 리포트</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--ink:#16181d;--sub:#5d6470;--line:#e4e7ec;--acc:#2b62e3;--up:#137a3f;--down:#c0352b}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#111316;--card:#1b1e23;--ink:#eef0f3;--sub:#9aa2ad;--line:#2b3038;--acc:#6d97ff;--up:#4cc27a;--down:#ff7a6e}}
-:root[data-theme=dark]{--bg:#111316;--card:#1b1e23;--ink:#eef0f3;--sub:#9aa2ad;--line:#2b3038;--acc:#6d97ff;--up:#4cc27a;--down:#ff7a6e}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",sans-serif}
-.wrap{max-width:760px;margin:0 auto;padding:16px 16px 60px}
-h1{font-size:22px;margin:4px 0 2px}.range{color:var(--sub);font-size:14px;margin:0 0 14px}
-.bar{display:flex;gap:8px;align-items:center;margin:0 0 10px}
-select{flex:1;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);min-height:44px}
-button{font:inherit;min-height:44px;padding:0 14px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}
-button.go{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:600}
-button:disabled{opacity:.5}
-.msg{color:var(--sub);font-size:14px;min-height:20px;margin:0 0 12px}
-.top{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;margin:0 0 14px}
-.top h3{font-size:15px;margin:8px 0 2px}.top ul{margin:0;padding-left:18px}.top li{margin:2px 0}
-.top .down li{color:var(--down)}.top .up li{color:var(--up)}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-@media (max-width:520px){.grid{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;cursor:pointer}
-.card .nm{font-weight:600;font-size:16px}
-.card .big{font-size:28px;font-weight:700;margin:2px 0 0}
-.card .ln{color:var(--sub);font-size:14px}
-.card .chg{font-size:14px;font-weight:600}.chg.up{color:var(--up)}.chg.down{color:var(--down)}
-.card .more{display:none;border-top:1px solid var(--line);margin-top:10px;padding-top:8px}
-.card.open .more{display:block}
-.more h4{font-size:14px;margin:8px 0 2px;color:var(--sub)}.more ul{margin:0;padding-left:18px;font-size:15px}
-.seg{display:flex;gap:6px;margin:0 0 12px}.seg button{flex:1}.seg button.on{background:var(--ink);border-color:var(--ink);color:var(--bg);font-weight:600}
-.bars{display:flex;align-items:flex-end;gap:2px;height:56px;margin:10px 0 2px}.bars i{flex:1;background:var(--line);border-radius:2px 2px 0 0;min-height:2px}.bars i.last{background:var(--sub)}
-.axis{display:flex;justify-content:space-between;color:var(--sub);font-size:13px}
-table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}td,th{text-align:right;padding:4px 2px;border-bottom:1px solid var(--line)}td:first-child,th:first-child{text-align:left}th{color:var(--sub);font-weight:400}
-.up,.card .ln.up{color:var(--up)}.down,.card .ln.down{color:var(--down)}
-details{margin:16px 0 0;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 16px}
-summary{cursor:pointer;font-weight:600;min-height:28px}details ul{margin:6px 0;padding-left:18px}
+:root{--bg:#fff;--ink:#16181d;--sub:#555b66;--line:#eceef1;--soft:#f4f5f7;--bar:#c9ced6;--up:#d6302a;--down:#2860d8}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#121417;--ink:#eef0f3;--sub:#9aa2ad;--line:#262a30;--soft:#1c1f24;--bar:#454b55;--up:#ff6b5f;--down:#6d97ff}}
+:root[data-theme=dark]{--bg:#121417;--ink:#eef0f3;--sub:#9aa2ad;--line:#262a30;--soft:#1c1f24;--bar:#454b55;--up:#ff6b5f;--down:#6d97ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Pretendard",sans-serif;-webkit-font-smoothing:antialiased}
+.wrap{max-width:640px;margin:0 auto;padding:12px 16px 48px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;min-height:44px}
+.head{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:20px;font-weight:700;margin:0}
+.ref{border:1px solid var(--line);border-radius:10px;padding:0 12px;font-size:13px;color:var(--sub)}
+.ref:disabled{opacity:.5}
+.seg{display:flex;background:var(--soft);border-radius:10px;padding:3px;margin:10px 0 4px}
+.seg button{flex:1;min-height:38px;border-radius:8px;font-size:13px;color:var(--sub)}
+.seg button.on{background:var(--bg);color:var(--ink);font-weight:600;box-shadow:0 0 0 1px var(--line)}
+.nav{display:flex;align-items:center;justify-content:space-between}
+.nav button{width:44px;font-size:20px;color:var(--sub)}.nav button:disabled{opacity:.25}
+.nav span{font-size:15px;font-weight:600;text-align:center}
+.msg{font-size:13px;color:var(--sub);margin:0;min-height:0}
+.sum{padding:8px 0 4px}
+.sum .lb{font-size:13px;color:var(--sub)}
+.sum .big{font-size:28px;font-weight:700;line-height:1.2}
+.chg{font-size:13px;color:var(--sub)}.up{color:var(--up)}.down{color:var(--down)}
+.chart{display:block;width:100%;height:auto;margin:8px 0 0}
+.chart text{font-size:13px;fill:var(--sub)}
+.sort{display:flex;gap:6px;margin:14px 0 2px}
+.sort button{min-height:34px;padding:0 12px;border-radius:17px;border:1px solid var(--line);font-size:13px;color:var(--sub)}
+.sort button.on{border-color:var(--ink);color:var(--ink);font-weight:600}
+.list{margin:0;padding:0;list-style:none}
+.row{display:grid;grid-template-columns:1fr 64px 76px;align-items:center;gap:10px;min-height:56px;padding:6px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.row .nm{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .ds{font-size:13px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .v{text-align:right;font-size:17px;font-weight:600;line-height:1.2}
+.row .c{text-align:right;font-size:13px}
+.spark{width:64px;height:24px;display:block}
+.spark polyline{fill:none;stroke:var(--sub);stroke-width:1.5}
+.spark circle{fill:var(--ink)}
+.notes{margin:16px 0 0}
+.notes h2,.det h2{font-size:15px;font-weight:600;margin:16px 0 4px}
+.notes ul,.det ul{margin:0;padding-left:18px;font-size:15px}.notes li,.det li{margin:2px 0}
+details{margin:12px 0 0;border-top:1px solid var(--line);padding-top:8px}
+summary{cursor:pointer;font-size:15px;font-weight:600;min-height:32px;padding-top:6px}
+details ul{margin:6px 0;padding-left:18px}
+.back{font-size:15px;color:var(--sub);padding:0}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px}
+td,th{text-align:right;padding:7px 2px;border-bottom:1px solid var(--line)}td:first-child,th:first-child{text-align:left}th{color:var(--sub);font-weight:400}
 </style></head><body><div class="wrap">
-<h1>방문 리포트</h1><p class="range" id="range"></p>
-<div class="seg"><button id="vDay" class="on">하루씩</button><button id="vTrend">흐름·증감</button></div>
-<div id="dayView">
-<div class="bar"><button id="prev" aria-label="이전 날">‹</button><select id="day"></select><button id="next" aria-label="다음 날">›</button></div>
-<div class="bar"><button class="go" id="refresh">지금 숫자로 갱신</button></div>
+<div class="head"><h1>방문 리포트</h1><button class="ref" id="refresh">지금 숫자로 갱신</button></div>
 <p class="msg" id="msg"></p>
-<div id="top"></div><div class="grid" id="grid"></div><div id="tail"></div>
+<div id="main">
+<div class="seg" id="mode"><button data-m="d" class="on">하루</button><button data-m="7">7일</button><button data-m="30">30일</button></div>
+<div class="nav" id="nav"><button id="prev" aria-label="이전">‹</button><span id="when"></span><button id="next" aria-label="다음">›</button></div>
+<div class="sum" id="sum"></div>
+<div class="sort" id="sort"><button data-s="v" class="on">방문 많은 순</button><button data-s="up">늘어난 순</button><button data-s="down">줄어든 순</button></div>
+<ul class="list" id="list"></ul>
+<div id="notes" class="notes"></div><div id="zero"></div>
 </div>
-<div id="trendView" hidden>
-<div class="seg" id="per"><button data-n="7" class="on">최근 7일</button><button data-n="14">14일</button><button data-n="30">30일</button></div>
-<p class="range" id="trange"></p>
-<div class="top" id="tsum"></div><div class="grid" id="tgrid"></div><div id="ttail"></div>
-</div>
+<div id="det" class="det" hidden></div>
 </div>
 <script>
 const D=__DATA__;const LIVE_AT=__LIVEAT__;
-const days=(D.live?[D.live]:[]).concat(D.days);
 const $=s=>document.getElementById(s);const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[c]);
-const f=n=>n==null?'-':n.toLocaleString('ko-KR');
-function chg(a,b){if(a==null||!b)return'';const r=a/b;if(r>=1.3)return`<span class="chg up">평소의 ${r.toFixed(1)}배</span>`;if(r<=0.7)return`<span class="chg down">평소보다 ${Math.round((1-r)*100)}% 적음</span>`;return'<span class="ln">평소와 비슷</span>'}
-function show(i){
-  let k=days[i];try{localStorage.setItem('ga-day',k.key)}catch(e){}
-  $('day').value=i;$('range').textContent=k.range+(k.key=='live'?' (하루가 안 끝난 숫자)':'');
-  $('top').innerHTML=k.doc.top.filter(b=>b.items.length&&!(b.items.length==1&&b.items[0]=='없음')).map(b=>`<div class="top ${b.t=='나빠진 것'?'down':b.t=='좋아진 것'?'up':''}"><h3>${esc(b.t)}</h3><ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')||'';
-  const live=k.key=='live';const cards=[],zero=[];
-  k.doc.svcs.forEach((s,j)=>{const m=k.sum[j];const web=m.web||0,toss=m.toss||0;
-    if(!web&&!toss&&!m.web30&&!m.toss30){zero.push(s.name);return}
-    const main=web?`<div class="big">${f(web)}명</div><div class="ln">웹 방문${m.web_usual!=null&&!live?` · 평소 ${f(m.web_usual)}명`:''}</div>`:`<div class="big">${f(toss)}명</div><div class="ln">토스 방문</div>`;
-    const lines=[];if(web&&!live)lines.push(chg(m.eng??web,m.eng_usual??m.web_usual));
-    const pd=live?null:days[i+1];if(pd&&pd.key!='live'){const pj=pd.doc.svcs.findIndex(x=>x.name==s.name);const pv=pj>=0?(web?pd.sum[pj].web:pd.sum[pj].toss):null;if(pv!=null){const dv=(web||toss)-pv;lines.push(`<div class="ln ${dv>0?'up':dv<0?'down':''}">전날보다 ${dv>0?'+':''}${f(dv)}명</div>`)}}
-    if(m.eng!=null)lines.push(`<div class="ln">실제로 머문 방문 ${f(m.eng)}회${m.eng_usual!=null&&!live?` · 평소 ${f(m.eng_usual)}회`:''}</div>`);
-    if(web&&m.toss!=null)lines.push(`<div class="ln">토스 ${f(m.toss)}명</div>`);
-    const blocks=s.blocks.filter(b=>!(b.items.length==1&&b.items[0]=='없음'));
-    cards.push(`<div class="card"><div class="nm">${esc(s.name)}</div>${main}${lines.join('')}<div class="more">${blocks.map(b=>`<h4>${esc(b.t)}</h4><ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</div></div>`)});
-  $('grid').innerHTML=cards.join('');
-  $('tail').innerHTML=(zero.length?`<details><summary>방문 0인 곳 ${zero.length}개</summary><ul>${zero.map(z=>`<li>${esc(z)}</li>`).join('')}</ul></details>`:'')+k.doc.tail.filter(b=>b.t!='전부 0인 곳').map(b=>`<details><summary>${esc(b.t)}</summary><ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`).join('');
-  document.querySelectorAll('#grid .card').forEach(c=>c.onclick=()=>c.classList.toggle('open'));
-  $('prev').disabled=i>=days.length-1;$('next').disabled=i<=0;
+const f=n=>n==null?'-':Math.round(n).toLocaleString('ko-KR');
+const fa=n=>n!=null&&n<10&&n%1?(Math.round(n*10)/10).toString():f(n);
+const days=(D.live?[D.live]:[]).concat(D.days);           // 최근 → 예전, 하루 탐색용
+const full=D.days.slice().reverse();                       // 예전 → 최근, 하루가 다 끝난 날만
+const S={},order=[];
+days.slice().reverse().forEach(k=>k.doc.svcs.forEach((sv,j)=>{const m=k.sum[j];if(!S[sv.name]){S[sv.name]={};order.push(sv.name)}S[sv.name][k.key]={web:m.web||0,eng:m.eng,toss:m.toss||0}}));
+const useWeb={};order.forEach(n=>useWeb[n]=Object.values(S[n]).some(v=>v.web>0));
+const val=(n,key)=>{const v=S[n][key];return v?(useWeb[n]?v.web:v.toss):null};
+const webTot=key=>order.reduce((t,n)=>t+(useWeb[n]?(val(n,key)||0):0),0);
+const avg=a=>{a=a.filter(x=>x!=null);return a.length?a.reduce((x,y)=>x+y,0)/a.length:null};
+function pc(a,b){if(a==null||b==null)return{t:'-',c:'',r:0};if(!b)return a?{t:'새로',c:'up',r:1e9}:{t:'-',c:'',r:0};const r=Math.round((a-b)/b*100);return{t:(r>0?'▲ ':r<0?'▼ ':'')+Math.abs(r)+'%',c:r>0?'up':r<0?'down':'',r}}
+function spark(vs){const w=64,h=24,m=Math.max(...vs.map(v=>v||0),1),n=vs.length;if(n<2)return'';const pt=(v,i)=>[(i/(n-1)*(w-4)+2).toFixed(1),(h-3-(v||0)/m*(h-6)).toFixed(1)];
+  const p=vs.map((v,i)=>pt(v,i).join(',')).join(' ');const [x,y]=pt(vs[n-1],n-1);return`<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><polyline points="${p}"/><circle cx="${x}" cy="${y}" r="2"/></svg>`}
+function chart(keys,vals,hi){const W=340,H=150,L=34,B=20,n=vals.length,m=Math.max(...vals.map(v=>v||0),1);const top=Math.ceil(m/(m>100?50:10))*(m>100?50:10);
+  const bw=(W-L)/n;let g='';[0,.5,1].forEach(t=>{const y=(H-B)-(H-B-6)*t;g+=`<line x1="${L}" x2="${W}" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-6}" y="${y+4}" text-anchor="end">${f(top*t)}</text>`});
+  vals.forEach((v,i)=>{const bh=Math.max((v||0)/top*(H-B-6),v?2:0);g+=`<rect x="${(L+i*bw+bw*.15).toFixed(1)}" y="${(H-B-bh).toFixed(1)}" width="${(bw*.7).toFixed(1)}" height="${bh.toFixed(1)}" rx="1.5" fill="${hi.includes(i)?'var(--ink)':'var(--bar)'}"/>`});
+  [0,Math.floor((n-1)/2),n-1].filter((x,i,a)=>a.indexOf(x)==i).forEach(i=>{g+=`<text x="${(i==0?L:i==n-1?W:L+i*bw+bw/2).toFixed(1)}" y="${H-4}" text-anchor="${i==0?'start':i==n-1?'end':'middle'}">${esc(lab(keys[i]))}</text>`});
+  return`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img">${g}</svg>`}
+const byKey={};days.forEach(k=>byKey[k.key]=k);
+const lab=key=>key=='live'?'지금':(d=>`${+d[1]}/${+d[2]}`)(key.split('-'));
+let MODE='d',IDX=0,SORT='v',OPEN=null;
+try{MODE=localStorage.getItem('ga-mode')||'d';const j=days.findIndex(k=>k.key==localStorage.getItem('ga-day'));if(j>=0)IDX=j}catch(e){}
+function ctx(){ // 지금 보는 기간: keys(차트·스파크라인 줄), 값, 비교값
+  if(MODE=='d'){const k=days[IDX],live=k.key=='live';const fi=live?full.length:full.findIndex(x=>x.key==k.key);
+    const keys=full.slice(Math.max(0,fi-13),fi).map(x=>x.key).concat(live?['live']:[k.key]);
+    const prev=full[fi-1]||null;
+    return{keys,hi:[keys.length-1],when:k.label+(live?' '+k.range.split('~ ')[1]+'까지':''),live,
+      cur:n=>val(n,k.key),prev:n=>prev?val(n,prev.key):null,cmp:live?'어제 하루':'전날 대비',lbl:live?'오늘 지금까지 웹 방문':'웹 방문 합계',
+      tot:webTot(k.key),ptot:prev?webTot(prev.key):null,doc:k.doc}}
+  const n=+MODE,c=full.slice(-n),p=full.slice(-2*n,-n);const pv=p.length==n?p:null;
+  return{keys:c.map(x=>x.key),hi:c.map((x,i)=>i),when:`${c[0].label} ~ ${c[c.length-1].label}`,live:false,
+    cur:nm=>avg(c.map(x=>val(nm,x.key))),prev:nm=>pv?avg(pv.map(x=>val(nm,x.key))):null,cmp:`앞 ${n}일 대비`,lbl:'하루 평균 웹 방문',
+    tot:avg(c.map(x=>webTot(x.key))),ptot:pv?avg(pv.map(x=>webTot(x.key))):null,doc:null}}
+function render(){
+  try{localStorage.setItem('ga-mode',MODE);localStorage.setItem('ga-day',days[IDX].key)}catch(e){}
+  document.querySelectorAll('#mode button').forEach(b=>b.classList.toggle('on',b.dataset.m==MODE));
+  document.querySelectorAll('#sort button').forEach(b=>b.classList.toggle('on',b.dataset.s==SORT));
+  const C=ctx();$('when').textContent=C.when;$('prev').disabled=MODE!='d'||IDX>=days.length-1;$('next').disabled=MODE!='d'||IDX<=0;
+  $('prev').style.visibility=$('next').style.visibility=MODE=='d'?'':'hidden';
+  const tp=C.live?{t:'',c:''}:pc(C.tot,C.ptot);
+  $('sum').innerHTML=`<div class="lb">${C.lbl}</div><div class="big">${f(C.tot)}명</div><div class="chg ${tp.c}">${C.live?`어제 하루 ${f(C.ptot)}명`:(C.ptot==null?'비교할 앞 기간 없음':`${C.cmp} ${tp.t}`)}</div>${chart(C.keys,C.keys.map(webTot),C.hi)}`;
+  const rows=[],zero=[];
+  order.forEach(n=>{const v=C.cur(n);if(v==null)return;const sv=C.keys.map(k=>val(n,k));if(!v&&!sv.some(x=>x)){zero.push(n);return}
+    const p=pc(v,C.prev(n));const e=MODE=='d'&&S[n][days[IDX].key]?S[n][days[IDX].key].eng:null;
+    rows.push({n,v,p,h:`<li class="row" data-n="${esc(n)}"><div><div class="nm">${esc(n)}</div><div class="ds">${useWeb[n]?'웹':'토스'}${MODE!='d'?' · 하루 평균':e!=null?` · 머문 방문 ${f(e)}회`:''}</div></div>${spark(sv)}<div><div class="v">${fa(v)}</div><div class="c ${C.live?'':p.c}">${C.live?(C.prev(n)==null?'-':'어제 '+f(C.prev(n))):p.t}</div></div></li>`})});
+  rows.sort(SORT=='v'?(a,b)=>b.v-a.v:SORT=='up'?(a,b)=>b.p.r-a.p.r||b.v-a.v:(a,b)=>a.p.r-b.p.r||b.v-a.v);
+  $('list').innerHTML=rows.map(r=>r.h).join('');
+  document.querySelectorAll('#list .row').forEach(r=>r.onclick=()=>detail(r.dataset.n));
+  const top=C.doc?C.doc.top.filter(b=>b.t&&b.items.length&&!(b.items.length==1&&b.items[0]=='없음')):[];
+  $('notes').innerHTML=top.length?`<details><summary>리포트 메모 ${top.reduce((t,b)=>t+b.items.length,0)}개</summary>${top.map(b=>`<h2>${esc(b.t)}</h2><ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</details>`:'';
+  $('zero').innerHTML=zero.length?`<details><summary>방문 0인 곳 ${zero.length}개</summary><ul>${zero.map(z=>`<li>${esc(z)}</li>`).join('')}</ul></details>`:'';
 }
-const full=D.days.slice().reverse();// 오래된 날 → 최근 날, 하루 다 끝난 날만
-const series={};full.forEach((k,di)=>k.doc.svcs.forEach((sv,j)=>{const m=k.sum[j];(series[sv.name]=series[sv.name]||{})[k.key]={web:m.web||0,eng:m.eng,toss:m.toss||0}}));
-const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:null;
-const pct=(a,b)=>{if(a==null||b==null)return'<span class="ln">앞 기간 자료 없음</span>';if(!b)return a?'<span class="up">새로 생김</span>':'';const r=Math.round((a-b)/b*100);return`<span class="${r>0?'up':r<0?'down':''}">앞 기간보다 ${r>0?'+':''}${r}%</span>`};
-let PER=7;
-function trend(){
-  const n=Math.min(PER,full.length),cur=full.slice(-n),prev=full.slice(-2*n,-n);const pv=prev.length==n?prev:null;
-  $('trange').textContent=`${cur[0].label} ~ ${cur[n-1].label}, 하루 평균으로 봐요`+(pv?` (앞 기간 ${pv[0].label} ~ ${pv[n-1].label})`:'');
-  const val=(nm,k,f2)=>{const v=(series[nm]||{})[k.key];return v?f2(v):0};
-  let T=0,TP=0;const cards=[],zero=[];
-  Object.keys(series).forEach(nm=>{
-    const useWeb=cur.some(k=>val(nm,k,v=>v.web)>0);const g=v=>useWeb?v.web:v.toss;
-    const vals=cur.map(k=>val(nm,k,g)),pvals=pv?pv.map(k=>val(nm,k,g)):null;
-    const a=avg(vals),b=pvals?avg(pvals):null;if(useWeb){T+=a;TP+=b||0}
-    if(!vals.some(x=>x)){zero.push(nm);return}
-    const mx=Math.max(...vals,1);
-    const rows=cur.map((k,ii)=>{const v=vals[ii],p0=ii?vals[ii-1]:(pvals?pvals[n-1]:null),d=p0==null?'':v-p0;const e=val(nm,k,v=>v.eng);
-      return`<tr><td>${esc(k.label)}</td><td>${f(v)}</td><td class="${d>0?'up':d<0?'down':''}">${d===''?'-':(d>0?'+':'')+f(d)}</td><td>${useWeb&&e!=null?f(e):'-'}</td></tr>`}).reverse().join('');
-    cards.push({a,html:`<div class="card"><div class="nm">${esc(nm)}</div><div class="big">${f(Math.round(a))}명</div><div class="ln">하루 평균 ${useWeb?'웹':'토스'} 방문</div><div class="chg">${pct(a,b)}</div>
-      <div class="bars">${vals.map((v,ii)=>`<i class="${ii==n-1?'last':''}" style="height:${Math.max(4,Math.round(v/mx*100))}%"></i>`).join('')}</div><div class="axis"><span>${esc(cur[0].label)}</span><span>${esc(cur[n-1].label)}</span></div>
-      <div class="more"><table><tr><th>날짜</th><th>방문</th><th>전날 대비</th><th>머문 방문</th></tr>${rows}</table></div></div>`})});
-  cards.sort((x,y)=>y.a-x.a);
-  $('tsum').innerHTML=`<h3>전체 웹 방문 하루 평균 ${f(Math.round(T))}명</h3><ul><li>${pv?pct(T,TP):'앞 기간 자료가 아직 없어요'}</li><li>카드를 누르면 날짜별 숫자와 전날 대비가 나와요</li></ul>`;
-  $('tgrid').innerHTML=cards.map(c=>c.html).join('');
-  $('ttail').innerHTML=zero.length?`<details><summary>이 기간 방문 0인 곳 ${zero.length}개</summary><ul>${zero.map(z=>`<li>${esc(z)}</li>`).join('')}</ul></details>`:'';
-  document.querySelectorAll('#tgrid .card').forEach(c=>c.onclick=()=>c.classList.toggle('open'));
-}
-document.querySelectorAll('#per button').forEach(b=>b.onclick=()=>{PER=+b.dataset.n;document.querySelectorAll('#per button').forEach(x=>x.classList.toggle('on',x==b));trend()});
-function view(t){$('dayView').hidden=t;$('range').hidden=t;$('trendView').hidden=!t;$('vDay').classList.toggle('on',!t);$('vTrend').classList.toggle('on',t);try{localStorage.setItem('ga-view',t?'t':'d')}catch(e){};if(t)trend()}
-$('vDay').onclick=()=>view(false);$('vTrend').onclick=()=>view(true);
-$('day').innerHTML=days.map((k,i)=>`<option value="${i}">${esc(k.label)}${k.key=='live'?' '+esc(k.range.split('~ ')[1]):''}</option>`).join('');
-$('day').onchange=e=>show(+e.target.value);$('prev').onclick=()=>show(+$('day').value+1);$('next').onclick=()=>show(+$('day').value-1);
-let start=0;try{const s=localStorage.getItem('ga-day');const j=days.findIndex(k=>k.key==s);if(j>=0)start=j}catch(e){}
-show(start);try{if(localStorage.getItem('ga-view')=='t')view(true)}catch(e){}
+function detail(n){OPEN=n;const C=ctx();const keys=full.slice(-30).map(x=>x.key).concat(D.live?['live']:[]);const vs=keys.map(k=>val(n,k));
+  const hi=keys.map((k,i)=>C.keys.includes(k)?i:-1).filter(i=>i>=0);const v=C.cur(n),pv=C.prev(n),p=pc(v,pv);
+  const rows=keys.map((k,i)=>{const x=vs[i],b=i?vs[i-1]:null,d=x!=null&&b!=null&&k!='live'?x-b:null;const e=S[n][k]?S[n][k].eng:null;
+    return`<tr><td>${esc(byKey[k]?byKey[k].label:k)}</td><td>${f(x)}</td><td class="${d>0?'up':d<0?'down':''}">${d==null?'-':(d>0?'+':'')+f(d)}</td><td>${useWeb[n]&&e!=null?f(e):'-'}</td></tr>`}).reverse().join('');
+  const k=MODE=='d'?days[IDX]:null;const svc=k?k.doc.svcs.find(s=>s.name==n):null;
+  const raw=svc?svc.blocks.filter(b=>!(b.items.length==1&&b.items[0]=='없음')):[];
+  $('det').innerHTML=`<button class="back" id="back">‹ 목록으로</button><div class="sum"><div class="lb">${esc(n)} · ${MODE=='d'?esc(C.when):'하루 평균, '+esc(C.when)}</div><div class="big">${fa(v)}명</div>
+    <div class="chg ${C.live?'':p.c}">${C.live?`어제 하루 ${f(pv)}명`:(pv==null?'비교할 앞 기간 없음':`${C.cmp} ${p.t}, ${MODE=='d'?'전날':'앞 기간'} ${fa(pv)}명`)}</div>
+    ${chart(keys,vs,hi)}</div><h2>날짜별 ${useWeb[n]?'웹':'토스'} 방문</h2><table><tr><th>날짜</th><th>방문</th><th>전날 대비</th><th>머문 방문</th></tr>${rows}</table>
+    ${raw.length?`<details><summary>그날 리포트 원문</summary>${raw.map(b=>`${b.t?`<h2>${esc(b.t)}</h2>`:''}<ul>${b.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`).join('')}</details>`:''}`;
+  $('main').hidden=true;$('det').hidden=false;window.scrollTo(0,0);$('back').onclick=()=>{OPEN=null;$('det').hidden=true;$('main').hidden=false}}
+document.querySelectorAll('#mode button').forEach(b=>b.onclick=()=>{MODE=b.dataset.m;render()});
+document.querySelectorAll('#sort button').forEach(b=>b.onclick=()=>{SORT=b.dataset.s;render()});
+$('prev').onclick=()=>{IDX++;render()};$('next').onclick=()=>{IDX--;render()};
+render();
 async function poll(req){for(let n=0;n<60;n++){await new Promise(r=>setTimeout(r,10000));
-  try{const l=await (await fetch('live.json?'+Date.now(),{cache:'no-store'})).json();if(l.at>=req){try{localStorage.setItem('ga-day','live')}catch(e){};location.reload();return}}catch(e){}
+  try{const l=await (await fetch('live.json?'+Date.now(),{cache:'no-store'})).json();if(l.at>=req){try{localStorage.setItem('ga-day','live');localStorage.setItem('ga-mode','d')}catch(e){};location.reload();return}}catch(e){}
   $('msg').textContent=`갱신 중이에요. 보통 4~5분 걸려요 (${(n+1)*10}초 지남)`}
   $('msg').textContent='10분이 지나도 안 끝났어요. 맥이 꺼져 있거나 막혔을 수 있어요';$('refresh').disabled=false}
 $('refresh').onclick=async()=>{$('refresh').disabled=true;$('msg').textContent='갱신을 요청했어요';
