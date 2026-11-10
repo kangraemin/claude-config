@@ -5,6 +5,10 @@
   pass_sms_verify.py code 123456 [--match ..]   → 인증번호 입력·확인
   pass_sms_verify.py extend                     → 남은 시간 연장
   pass_sms_verify.py ogq-open                   → OGQ 크리에이터 스튜디오 휴대폰 인증 창 열기(업로드 2단계 인증)
+  pass_sms_verify.py open <페이지URL> [--button 본인확인]  → 사이트의 본인확인 버튼을 실제 마우스로 눌러 팝업을 연다(합성 클릭은 팝업 차단)
+  pass_sms_verify.py wait [--match ..]          → 알림 봇(RAM_NOTI_TG)으로 6자리 요청 → 답장(또는 answer 파일)을 5초마다 보고 즉시 code 입력, 2분마다 시간연장
+- 11/10 고령 설문: 다른 세션(텔레그램 채널 플러그인)이 답장을 먼저 가져가 늦게 전달 → 창 만료. wait는 /tmp/pass-answer.txt 도 본다
+  (다른 세션이 받은 번호는 `echo 123456 > /tmp/pass-answer.txt`로 넘긴다). 만료되면 open부터 다시.
 
 - 사전 조건: 본인확인 창이 이미 열려 있어야 한다(사이트의 '휴대폰 인증' 버튼으로 연다).
 - OGQ 주의: 통합계정(oid.ogq.me/me '인증')과 크리에이터 스튜디오(creators.ogq.me/profile/verification)는 인증이 따로다.
@@ -27,7 +31,9 @@ sys.path.insert(0, os.path.expanduser("~/.claude/skills/chrome-direct"))
 import chromectl as c  # noqa: E402
 
 ap = argparse.ArgumentParser()
-ap.add_argument("cmd", choices=["send", "code", "extend", "ogq-open"])
+ap.add_argument("cmd", choices=["send", "code", "extend", "ogq-open", "open", "wait"])
+ap.add_argument("--button", default="본인확인")
+ap.add_argument("--timeout", type=int, default=900)
 ap.add_argument("value", nargs="?")
 ap.add_argument("--captcha")
 ap.add_argument("--match", default="cert.mobile-ok.com")
@@ -73,14 +79,70 @@ def ogq_open():
     print("RESULT: OPENED — 이어서 send --match mobile-ok")
 
 
+def open_popup():
+    t = c.new_tab(a.value, profile="Profile 1")
+    time.sleep(4)
+    try:
+        c.rclick(t, sel=f'input[value="{a.button}"]')
+    except RuntimeError:
+        c.rclick(t, text=a.button)
+    time.sleep(5)
+    ok = any("siren24" in x[3] or "mobile-ok" in x[3] or "checkplus" in x[3] or "kcp" in x[3] for x in c.tabs(with_id=True))
+    print("SITE_TAB", t)
+    print("RESULT:", "OPENED — 이어서 send --match <창 주소>" if ok else "FAILED 팝업 안 열림")
+
+
+def wait_code():
+    import json, subprocess
+    tok, ch = os.environ.get("RAM_NOTI_TG_TOKEN"), str(os.environ.get("RAM_NOTI_TG_CHAT_ID"))
+    if not tok:
+        sys.exit("RESULT: FAILED RAM_NOTI_TG_TOKEN 없음 — set -a; source ~/.claude/.env")
+    af, t0 = "/tmp/pass-answer.txt", int(time.time())
+    subprocess.run(["curl", "-s", "-m", "15", "-d", f"chat_id={ch}", "--data-urlencode",
+                    "text=[인증번호 요청]\n- 방금 휴대폰으로 온 본인확인 6자리만 답장해 주세요",
+                    f"https://api.telegram.org/bot{tok}/sendMessage"], capture_output=True)
+    end, last = time.time() + a.timeout, time.time()
+    while time.time() < end:
+        code = None
+        try:
+            ups = json.loads(subprocess.check_output(["curl", "-s", "-m", "15", f"https://api.telegram.org/bot{tok}/getUpdates?offset=-20"]))["result"]
+            for u in ups:
+                m = u.get("message", {})
+                if m.get("date", 0) > t0 and str(m.get("chat", {}).get("id")) == ch:
+                    x = re.search(r"\b(\d{6})\b", m.get("text", ""))
+                    code = x.group(1) if x else code
+        except Exception:
+            pass
+        if not code and os.path.exists(af) and os.path.getmtime(af) > t0:
+            x = re.search(r"(\d{6})", open(af).read())
+            code = x.group(1) if x else None
+        if code:
+            a.value = code
+            a.cmd = "code"
+            return main()
+        if time.time() - last > 120:
+            body = text(a.match)
+            if "만료" in body or "통신사를" in body:
+                sys.exit("RESULT: EXPIRED — open부터 다시")
+            if "시간연장" in body:
+                c.press(a.match, text="시간연장")
+            last = time.time()
+        time.sleep(5)
+    sys.exit("RESULT: TIMEOUT")
+
+
 def main():
     if a.cmd == "ogq-open":
         return ogq_open()
+    if a.cmd == "open":
+        return open_popup()
     try:
         c.ref(a.match)  # 탭이 없으면 RuntimeError
     except RuntimeError:
         sys.exit(f"RESULT: FAILED '{a.match}' 탭 없음 — 사이트에서 휴대폰 인증 창을 먼저 연다")
     t = a.match
+    if a.cmd == "wait":
+        return wait_code()
     if a.cmd == "extend":
         c.press(t, text="시간연장")
         print("RESULT: EXTENDED")
@@ -112,8 +174,8 @@ def main():
     if "인증방법을" in text(t):
         c.press(t, text="문자(SMS) 인증")
         time.sleep(1)
-        # mobile-ok: user_agree_checkbox / siren24(서울평가정보): check_txt / 다날(teledit, 크몽): agree_checkbox
-        c.press(t, sel="label[for=user_agree_checkbox],label[for=check_txt],label[for=agree_checkbox],label[for=mobileCertAgree]")
+        # mobile-ok: user_agree_checkbox / KCP: agreeTotal / siren24(서울평가정보): check_txt / 다날(teledit, 크몽): agree_checkbox
+        c.press(t, sel="label[for=user_agree_checkbox],label[for=check_txt],label[for=agree_checkbox],label[for=mobileCertAgree],label[for=agreeTotal]")  # agreeTotal = KCP(cert.kcp.co.kr)
         time.sleep(1)
         nxt(t)
     if "이름을" in text(t):
@@ -126,7 +188,7 @@ def main():
         put(t, 'e.id=="myNum2"||(e.type=="tel"&&!e.placeholder)', "1")  # myNum2 = NICE checkplus
         time.sleep(1.5)
     if "휴대폰번호를" in text(t):
-        put(t, 'e.name=="mobileNo_sms"||e.id=="mobileNo"||e.id=="sms_mobileno"', phone)
+        put(t, 'e.name=="mobileNo_sms"||e.id=="mobileNo"||e.id=="sms_mobileno"||e.id=="userPhone"', phone)
         time.sleep(1.5)
     if "보안문자를" in text(t):
         if not a.captcha:
@@ -141,6 +203,9 @@ def main():
         time.sleep(1)
         nxt(t)
         time.sleep(1)
+    if "입력정보를" in text(t):  # KCP(cert.kcp.co.kr): 보안문자 뒤 '다음' 대신 '확인'
+        c.press(t, text="확인")
+        time.sleep(4)
     body = text(t)
     if "인증번호 6자리" in body:
         print("RESULT: SMS_SENT — 폰에 온 6자리를 code 로")
