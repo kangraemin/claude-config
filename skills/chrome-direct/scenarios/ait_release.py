@@ -23,6 +23,11 @@ DLG = "const d = [...document.querySelectorAll('[role=dialog], [role=alertdialog
 CUR = r"return (document.body.innerText.match(/현재 출시된 버전:\s*(\S+)/) || [, ''])[1];"
 
 
+PRESS_JS = "const PRESS=E=>{for(const n of ['pointerdown','mousedown','pointerup','mouseup','click'])E.dispatchEvent(new MouseEvent(n,{bubbles:true,cancelable:true,button:0,view:window}))};"
+ROW = PRESS_JS + ROW
+DLG = PRESS_JS + DLG
+
+
 def row(tid):
     rows = [r for r in table(tid) if len(r["cells"]) > 3 and r["cells"][1] == a.version]
     if not rows:
@@ -48,9 +53,10 @@ def main():
         if not a.submit:
             emit(info, "DRY_RUN", "출시 가능 — --submit 으로 출시")
             return
-        # 확인 창은 click() 으로 안 뜰 때가 있고 __press 로는 떴다(10/22 seoultax). 둘 다 안 되면 탭을 앞으로 띄운 뒤 다시.
+        # 확인 창은 click() 으로 안 뜰 때가 있고 __press 로는 떴다(10/22 seoultax).
+        # 11/12 spot-difference-daily: __press 로 창이 안 떴고 MouseEvent(pointerdown~click) 디스패치로 떴다 → PRESS 사용.
         # 탭을 앞으로 띄우고 평범한 click() 으로 누르면 바로 뜬다.
-        if js(tid, ROW + "const b = [...tr.querySelectorAll('button')].find(b => b.innerText.trim() === '출시하기'); __press(b); return 1") != 1:
+        if js(tid, ROW + "const b = [...tr.querySelectorAll('button')].find(b => b.innerText.trim() === '출시하기'); PRESS(b); return 1") != 1:
             raise RuntimeError("버튼 누르기 실패")
         dtext = poll(tid, DLG + "return d ? d.innerText : null", 15)
         info["dialog"] = dtext[:800]
@@ -58,7 +64,7 @@ def main():
             raise Blocked("NEEDS_OWNER 출시 창에 약관/동의 — " + dtext[:200].replace("\n", " "))
         ok = js(tid, DLG + """const bs = [...d.querySelectorAll('button')].filter(b => !b.disabled && !/취소|닫기/.test(b.innerText));
           const b = bs.find(b => /출시/.test(b.innerText)) || bs.find(b => /확인/.test(b.innerText)); if (!b) return 'NOBUTTON:' + bs.map(b => b.innerText).join('|');
-          __press(b); return 'OK';""")
+          PRESS(b); return 'OK';""")
         if ok != "OK":
             raise RuntimeError(f"창 출시 버튼: {ok}")
         for _ in range(20):
