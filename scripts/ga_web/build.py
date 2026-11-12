@@ -138,13 +138,14 @@ def load():
     if lj.exists() and lt.exists():
         meta = json.loads(lj.read_text())
         at = dt.datetime.fromtimestamp(meta['at'] / 1000)
-        if meta.get('day'):  # 0시~아침판 전 갱신: 어제 하루치 임시판(sync.sh)
-            d = dt.date.fromisoformat(meta['day']); n = d + dt.timedelta(days=1)
-            doc = parse(lt.read_text())
-            live = {'key': 'live', 'label': '지금', 'range': f'{d.month}/{d.day} 0시 ~ {n.month}/{n.day} 0시 (아침 확정 전, {at:%H:%M} 기준)', 'doc': doc,
-                    'sum': [summary(s) for s in doc['svcs']],
-                    'at': meta['at']}
-            return days, live
+        if meta.get('day'):  # 0시~아침판 전 갱신: 어제 하루치 임시판(sync.sh)는 어제 날짜 칸에 이미 들어 있다
+            # '지금' 칸을 따로 만들면 같은 날이 두 번 나와 '어제 하루'가 자기 자신과 비교됐다(사용자 11/13 "어제 ga통계 저거 맞아?").
+            # 어제 날짜 칸에 '아침 확정 전' 표시만 붙이고, 아침판(<day>.sent)이 나가면 그것도 뗀다.
+            if not (SRC / f"{meta['day']}.sent").exists():
+                for x in days:
+                    if x['key'] == meta['day']:
+                        x['range'] += f' (아침 확정 전, {at:%H:%M} 기준)'
+            return days, {'at': meta['at'], 'merged': True}
         doc = parse(lt.read_text().replace('- 어제 ', '- 오늘 '))
         doc['top'] = [b for b in doc['top'] if b['t'] not in ('나빠진 것', '좋아진 것')]  # 하루가 안 끝나 평소와 견주면 다 나빠 보인다
         live = {'key': 'live', 'label': '지금', 'range': f'{at.month}/{at.day} 0시 ~ {at:%H:%M}', 'doc': doc,
@@ -276,7 +277,7 @@ function ctx(){ // 지금 보는 기간: keys(차트·스파크라인 줄), 값,
     const all=full.map(x=>x.key).concat(D.live?['live']:[]),pos=live?all.length-1:fi;
     const st=Math.max(0,pos>=all.length-14?all.length-14:pos-13),keys=all.slice(st,st+14).filter(x=>x!='live'||live);  // 사용자 11/11 "그래프가 좀 이상한데" — 지난 날을 볼 땐 반나절짜리 '지금' 칸을 그래프 끝에 붙이지 않는다
     const prev=full[fi-1]||null;
-    return{keys,hi:[pos-st],when:k.label+(live?' '+k.range.split('~ ')[1]+'까지':''),live,
+    return{keys,hi:[pos-st],when:k.label+(live?' '+k.range.split('~ ')[1]+'까지':k.range.includes('확정 전')?' · 아침 확정 전':''),live,
       cur:n=>val(n,k.key),prev:n=>prev?val(n,prev.key):null,cmp:live?'어제 하루':'전날 대비',lbl:live?'오늘 지금까지 웹 방문':'웹 방문 합계',
       tot:webTot(k.key),ptot:prev?webTot(prev.key):null,doc:k.doc}}
   // 사용자 11/11 "7일·30일은 왜 전후 클릭이 안 돼" — SH일만큼 끝을 앞당긴 기간
@@ -360,10 +361,13 @@ def main():
     days, live = load()
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
+    at = live['at'] if live else 0
+    if live and live.get('merged'):  # 갱신 버튼 새로고침용 시각만 남기고 칸은 만들지 않는다
+        live = None
     data = json.dumps({'days': days, 'live': live, 'gsc': gsc()}, ensure_ascii=False).replace('</', '<\\/')
-    page = PAGE.replace('__DATA__', data).replace('__LIVEAT__', str(live['at'] if live else 0))
+    page = PAGE.replace('__DATA__', data).replace('__LIVEAT__', str(at))
     (out / 'index.html').write_text(page)
-    (out / 'live.json').write_text(json.dumps({'at': live['at'] if live else 0}))
+    (out / 'live.json').write_text(json.dumps({'at': at}))
     print(f'RESULT: OK days={len(days)} live={"yes" if live else "no"}')
 
 
