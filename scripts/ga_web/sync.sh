@@ -16,17 +16,23 @@ if [ "$REQ" -gt "$DONE" ]; then
   echo "== $(date '+%F %T') live req=$REQ" >> "$LOG"
   T=$(date +%F); NOW=$(python3 -c 'import time;print(int(time.time()*1000))'); DAYJ=""
   # 0시~아침 확정판(07시) 전에 누르면 오늘치는 몇십 분이라 전부 0으로 보인다(사용자 11/13 00:31 "갱신 눌렀는데 아직 저 상태").
-  # 그 사이엔 어제 하루치(확정 전 임시)를 뽑는다. 어제 파일이 이미 있으면(아침판 나옴) 원래대로 오늘치.
-  Y=$(date -v-1d +%F)
-  if [ "$(date +%H)" -lt 7 ] && [ ! -f "$C/$Y.txt" ]; then T=$Y; DAYJ=", \"day\": \"$Y\""; fi
+  # 그 사이엔 어제 하루치를 뽑아 어제 날짜 칸에도 바로 채운다(사용자 11/13 "지금 갱신 누르면 이것도 채워졌어야지").
+  # 아침판을 이미 보냈으면(<어제>.sent) 원래대로 오늘치. 아침 07시 판이 같은 파일을 확정 숫자로 덮는다.
+  Y=$(date -v-1d +%F); KEEP=0
+  if [ "$(date +%H)" -lt 7 ] && [ ! -f "$C/$Y.sent" ]; then T=$Y; DAYJ=", \"day\": \"$Y\""; KEEP=1; fi
   # 갱신 버튼판은 하루 중간 숫자다. <오늘>.txt에 남기면 다음 날 아침 확정판이 덮어써 같은 날 숫자가 바뀐 것처럼 보인다(사용자 11/11 "11/10 데이터가 왜 바뀜").
   # 그래서 돌린 뒤 live.txt로만 옮기고 날짜 파일은 원래대로 되돌린다.
+  # 누른 시점 이전 날짜 칸은 전부 채운다(사용자 11/13 "누른 시점으로부터 과거는 다 채워져야지"): 최근 14일 중 파일 없는 날을 만든다.
+  for k in $(seq 1 14); do
+    P=$(date -v-${k}d +%F); [ "$P" = "$T" ] && [ "$KEEP" = 1 ] && continue
+    [ -f "$C/$P.txt" ] || python3 "$HOME/.claude/scripts/ga_daily_report.py" --day "$P" --dry-run --no-ai --force >> "$LOG" 2>&1 || echo "fill $P FAIL" >> "$LOG"
+  done
   B="$C/.live-bak"; rm -rf "$B"; mkdir -p "$B"
   for s in "" -full -detail; do [ -f "$C/$T$s.txt" ] && cp -p "$C/$T$s.txt" "$B/"; done
   if python3 "$HOME/.claude/scripts/ga_daily_report.py" --day "$T" --dry-run --no-ai --force >> "$LOG" 2>&1 && [ -f "$C/$T.txt" ]; then
     cp "$C/$T.txt" "$C/live.txt"; echo "{\"at\": $NOW$DAYJ}" > "$C/live.json"
   else echo "live FAIL" >> "$LOG"; fi
-  for s in "" -full -detail; do rm -f "$C/$T$s.txt"; [ -f "$B/$T$s.txt" ] && cp -p "$B/$T$s.txt" "$C/"; done
+  [ "$KEEP" = 1 ] || for s in "" -full -detail; do rm -f "$C/$T$s.txt"; [ -f "$B/$T$s.txt" ] && cp -p "$B/$T$s.txt" "$C/"; done
   rm -rf "$B"
   echo "$REQ" > "$C/live.req"
 fi
