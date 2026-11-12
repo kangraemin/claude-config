@@ -138,10 +138,10 @@ def load():
     if lj.exists() and lt.exists():
         meta = json.loads(lj.read_text())
         at = dt.datetime.fromtimestamp(meta['at'] / 1000)
-        if meta.get('day'):  # 0시~아침판 전 갱신: 어제 하루치 임시판(sync.sh)는 어제 날짜 칸에 이미 들어 있다
-            # '지금' 칸을 따로 만들면 같은 날이 두 번 나와 '어제 하루'가 자기 자신과 비교됐다(사용자 11/13 "어제 ga통계 저거 맞아?").
-            # 자정이 지나면 그날은 끝난 하루라 '확정 전' 같은 표시를 붙이지 않는다(사용자 11/13 "목요일껀 확정돼고 해야하는거아님").
-            return days, {'at': meta['at'], 'merged': True}
+        if at.date() != dt.date.today():  # 어제 누른 판은 그날 날짜 칸(확정판)이 대신한다
+            return days, None
+        # 0시~아침판 전에 눌러도 오늘 0시~누른 시각 칸을 보인다. 어제 하루치는 sync.sh가 어제 날짜 칸에 따로 채운다
+        # (사용자 11/13 "05:36에 눌렀으면 오늘 0시부터 5시간가량 데이터랑 목요일 거랑 있어야 하는 거 아냐").
         doc = parse(lt.read_text().replace('- 어제 ', '- 오늘 '))
         doc['top'] = [b for b in doc['top'] if b['t'] not in ('나빠진 것', '좋아진 것')]  # 하루가 안 끝나 평소와 견주면 다 나빠 보인다
         live = {'key': 'live', 'label': '지금', 'range': f'{at.month}/{at.day} 0시 ~ {at:%H:%M}', 'doc': doc,
@@ -358,8 +358,6 @@ def main():
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     at = live['at'] if live else 0
-    if live and live.get('merged'):  # 갱신 버튼 새로고침용 시각만 남기고 칸은 만들지 않는다
-        live = None
     data = json.dumps({'days': days, 'live': live, 'gsc': gsc()}, ensure_ascii=False).replace('</', '<\\/')
     page = PAGE.replace('__DATA__', data).replace('__LIVEAT__', str(at))
     (out / 'index.html').write_text(page)

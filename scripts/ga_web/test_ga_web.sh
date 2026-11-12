@@ -12,16 +12,19 @@ s = build.summary(d['svcs'][0])
 assert s == {'web': 120, 'web_usual': 100, 'web30': 3000, 'eng': 80, 'eng_usual': 70, 'toss': 5}, s
 assert d['tail'][0]['t'] == '전부 0인 곳'
 P
-# 0시~아침판 전 갱신(live.json에 day)이면 어제 칸을 두 번 만들지 않는다(사용자 11/13 "어제 ga통계 저거 맞아?")
+# 새벽(아침판 전)에 누르면 어제 하루 칸과 오늘 0시~누른 시각 칸이 둘 다 있다(사용자 11/13 "05:36에 눌렀으면 오늘 0시부터 5시간가량 데이터랑 목요일 거랑 있어야")
 python3 - <<'P'
-import sys, json, tempfile, pathlib; sys.path.insert(0, '/Users/ram/.claude/scripts/ga_web'); import build
+import sys, json, time, tempfile, pathlib, datetime as dt; sys.path.insert(0, '/Users/ram/.claude/scripts/ga_web'); import build
 t = pathlib.Path(tempfile.mkdtemp()); body = "11/12(목) 방문 리포트\n\n[글마감]\n\n웹\n- 어제 59명 (평소 91명)\n"
-(t / '2026-11-11.txt').write_text(body.replace('11/12(목)', '11/11(수)')); (t / '2026-11-12.txt').write_text(body); (t / 'live.txt').write_text(body)
-(t / 'live.json').write_text(json.dumps({'at': 1794515829601, 'day': '2026-11-12'})); build.SRC = t
+y = dt.date.today() - dt.timedelta(days=1); y2 = y - dt.timedelta(days=1)
+(t / f'{y2}.txt').write_text(body); (t / f'{y}.txt').write_text(body); (t / 'live.txt').write_text(body)
+now = int(time.time() * 1000); (t / 'live.json').write_text(json.dumps({'at': now})); build.SRC = t
 days, live = build.load()
-assert [x['key'] for x in days] == ['2026-11-12', '2026-11-11'], days
-assert live == {'at': 1794515829601, 'merged': True}, live
-assert '확정 전' not in days[0]['range'], days[0]['range']  # 끝난 하루는 확정된 날로 보인다
+assert [x['key'] for x in days] == [str(y), str(y2)], days      # 어제 칸은 한 번만
+assert live and live['key'] == 'live' and live['range'].startswith(f'{dt.date.today().month}/{dt.date.today().day} 0시 ~'), live
+assert '확정 전' not in days[0]['range'], days[0]['range']
+(t / 'live.json').write_text(json.dumps({'at': now - 86400000})); days, live = build.load()
+assert live is None, live                                          # 어제 누른 판은 오늘 칸으로 안 보인다
 P
 K=$(grep '^PRIVATE_WEB_KEY=' ~/.claude/.env | cut -d= -f2); U=https://ga-report.remin1994.workers.dev
 test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' $U/)" = 404          # 키 없으면 못 봄
