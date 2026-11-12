@@ -21,9 +21,7 @@ t = pathlib.Path(tempfile.mkdtemp()); body = "11/12(목) 방문 리포트\n\n[�
 days, live = build.load()
 assert [x['key'] for x in days] == ['2026-11-12', '2026-11-11'], days
 assert live == {'at': 1794515829601, 'merged': True}, live
-assert '아침 확정 전' in days[0]['range'], days[0]['range']
-(t / '2026-11-12.sent').write_text('x'); days, live = build.load()
-assert '아침 확정 전' not in days[0]['range'], days[0]['range']
+assert '확정 전' not in days[0]['range'], days[0]['range']  # 끝난 하루는 확정된 날로 보인다
 P
 K=$(grep '^PRIVATE_WEB_KEY=' ~/.claude/.env | cut -d= -f2); U=https://ga-report.remin1994.workers.dev
 test "$(curl -s -m 20 -o /dev/null -w '%{http_code}' $U/)" = 404          # 키 없으면 못 봄
