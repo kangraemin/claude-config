@@ -138,6 +138,13 @@ def load():
     if lj.exists() and lt.exists():
         meta = json.loads(lj.read_text())
         at = dt.datetime.fromtimestamp(meta['at'] / 1000)
+        if meta.get('day'):  # 0시~아침판 전 갱신: 어제 하루치 임시판(sync.sh)
+            d = dt.date.fromisoformat(meta['day']); n = d + dt.timedelta(days=1)
+            doc = parse(lt.read_text())
+            live = {'key': 'live', 'label': '지금', 'range': f'{d.month}/{d.day} 0시 ~ {n.month}/{n.day} 0시 (아침 확정 전, {at:%H:%M} 기준)', 'doc': doc,
+                    'sum': [summary(s) for s in doc['svcs']],
+                    'at': meta['at']}
+            return days, live
         doc = parse(lt.read_text().replace('- 어제 ', '- 오늘 '))
         doc['top'] = [b for b in doc['top'] if b['t'] not in ('나빠진 것', '좋아진 것')]  # 하루가 안 끝나 평소와 견주면 다 나빠 보인다
         live = {'key': 'live', 'label': '지금', 'range': f'{at.month}/{at.day} 0시 ~ {at:%H:%M}', 'doc': doc,
