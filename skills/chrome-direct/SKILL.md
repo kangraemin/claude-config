@@ -118,6 +118,8 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 | `firebase_android_app.py <project_id> <package> <sha1_hex> <저장 경로>` | 콘솔 없이 Firebase 켜기 → Android 앱·SHA-1 등록 → google-services.json 받기 |
 | `apple_appid_asc_create.sh <bundle_id> <ascii_desc> <app_name> <sku> [locale]` | Apple 계약 업데이트 동의(있으면) → App ID 등록(IAP 기본) → App Store Connect 신규 앱 생성. 마지막 줄에 ASC 앱 URL | 생성 | 수동 검증 2026-10-31 |
 | `apple_siwa_setup.py <bundle_id> <app_name> <service_id> <domain> <return_url> <key_name> --out <p8> [--submit]` | Sign in with Apple 웹 로그인 준비: App ID, Services ID(도메인·Return URL), 키(.p8) 생성. 멱등, `--submit` 없으면 상태만 출력. 로그아웃이면 BLOCKED: idmsa '패스키로 로그인' 실제 클릭 → Mac 시트 '계속'. 저장 비밀번호 자동입력은 틀릴 수 있어 쓰지 않는다 | script | 생성 순서는 수동 조작으로 2026-11-05 검증, 스크립트 --submit 경로 미검증(상태 확인 경로만 실행) |
+| `apple_apns_key.py <key_name> --out <p8> [--submit]` | APNs 인증 키(.p8, Sandbox & Production, 팀 전체) 만들기. 같은 이름 있으면 건너뜀 | script | 2026-11-13 --submit 실행 성공(OguriWorks APNs, GCU8KB2UTB) |
+| `firebase_apns_upload.py <project_id> <bundle_id> <p8> <key_id> <team_id>` | Firebase iOS 앱에 APNs 키 개발·프로덕션 업로드(실제 클릭 + 맥 파일창 Cmd+Shift+G). 멱등 | script | 2026-11-13 수동 같은 순서로 성공, 스크립트는 멱등 확인 경로만 실행 |
 | `asc_store_listing.sh [앱번호]` (= `asc_store_listing.py all` API + `asc_privacy.sh` Chrome) | ASC 출시 준비 일괄: TestFlight 내부 그룹·빌드·소유자 테스터, 인앱 상품(접두어 `forgesurvivor_`, 한/영·가격·심사 스샷), 스토어 정보 한/영·카테고리·연령 등급·무료·6.9"/iPad 스크린샷·빌드 연결, 앱 개인정보 게시. 심사 제출은 안 함. 전화번호는 `ASC_REVIEW_PHONE=+82..` | 생성 | 수동 검증 2026-10-31 |
 | `asc_dsa_trader.sh` | ASC 비즈니스 EU DSA 거래자 선언: 주소·전화·이메일 입력 → 이메일 코드(Gmail) 입력(iframe은 cliclick 클릭+rtype) → 문자 코드는 인자(EMAIL_CODE 환경변수로 이메일 코드) → 확인 문서 2건 사업자등록증 PDF 업로드 → 확인. 사용: asc_dsa_trader.sh <문자코드> | 생성 | 끝까지 검증 2026-10-31 |
 | `github_repo_delete.py owner/repo [--submit]` | Delete a private GitHub repo when the gh token lacks delete_repo. Dry-run by default, refuses public repos, stops BLOCKED at GitHub's sudo (password/passkey) screen | Submit | up to sudo screen (11/4) |
@@ -131,6 +133,7 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 | `announce_check.py [--days N] [--only id]` | Opens result pages for contests in `_radar/announce.json` whose announce date has passed. Hints only | Read | yes |
 | `chatgpt_upgrade.py [100|200|500] [--pay]` | ChatGPT 요금제를 Pro 100/200/500으로 올린다. --pay 없으면 플랜 변경 확인 금액만 읽음. 세금 ID는 pay.openai.com 청구 정보에 미리 있어야 함 | Write (결제) | yes (11/01, Plus→Pro 100) |
 | `commonz042_verify_sent.py <wr_id> <out_dir> <sent_dir>` | 대전사회혁신센터(commonz042.kr) 신청 글을 로그인(DJSI_ID/PW)해서 연다. 첨부를 내려받아 sent/ 파일과 SHA256을 대조한다(브라우저 없이 requests) | Read | yes (11/10, wr_id=653 2개 일치) |
+| `line_paypal_connect.py [--submit]` | LINE Creators Market 송금 정보에 PayPal 연결(PAYPAL_PW 실제 입력, 동의). 이미 연결이면 ALREADY. PayPal 이메일 미확인·패스키 창·오래된 동의 화면 Bad Request 함정은 docstring | Write (--submit) | ALREADY 경로 (11/13). 연결은 손으로 같은 순서 성공 |
 | `../win_split.py [--left "Profile N"] [--loop 60]` | Tiles Chrome windows: Profile 1 → left half, SNS persona profiles → right half, so one session raising its window no longer covers the whole screen. Run in `tmux -L gh` (Finder AppleEvents hang → screen size via AppKit) | Write (window bounds only) | yes (10/29, 1 left · 5 right) |
 
 ## Submit-type rules
