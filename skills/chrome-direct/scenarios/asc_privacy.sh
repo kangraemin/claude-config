@@ -1,6 +1,6 @@
 #!/bin/bash
 # ASC 앱 개인정보(영양 표시) 입력·게시 — 공개 API가 없어 Chrome JS 조작 (2026-10-31 '이게 되네' 검증).
-# 사용: asc_privacy.sh [앱번호=6829073185]   데이터 수집 없는 앱: NO_DATA=1 asc_privacy.sh <앱번호> ('아니요, 수집하지 않음' → 저장 → 게시)
+# 사용: asc_privacy.sh [앱번호=6829073185]   이미 게시된 라벨 바꾸기: EDIT=1 DECL=... asc_privacy.sh <앱번호> (2026-11-13 먹맵, '수집 안 함'→광고·알림 반영)   항목 바꾸기: DECL="유형;목적;연결idx;추적idx\n..." asc_privacy.sh <앱번호> (11/10 바다님께 물어봐: 광고 SDK만)   데이터 수집 없는 앱: NO_DATA=1 asc_privacy.sh <앱번호> ('아니요, 수집하지 않음' → 저장 → 게시)
 #   전제: Chrome Profile 1에 ASC 로그인. 이미 게시돼 있으면 '시작하기'가 없어 건너뛴다.
 # 선언: 기기ID·사용자ID·게임플레이 콘텐츠·제품 상호작용·광고 데이터·충돌/실적/기타 진단 (Firebase+AdMob+서버 저장 기준). 기기ID·광고 데이터는 추적(ATT).
 APP=${1:-6829073185}
@@ -21,28 +21,33 @@ dtype() { # name purposes linkedIdx trackIdx
   clkt "$1 설정" >/dev/null; sleep 2; chk "$2" >/dev/null; clk 다음 >/dev/null; sleep 2; rad $3 >/dev/null; clk 다음 >/dev/null; sleep 2
   for i in 1 2 3 4; do
     S=$(J $A "(()=>{const d=document.querySelector('[role=dialog]');if(!d)return 'closed';const t=d.innerText;const r=d.querySelectorAll('input[type=radio]');if(r.length==2&&/사용합니까/.test(t)){r[$4].click();return 'track'}return 'next'})()")
-    case "$S" in closed) break;; track) sleep 1; clk 저장 >/dev/null; sleep 3; break;; *) clk 다음 >/dev/null; sleep 2;; esac
+    case "$S" in closed) break;; track) sleep 1; clk 저장 | grep -q ok || clk 게시 >/dev/null; sleep 4; break;; *) clk 다음 >/dev/null; sleep 2;; esac
   done
   echo "$1 done: $(J $A "(()=>document.querySelector('[role=dialog]')?'STILL OPEN':'ok')()")"
 }
 A=$(NT "https://appstoreconnect.apple.com/apps/$APP/distribution/privacy" | tail -1); A=${A#id:}; A=id:$A; sleep 14
-if ! J $A '(()=>[...document.querySelectorAll("button")].some(b=>b.textContent.trim()==="시작하기")?"start":"no")()' | grep -q start; then echo "이미 시작됨/게시됨"; exit 0; fi
-clk 시작하기; sleep 3
+if J $A '(()=>[...document.querySelectorAll("button")].some(b=>b.textContent.trim()==="시작하기")?"start":"no")()' | grep -q start; then clk 시작하기; sleep 3
+elif [ -n "${EDIT:-}" ]; then # 이미 게시된 라벨 바꾸기: '데이터 유형' 옆 편집(페이지의 마지막 '편집') → 같은 '수집합니까' 대화상자
+  J $A "(()=>{$MCF const b=[...document.querySelectorAll('button')].filter(x=>x.textContent.trim()==='편집');MC(b[b.length-1]);return b.length})()" >/dev/null; sleep 3
+else echo "이미 시작됨/게시됨 (바꾸려면 EDIT=1)"; exit 0; fi
 if [ -n "${NO_DATA:-}" ]; then
   J $A "(()=>{const d=document.querySelector('[role=dialog]');const r=d.querySelectorAll('input[type=radio]');r[r.length-1].click();return r.length})()"; sleep 1; clk 저장; sleep 4
   clk 게시; sleep 3; clk 게시; sleep 5
   J $A '(()=>document.body.innerText.match(/[^\n]*(게시함|수집되지 않음)[^\n]*/)?.[0]||"CHECK")()'; exit 0
 fi
+# DECL: 줄마다 "유형;목적(|구분);사용자연결idx(0=예,1=아니요);추적idx(0=예,1=아니요)". 없으면 게임 기본값(Firebase+AdMob+서버 저장).
+DECL=${DECL:-"게임 플레이 콘텐츠;앱 기능;0;1
+사용자 ID;분석|앱 기능;0;1
+기기 ID;타사 광고|분석|앱 기능;0;0
+제품 상호 작용;분석;0;1
+광고 데이터;타사 광고;0;0
+충돌 데이터;분석|앱 기능;1;1
+실적 데이터;분석|앱 기능;1;1
+기타 진단 데이터;분석|앱 기능;1;1"}
+NAMES="[$(printf '%s\n' "$DECL" | cut -d';' -f1 | sed "s/.*/'&'/" | paste -sd, -)]"
 J $A "(()=>{const d=document.querySelector('[role=dialog]');d.querySelectorAll('input[type=radio]')[0].click();return 1})()" >/dev/null; sleep 1; clk 저장; sleep 2; clk 다음; sleep 3
-J $A "(()=>{const d=document.querySelector('[role=dialog]');for(const w of ['사용자 ID','기기 ID','제품 상호 작용','광고 데이터','충돌 데이터','실적 데이터','기타 진단 데이터','게임 플레이 콘텐츠']){const e=[...d.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===w);let t=e;while(t&&!t.querySelector('input[type=checkbox]'))t=t.parentElement;const i=t&&t.querySelector('input[type=checkbox]');if(i&&!i.checked)i.click()}return 1})()" >/dev/null
-clk 저장; sleep 4; clk 승인; sleep 4
-dtype '게임 플레이 콘텐츠' '앱 기능' 0 1
-dtype '사용자 ID' '분석|앱 기능' 0 1
-dtype '기기 ID' '타사 광고|분석|앱 기능' 0 0
-dtype '제품 상호 작용' '분석' 0 1
-dtype '광고 데이터' '타사 광고' 0 0
-dtype '충돌 데이터' '분석|앱 기능' 1 1
-dtype '실적 데이터' '분석|앱 기능' 1 1
-dtype '기타 진단 데이터' '분석|앱 기능' 1 1
+J $A "(()=>{const d=document.querySelector('[role=dialog]');for(const w of $NAMES){const e=[...d.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===w);let t=e;while(t&&!t.querySelector('input[type=checkbox]'))t=t.parentElement;const i=t&&t.querySelector('input[type=checkbox]');if(i&&!i.checked)i.click()}return 1})()" >/dev/null
+clk 저장 >/dev/null; clk 계속 >/dev/null; sleep 4; clk 승인; sleep 4  # 편집(EDIT=1) 땐 버튼이 '계속'
+while IFS=';' read -r n p l k; do [ -n "$n" ] && dtype "$n" "$p" $l $k; done <<< "$DECL"
 clk 게시; sleep 3; clk 게시; sleep 5
 J $A '(()=>document.body.innerText.match(/[^\n]*게시함/)?.[0]||"CHECK")()'
