@@ -71,6 +71,12 @@ def next_page(tid, timeout=15):
 FILL = r"""
 const A = %s, norm = s => (s || '').replace(/[\s*:·()\[\]]/g, '').toLowerCase();
 const out = [];
+// 11/10 도서관의 날: '…을(를) 내 응답에 포함할 이메일로 기록합니다.' 필수 체크박스는 listitem 밖에 있어 '다음'이 조용히 막힌다
+[...document.querySelectorAll('[role=checkbox]')].filter(e => __vis(e) && !e.closest('div[role=listitem]')
+  && /이메일로 기록|as the email to be included|Record .* as the email/i.test(e.getAttribute('aria-label') || '')).forEach(e => {
+  if (e.getAttribute('aria-checked') !== 'true') __press(e);
+  out.push({key: '__record_email', title: e.getAttribute('aria-label'), status: 'filled'});
+});
 [...document.querySelectorAll('div[role=listitem]')].filter(__vis).forEach(it => {
   const h = it.querySelector('[role=heading]'); if (!h) return;
   const t = norm(h.innerText); const key = Object.keys(A).find(k => t === norm(k)) || Object.keys(A).find(k => t.includes(norm(k)));
@@ -113,5 +119,44 @@ def fill_page(tid, answers):
                 if ok:
                     break
             time.sleep(0.5)
+            chosen = f"""const it = [...document.querySelectorAll('div[role=listitem]')].filter(e => __vis(e) && e.innerText.includes({json.dumps(r['title'])}))[0];
+              const s = it && it.querySelector('[role=listbox] [aria-selected=true]'); return !!s && (s.getAttribute('data-value') === {json.dumps(v)} || s.innerText.trim() === {json.dumps(v)});"""
+            if ok and not js(tid, chosen):
+                # 11/13 산림복지 수상자 폼: 숨은 탭에서 합성 클릭이 선택을 못 남김 → 탭을 앞으로 올려 실제 마우스 클릭
+                import chromectl as c
+                for _ in range(3):
+                    # 목록을 합성 press로 열면 옵션 클릭이 안 먹는다 → 목록 자체도 실제 클릭으로 연다(11/13 확인)
+                    closed = js(tid, f"""document.querySelectorAll('[data-cdlb]').forEach(e => e.removeAttribute('data-cdlb'));
+                      const it = [...document.querySelectorAll('div[role=listitem]')].filter(e => __vis(e) && e.innerText.includes({json.dumps(r['title'])}))[0];
+                      const lb = it.querySelector('[role=listbox]'); lb.setAttribute('data-cdlb', '1'); return lb.getAttribute('aria-expanded') !== 'true';""")
+                    if closed:
+                        try:
+                            c.rclick(tid, sel="[data-cdlb='1']")
+                        except RuntimeError:
+                            pass
+                    time.sleep(1.5)
+                    try:
+                        c.rclick(tid, sel=f"[role=option][data-value={json.dumps(v)}]")
+                    except RuntimeError:
+                        pass
+                    time.sleep(0.8)
+                    if js(tid, chosen):
+                        break
+                ok = bool(js(tid, chosen))
             r["status"] = "filled" if ok else "no-option"
+    if any(r["key"] == "__record_email" for r in res):
+        # 11/10 도서관의 날: 숨은 탭에서는 이 체크박스가 합성 이벤트로 안 켜진다 → 탭을 앞으로 올려 실제 마우스 클릭
+        sel = "[role=checkbox][aria-label*='이메일로 기록']"
+        chk = "return [...document.querySelectorAll(\"[role=checkbox]\")].filter(e => /이메일로 기록|as the email/i.test(e.getAttribute('aria-label') || '')).every(e => e.getAttribute('aria-checked') === 'true')"
+        for _ in range(3):
+            time.sleep(0.8)
+            if js(tid, chk):
+                break
+            import chromectl as c
+            c.rclick(tid, sel=sel)
+        else:
+            time.sleep(0.8)
+        for r in res:
+            if r["key"] == "__record_email" and not js(tid, chk):
+                r["status"] = "mismatch"
     return res
