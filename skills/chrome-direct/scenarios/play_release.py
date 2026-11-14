@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Usage: play_release.py --dev <개발자ID> --app <앱ID> status | sha1 | managed [--submit] | submit [--submit] | upload --track <트랙ID> --aab <파일> [--notes "<ko-KR 노트>"] [--submit]
+"""Usage: play_release.py --dev <개발자ID> --app <앱ID> status | sha1 | managed [--submit] | publish [--submit] | submit [--submit] | upload --track <트랙ID> --aab <파일> [--notes "<ko-KR 노트>"] [--submit]
 
 Play Console 앱 한 개의 출시 상태를 읽고, 앱 서명 SHA-1을 얻고, '검토를 위해 변경사항 N개 제출'을 누른다.
 - status: 게시 개요의 제출 버튼 글자·활성 여부·차단 문제 수를 읽는다. 누르지 않는다.
 - sha1: 앱 서명 키 SHA-1과 카카오용 base64 해시를 출력한다. 카카오 등록은 kakao_app_setup.py --hash.
 - upload: 트랙에 '새 버전 만들기' → AAB 업로드 → 출시 노트 → 다음 → 저장(검토 제출은 안 함). 같은 버전 코드가 이미 트랙에 있으면 건너뛴다.
   미제출 출시가 있으면 새 출시가 그것을 대체한다. --submit 없으면 업로드까지만 하고 저장하지 않는다.
+- upload 추가(2026-11-10): '버전 코드 이미 사용'이면(dry-run으로 먼저 올린 경우 등) 앱 라이브러리에서 방금 올린 번들을 추가한다. submit은 이미 '검토 중'인 변경이 있으면 '검토 다시 시작'(기존 검토 취소 후 대기 재시작)을 누른다.
 - managed: 관리형 게시(승인돼도 '게시 준비됨'에서 대기, 수동 게시) 상태를 읽고 --submit이면 켠다. 이미 켜져 있으면 그대로 둔다.
   드롭다운은 JS click·cliclick으로 안 열리고 pointer/mouse 이벤트 연속 dispatch(CK)로만 열린다. 검토 중인 변경사항이 있어도 켤 수 있다.
 - submit: 문제 0개이고 버튼이 켜졌을 때만 진행. --submit 없으면 dry-run. 실패 시 재클릭하지 않는다.
@@ -17,7 +18,8 @@ Gotcha: Angular라 c.shot으로 앞에 띄운 뒤 읽는다. 지문 값은 DOM�
         첫 프로덕션은 트랙 국가가 0개라 '저장하려면 오류를 수정하세요'로 막힌다 → tracks/<ID>?tab=countryAvailability 에서
         '국가/지역 수정' → mat-checkbox[aria-label='모든 행 선택']의 .mat-checkbox-container에 마우스 이벤트(그냥 click은 안 먹음) → 저장(178개).
         --track production 도 된다(콘솔이 숫자 트랙 ID로 바꿈). 출시 노트 기본 언어가 en-US면 <en-US>도 넣는다.
-RESULT: MANAGED_ON | MANAGED_OFF | READY <버튼> | BLOCKED <문제 수> | NOT_READY | SUBMITTED | DRY_RUN_READY | SHA1 <해시> | FAIL
+- publish: 관리형 게시로 '게시 준비됨'인 승인 변경을 '변경사항 N개 게시'로 공개한다.
+RESULT: PUBLISHED | MANAGED_ON | MANAGED_OFF | READY <버튼> | BLOCKED <문제 수> | NOT_READY | SUBMITTED | DRY_RUN_READY | SHA1 <해시> | FAIL
 """
 import base64
 import json
@@ -31,10 +33,11 @@ import time
 from _common import c, js, parser, tab
 
 ap = parser("Play Console release status / signing SHA-1 / submit", submit=True)
-ap.add_argument("action", choices=["status", "sha1", "submit", "upload", "managed"])
+ap.add_argument("action", choices=["status", "sha1", "submit", "upload", "managed", "publish"])
 ap.add_argument("--track", help="upload: 트랙 ID (tracks/<ID> 주소의 숫자)")
 ap.add_argument("--aab", help="upload: 올릴 .aab 경로")
 ap.add_argument("--notes", default="", help="upload: 출시 노트 본문(ko-KR)")
+ap.add_argument("--library", action="store_true", help="upload: 파일을 다시 올리지 않고 앱 라이브러리에서 버전 코드가 가장 큰 번들을 추가(이미 올라간 경우)")
 ap.add_argument("--dev", required=True)
 ap.add_argument("--app", required=True)
 a = ap.parse_args()
@@ -97,10 +100,31 @@ def submit(tid):
     show(tid, 3)
     # 확인 창이 뜨면 그 안의 제출 버튼을 한 번 누른다
     js(tid, """const d=[...document.querySelectorAll('[role=dialog],mat-dialog-container,material-dialog')].find(e=>e.offsetParent);
-      if(d){const b=[...d.querySelectorAll('button')].find(e=>/제출|전송/.test(e.innerText)); if(b)b.click()} return 1""")
+      if(d){const b=[...d.querySelectorAll('button')].find(e=>/제출|전송|검토 다시 시작/.test(e.innerText)); if(b)b.click()} return 1""")
     show(tid, 6)
     x = js(tid, "return document.body.innerText")
-    out("SUBMITTED" if re.search(r"검토 중|검토를 위해 제출|제출됨", x) else "FAIL 제출 후 상태 확인 안 됨 — 재클릭 금지, 화면 확인")
+    # 이미 '검토 중'인 변경이 있으면 '검토를 다시 시작하시겠어요?'(검토 취소 후 대기 재시작)가 뜬다 → 위에서 '검토 다시 시작'을 누른다(2026-11-10)
+    out("SUBMITTED" if (re.search(r"검토를 위해 제출|제출됨|검사가 성공적으로 완료되는 즉시", x) and not re.search(r"변경사항이 아직 검토를 위해 제출되지 않음", x)) else "FAIL 제출 후 상태 확인 안 됨 — 재클릭 금지, 화면 확인")
+
+
+def publish(tid):
+    """관리형 게시로 '게시 준비됨'에 머문 승인된 변경을 공개한다(2026-11-14 스레드언팔)."""
+    show(tid)
+    b = js(tid, """const b=[...document.querySelectorAll('button')].find(e=>e.offsetParent&&/변경사항 \\d+개 게시/.test(e.innerText));
+      return b?{t:b.innerText.trim(),on:!b.disabled&&b.getAttribute('aria-disabled')!='true'}:null""")
+    print("publish button", b)
+    if not b or not b["on"]:
+        out("NOT_READY 게시 버튼 없음")
+    if not a.submit:
+        out("DRY_RUN_READY " + b["t"])
+    js(tid, """[...document.querySelectorAll('button')].find(e=>e.offsetParent&&/변경사항 \\d+개 게시/.test(e.innerText)).click(); return 1""")
+    show(tid, 3)
+    js(tid, """const d=[...document.querySelectorAll('[role=dialog],mat-dialog-container,material-dialog')].find(e=>e.offsetParent);
+      if(d){const b=[...d.querySelectorAll('button')].find(e=>/변경사항 출시|^게시$/.test(e.innerText.trim())); if(b)b.click()} return 1""")
+    show(tid, 8)
+    x = js(tid, "return document.body.innerText")
+    print(x[:600])
+    out("PUBLISHED" if not re.search(r"변경사항 \d+개 게시", x) else "FAIL 게시 후에도 버튼이 남음 — 재클릭 금지, 화면 확인")
 
 
 CK = ("const ck=e=>['pointerdown','mousedown','pointerup','mouseup','click'].forEach(k=>e.dispatchEvent(new MouseEvent(k,{bubbles:true,cancelable:true,view:window})));"
@@ -131,6 +155,27 @@ const dt=new DataTransfer(); dt.items.add(new File([u],%s,{type:'application/oct
 e.dispatchEvent(new Event('input',{bubbles:true})); e.dispatchEvent(new Event('change',{bubbles:true})); return 'ok '+u.length""" % (n, json.dumps(os.path.basename(path))))
 
 
+def lib_add(tid):
+    """'버전 코드 이미 사용' 뒤: 실패한 파일 항목을 지우고 '라이브러리에서 추가' 대화상자의 첫 행(가장 최근 업로드)을 추가한다. 추가된 버전 코드를 돌려준다."""
+    for _ in range(4):  # 같은 파일이 두 줄(성공 1·'이미 사용' 1)로 붙는 경우가 있어 실패 줄을 전부 지운다(2026-11-14 먹맵)
+        if not js(tid, CK + "const b=[...document.querySelectorAll('button')].find(x=>x.offsetParent&&x.innerText.trim()=='clear'); if(b)ck(b); return !!b"):
+            break
+        time.sleep(2)
+    js(tid, CK + "ck(bt('라이브러리에서 추가'));return 1")
+    time.sleep(4)
+    # 2026-11-14 먹맵: 대화상자 안 querySelectorAll이 비어 나온다(오버레이). 문서 전체에서 버전 코드가 가장 큰 행의 체크박스를 누른다
+    js(tid, CK + "const vc=[...document.querySelectorAll('ess-cell[essfield=versionCode]')].filter(e=>e.getClientRects().length&&/^\\d+$/.test(e.innerText.trim())).sort((p,q)=>+q.innerText-+p.innerText)[0];"
+       "if(!vc) return 0; const cb=vc.parentElement.querySelector('mat-checkbox'); if(!cb) return 0; ck(cb); return 1")
+    time.sleep(2)
+    ok = js(tid, CK + "const b=[...document.querySelectorAll('button')].find(x=>x.offsetParent&&x.innerText.trim()=='버전에 추가'); if(!b||b.disabled) return 0; ck(b); return 1")
+    print("lib_add", ok)
+    time.sleep(6)
+    x = js(tid, "return document.body.innerText")
+    sec = x.split("App Bundle 업로드", 1)[-1].split("이전 버전", 1)[0]
+    m = re.search(r"\n(\d+) \(([^)]+)\)", sec)
+    return m.group(1) if (ok and m) else None
+
+
 def upload(tid):
     import zipfile
     if not a.track or not a.aab or not os.path.exists(a.aab):
@@ -148,18 +193,31 @@ def upload(tid):
         if js(tid, "return document.querySelectorAll('input[type=file]').length"):
             break
         time.sleep(3)
-    print(big_upload(tid, os.path.abspath(a.aab)))
     code = None
-    for _ in range(36):
+    tried_lib = False
+    if a.library:  # 2026-11-14 먹맵: 업로드가 같은 파일을 두 번 붙여 '이미 사용' 줄이 남으면 라이브러리 추가도 막힌다 → 깨끗한 새 버전에서 라이브러리로만 추가
+        tried_lib = True
+        code = lib_add(tid)
+    else:
+        print(big_upload(tid, os.path.abspath(a.aab)))
+    for _ in range(0 if code else 36):
         time.sleep(5)
         x = js(tid, "return document.body.innerText")
         sec = x.split("App Bundle 업로드", 1)[-1].split("이전 버전", 1)[0]  # 아래쪽 '포함되지 않음'의 옛 버전을 잡지 않게 자른다
         m = re.search(r"\n(\d+) \(([^)]+)\)", sec)
         if m:
             code = m.group(1); break
-        if re.search(r"이미 사용|already been used|오류", x):
+        if re.search(r"이미 사용|already been used", x) and not tried_lib:
+            # 같은 AAB가 이미 앱 라이브러리에 있다(앞서 dry-run으로 올렸거나 임시 출시가 날아간 경우): 실패 항목 지우고 라이브러리에서 가장 최근 것을 추가(2026-11-10 나사톡톡)
+            tried_lib = True
+            code = lib_add(tid)
+            if code:
+                break
+        if re.search(r"이미 사용|already been used|오류", x) and tried_lib:
             out("FAIL 업로드 거부: " + (re.search(r"[^\n]*(이미 사용|already been used|오류)[^\n]*", x).group(0)))
     if not code:
+        x = js(tid, "return document.body.innerText")
+        print("PAGE:", re.sub(r"\s+", " ", x.split("App Bundle", 1)[-1])[:1500])
         out("FAIL 업로드 후 버전 코드 안 보임")
     print("version_code", code)
     if a.notes:
@@ -200,6 +258,8 @@ with tab(BASE + path, a) as tid:
         sha1(tid)
     elif a.action == "submit":
         submit(tid)
+    elif a.action == "publish":
+        publish(tid)
     elif a.action == "managed":
         managed(tid)
     elif a.action == "upload":
