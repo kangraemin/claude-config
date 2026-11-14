@@ -14,7 +14,8 @@
 - OGQ 주의: 통합계정(oid.ogq.me/me '인증')과 크리에이터 스튜디오(creators.ogq.me/profile/verification)는 인증이 따로다.
   업로드에 필요한 건 크리에이터 쪽(api verifyPhone). 그 '인증하기' 버튼은 API 응답 뒤 window.open이라 합성 클릭이면 팝업 차단 →
   ogq-open 은 /api/user/verification/identity 를 직접 불러 받은 주소를 새 탭으로 연다. 결과는 rtn_url(api.ocs) 서버 콜백으로 저장된다.
-- 값은 ~/Documents/oguri-works/개인정보.md 에서 패턴으로 뽑는다(출력 안 함). 통신사 SKT 알뜰폰, 주민번호 뒤 첫 숫자 1.
+- 값은 --info 파일(기본 ~/Documents/oguri-works/개인정보.md)에서 패턴으로 뽑는다(출력 안 함). 성별→주민번호 뒤 첫 숫자, 통신사 칸→siren24 버튼(없으면 SKT 알뜰폰).
+  성별 칸이 비면 BLOCKED. 김은미: --info ~/Documents/oguri-works/개인정보-김은미.md
 - 보안문자는 이미지(data URL)를 CAPTCHA_PNG 로 저장하고 멈춘다 → 읽어서 `send --captcha 123456` 로 다시 부른다.
   (단계마다 다음 칸이 나타나는 방식이라, 보안문자 이전 단계는 다시 불러도 이미 채워진 칸은 건너뛴다.)
 - 사람 몫은 폰에 온 인증번호 6자리뿐이다. 창은 오래 두면 "유효시간이 만료" → 사이트에서 다시 연다.
@@ -37,6 +38,8 @@ ap.add_argument("--timeout", type=int, default=900)
 ap.add_argument("value", nargs="?")
 ap.add_argument("--captcha")
 ap.add_argument("--match", default="cert.mobile-ok.com")
+ap.add_argument("--info", default="~/Documents/oguri-works/개인정보.md",
+                help="개인정보 파일(김은미는 ~/Documents/oguri-works/개인정보-김은미.md). 성별·통신사 칸을 읽는다")
 a = ap.parse_args()
 CAPTCHA_PNG = "/tmp/pass-captcha.png"
 SETV = """(e,v)=>{e.focus();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value").set.call(e,v);
@@ -163,13 +166,26 @@ def main():
         print(body[:300])
         print("RESULT:", "FAILED" if re.search(r"일치하지|만료|오류", body) else "DONE")
         return
-    info = open(os.path.expanduser("~/Documents/oguri-works/개인정보.md")).read()
-    name = re.search(r"- 이름:\s*(\S+)", info).group(1)
-    y, m, d = re.search(r"생년월일:\s*(\d{4})-(\d{2})-(\d{2})", info).groups()
+    info = open(os.path.expanduser(a.info)).read()
+    name = re.search(r"- 이름:[ \t]*(\S+)", info).group(1)
+    y, m, d = re.search(r"생년월일:[ \t]*(\d{4})-(\d{2})-(\d{2})", info).groups()
     phone = re.search(r"01\d-\d{3,4}-\d{4}", info).group(0).replace("-", "")
+    gm = re.search(r"- 성별:[ \t]*(\S+)", info)  # [ \t]만: 빈 칸이면 다음 줄을 읽지 않게(11/14 김은미 성별 빈칸)
+    if not gm or gm.group(1)[0] not in "남여":
+        sys.exit("RESULT: BLOCKED 정보 필요: 성별 — " + a.info)
+    gdig = ("1" if gm.group(1)[0] == "남" else "2") if int(y) < 2000 else ("3" if gm.group(1)[0] == "남" else "4")
+    tm = re.search(r"- 통신사:[ \t]*(.+)", info)
+    telco = None
+    if tm:  # 'LG U+ 알뜰폰 (본인인증 시)' → 'LG U+ 알뜰폰'
+        tv = tm.group(1)
+        base = "LG U+" if re.search(r"LG|U\+", tv) else "KT" if re.search(r"\bKT\b", tv) else "SKT" if "SK" in tv else None
+        telco = base and (base + (" 알뜰폰" if "알뜰" in tv else ""))
     if "통신사를" in text(t):
-        # SKT 알뜰폰 (siren24 창은 data-telco가 없어 첫 save 버튼)
-        c.press(t, sel="#telcomSM,li.tel_item.save button[data-telco=skt],li.tel_item.save button")  # #telcomSM = NICE checkplus
+        if telco and "pcc.siren24" in a.match:  # siren24: 버튼 글자 그대로(SKT/KT/LG U+/… 알뜰폰)
+            c.run_js(t, f"""setTimeout(()=>[...document.querySelectorAll("li.tel_item button")].find(b=>b.innerText.trim()=={telco!r}).click(),10);1""")
+        else:
+            # SKT 알뜰폰 (siren24 창은 data-telco가 없어 첫 save 버튼)
+            c.press(t, sel="#telcomSM,li.tel_item.save button[data-telco=skt],li.tel_item.save button")  # #telcomSM = NICE checkplus
         time.sleep(2)
     if "인증방법을" in text(t):
         c.press(t, text="문자(SMS) 인증")
@@ -185,7 +201,7 @@ def main():
     if "생년월일/성별" in text(t):
         put(t, 'e.placeholder=="생년월일 6자리"', y[2:] + m + d)
         time.sleep(0.5)
-        put(t, 'e.id=="myNum2"||(e.type=="tel"&&!e.placeholder)', "1")  # myNum2 = NICE checkplus
+        put(t, 'e.id=="myNum2"||(e.type=="tel"&&!e.placeholder)', gdig)  # myNum2 = NICE checkplus
         time.sleep(1.5)
     if "휴대폰번호를" in text(t):
         put(t, 'e.name=="mobileNo_sms"||e.id=="mobileNo"||e.id=="sms_mobileno"||e.id=="userPhone"', phone)
