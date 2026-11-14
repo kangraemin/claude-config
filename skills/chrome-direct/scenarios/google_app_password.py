@@ -2,7 +2,7 @@
 """구글 계정을 전용 Chrome 프로필에서 로그인하고 지메일 앱 비밀번호를 만들어 .env에 넣는다 (SMTP 발신용).
 2026-11-14 김은미(dmsal547) 계정으로 처음 돌린 순서를 그대로 옮김.
 
-  google_app_password.py --profile "Profile 15" --email dmsal547@gmail.com \
+  google_app_password.py --profile "Profile 16" --email eunmikim19950109@gmail.com \
       --pw-env KIMEUNMI_GMAIL_PASSWORD --out-env KIMEUNMI_GMAIL_APP_PASSWORD
 
 - 비밀번호는 ~/.claude/.env 에서 읽고 화면·로그에 찍지 않는다.
