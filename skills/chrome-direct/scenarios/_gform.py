@@ -79,7 +79,7 @@ const out = [];
 });
 [...document.querySelectorAll('div[role=listitem]')].filter(__vis).forEach(it => {
   const h = it.querySelector('[role=heading]'); if (!h) return;
-  const t = norm(h.innerText); const key = Object.keys(A).find(k => t === norm(k)) || Object.keys(A).find(k => t.includes(norm(k)));
+  const t = norm(h.innerText); const key = Object.keys(A).find(k => t === norm(k)) || Object.keys(A).filter(k => t.includes(norm(k))).sort((a, b) => norm(b).length - norm(a).length)[0];
   if (!key) return;
   let v = A[key], st = 'filled';
   const radios = [...it.querySelectorAll('[role=radio]')], checks = [...it.querySelectorAll('[role=checkbox]')];
@@ -144,6 +144,30 @@ def fill_page(tid, answers):
                         break
                 ok = bool(js(tid, chosen))
             r["status"] = "filled" if ok else "no-option"
+    # 11/14 산림복지 국민제안(Profile 15): 숨은 탭에서 라디오·체크박스 합성 press가 선택으로 안 남음 → 안 켜진 선택지만 실제 마우스 클릭
+    TAG = r"""const A = %s, norm = s => (s || '').replace(/[\s*:·()\[\]]/g, '').toLowerCase();
+      const lab = e => (e.getAttribute('data-value') || e.getAttribute('data-answer-value') || e.getAttribute('aria-label') || '').trim();
+      document.querySelectorAll('[data-cdrc]').forEach(e => e.removeAttribute('data-cdrc')); let n = 0;
+      [...document.querySelectorAll('div[role=listitem]')].filter(__vis).forEach(it => {
+        const h = it.querySelector('[role=heading]'); if (!h) return; const t = norm(h.innerText);
+        const key = Object.keys(A).find(k => t === norm(k)) || Object.keys(A).filter(k => t.includes(norm(k))).sort((a, b) => norm(b).length - norm(a).length)[0]; if (!key) return;
+        const opts = [...it.querySelectorAll('[role=radio],[role=checkbox]')]; if (!opts.length) return;
+        const want = Array.isArray(A[key]) ? A[key].map(String) : [String(A[key])];
+        for (const w of want) { const o = opts.find(e => lab(e) === w) || opts.find(e => lab(e).includes(w));
+          if (o && o.getAttribute('aria-checked') !== 'true') { o.setAttribute('data-cdrc', String(n++)); } }
+      }); return n;"""
+    for _ in range(3):
+        time.sleep(0.6)
+        n = js(tid, TAG % json.dumps(answers, ensure_ascii=False)) or 0
+        if not n:
+            break
+        import chromectl as c
+        for i in range(n):
+            try:
+                c.rclick(tid, sel=f"[data-cdrc='{i}']")
+            except RuntimeError:
+                pass
+            time.sleep(0.5)
     if any(r["key"] == "__record_email" for r in res):
         # 11/10 도서관의 날: 숨은 탭에서는 이 체크박스가 합성 이벤트로 안 켜진다 → 탭을 앞으로 올려 실제 마우스 클릭
         sel = "[role=checkbox][aria-label*='이메일로 기록']"
