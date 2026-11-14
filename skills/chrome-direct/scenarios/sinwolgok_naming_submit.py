@@ -33,13 +33,20 @@ def main():
     ap.add_argument("--dong-file", required=True)
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--held", action="store_true", help="지휘 세션이 잠금을 먼저 건 경우")
+    ap.add_argument("--info-md", help="다른 응모자 개인정보 md(예: 개인정보-김은미.md) — '- 이름:'·'- 휴대폰:' 줄을 읽음")
+    ap.add_argument("--gugun", default="동대문구", help="주소 구군(sojaeji 목록 값)")
+    ap.add_argument("--sido", default="서울")
     a = ap.parse_args()
     out_dir = Path(a.out_dir); out_dir.mkdir(parents=True, exist_ok=True)
     info = cm.personal_info()
+    if a.info_md:  # 2026-11-15 김은미 응모: 강래민 값 대신 그 사람 파일에서 읽는다
+        t = Path(a.info_md).expanduser().read_text()
+        info = {"name": re.search(r"- 이름:\s*([가-힣]{2,4})", t)[1],
+                "phone": re.search(r"- 휴대폰:\s*(01\d-\d{3,4}-\d{4})", t)[1]}
     intent = Path(a.intent_file).read_text().strip()
     dong = Path(a.dong_file).read_text().strip()
     p1, p2, p3 = info["phone"].split("-")
-    want = {"wr_8": info["name"], "hp1": p1, "hp2": p2, "hp3": p3, "sido": "서울", "gugun": "동대문구", "dong": dong,
+    want = {"wr_8": info["name"], "hp1": p1, "hp2": p2, "hp3": p3, "sido": a.sido, "gugun": a.gugun, "dong": dong,
             "wr_1": "비조합원", "personal1": "y", "personal2": "y",
             "wr_link1": a.shop, "wr_link2": a.apt, "wr_content": intent}
     out = {"form": URL}
