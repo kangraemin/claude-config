@@ -31,10 +31,17 @@ window.__n=hs.length;hs.forEach((h,k)=>fetch(h.replace('disp=inline','disp=safe'
 def main():
     want = {hashlib.sha256(Path(f).read_bytes()).hexdigest(): Path(f).name for f in a.expect}
     with tab(f"https://mail.google.com/mail/u/{a.account}/#{a.label}/{a.thread}", a) as tid:
-        poll(tid, "return document.querySelectorAll('a[href*=\"view=att\"]').length>0", 40)
-        if a.expand:  # 접힌 메일 머리글(.kv/.kQ)을 눌러 펼치고 첨부 링크가 늘어날 때까지 기다린다
+        if not a.expand:
+            poll(tid, "return document.querySelectorAll('a[href*=\"view=att\"]').length>0", 40)
+        else:  # 11/16 모비스: 마지막 메일(펼쳐진 것)에 첨부가 없으면 첨부 링크 0개라 먼저 기다리면 멈춤.
+            # 합성 click()으로는 안 펼쳐지고, '모두 펼치기' 버튼을 실제 마우스(c.rclick)로 눌러야 펼쳐진다.
+            poll(tid, "return !!document.querySelector('[data-message-id]')", 40)
             n0 = js(tid, "return document.querySelectorAll('a[href*=\"view=att\"]').length")
-            js(tid, "var b=document.querySelector('[aria-label=\"모두 펼치기\"],[aria-label=\"Expand all\"]');if(b)b.click();document.querySelectorAll('div.kv,div.kQ').forEach(function(e){e.click()});return 1")
+            import chromectl as c
+            try:
+                c.front(tid); c.rclick(tid, sel='[aria-label="모두 펼치기"],[aria-label="Expand all"]')
+            except Exception as e:
+                print(f"expand: rclick failed ({e})", file=sys.stderr)
             try:
                 poll(tid, f"return new Set([...document.querySelectorAll('a[href*=\"view=att\"]')].map(x=>x.href)).size>{n0}", 30)
             except Exception as e:
