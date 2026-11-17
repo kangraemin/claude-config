@@ -18,6 +18,7 @@
   성별 칸이 비면 BLOCKED. 김은미: --info ~/Documents/oguri-works/개인정보-김은미.md
 - 보안문자는 이미지(data URL)를 CAPTCHA_PNG 로 저장하고 멈춘다 → 읽어서 `send --captcha 123456` 로 다시 부른다.
   (단계마다 다음 칸이 나타나는 방식이라, 보안문자 이전 단계는 다시 불러도 이미 채워진 칸은 건너뛴다.)
+- siren24 보안문자는 6자리(maxlength 6). 글자가 가려 5자리로 읽히면 '다음'이 안 나온다 → 새 그림: img#simpleCaptchaImg.src='/pcc_V3/Captcha/simpleCaptchaImg.jsp?t='+Date.now() 후 send 다시(getSimpleCaptchaImg()는 run_js 격리 환경이라 못 부름, 11/17 고령 김은미).
 - 사람 몫은 폰에 온 인증번호 6자리뿐이다. 창은 오래 두면 "유효시간이 만료" → 사이트에서 다시 연다.
 - 왜 화면 조작인가: 본인확인은 공개 API가 없다. 칸은 keyup이 있어야 '다음'이 나타나고, 버튼은 press(포인터 이벤트)만 먹는다.
 """
@@ -38,6 +39,8 @@ ap.add_argument("--timeout", type=int, default=900)
 ap.add_argument("value", nargs="?")
 ap.add_argument("--captcha")
 ap.add_argument("--match", default="cert.mobile-ok.com")
+ap.add_argument("--profile", default="Profile 1", help="open·ogq-open 때 쓸 Chrome 프로필(김은미 = Profile 16)")
+ap.add_argument("--who", default="", help="wait 알림 문구 앞에 붙일 설명(예: 대전 공모 김은미 가입)")
 ap.add_argument("--info", default="~/Documents/oguri-works/개인정보.md",
                 help="개인정보 파일(김은미는 ~/Documents/oguri-works/개인정보-김은미.md). 성별·통신사 칸을 읽는다")
 a = ap.parse_args()
@@ -66,7 +69,7 @@ def nxt(t):
 
 
 def ogq_open():
-    t = c.new_tab("https://creators.ogq.me/profile/verification", profile="Profile 1")
+    t = c.new_tab("https://creators.ogq.me/profile/verification", profile=a.profile)
     try:
         time.sleep(4)
         c.run_js(t, """window.__r=null;fetch('/api/user/verification/identity',{method:'POST',credentials:'include',
@@ -77,13 +80,13 @@ def ogq_open():
         c.close_tab(t)
     if not url or not url.startswith("http"):
         sys.exit(f"RESULT: FAILED {url}")
-    c.new_tab(url, profile="Profile 1")
+    c.new_tab(url, profile=a.profile)
     time.sleep(4)
     print("RESULT: OPENED — 이어서 send --match mobile-ok")
 
 
 def open_popup():
-    t = c.new_tab(a.value, profile="Profile 1")
+    t = c.new_tab(a.value, profile=a.profile)
     time.sleep(4)
     try:
         c.rclick(t, sel=f'input[value="{a.button}"]')
@@ -102,7 +105,7 @@ def wait_code():
         sys.exit("RESULT: FAILED RAM_NOTI_TG_TOKEN 없음 — set -a; source ~/.claude/.env")
     af, t0 = "/tmp/pass-answer.txt", int(time.time())
     subprocess.run(["curl", "-s", "-m", "15", "-d", f"chat_id={ch}", "--data-urlencode",
-                    "text=[인증번호 요청]\n- 방금 휴대폰으로 온 본인확인 6자리만 답장해 주세요",
+                    "text=[인증번호 요청]" + (f" {a.who}" if a.who else "") + "\n- 방금 휴대폰으로 온 본인확인 6자리만 답장해 주세요",
                     f"https://api.telegram.org/bot{tok}/sendMessage"], capture_output=True)
     end, last = time.time() + a.timeout, time.time()
     while time.time() < end:
@@ -181,8 +184,9 @@ def main():
         base = "LG U+" if re.search(r"LG|U\+", tv) else "KT" if re.search(r"\bKT\b", tv) else "SKT" if "SK" in tv else None
         telco = base and (base + (" 알뜰폰" if "알뜰" in tv else ""))
     if "통신사를" in text(t):
-        if telco and "pcc.siren24" in a.match:  # siren24: 버튼 글자 그대로(SKT/KT/LG U+/… 알뜰폰)
-            c.run_js(t, f"""setTimeout(()=>[...document.querySelectorAll("li.tel_item button")].find(b=>b.innerText.trim()=={telco!r}).click(),10);1""")
+        # --match id:<탭>로 넘기면 a.match에 주소가 없다 → 창 주소로 본다(11/14 김은미: SKT 알뜰폰으로 잘못 눌러 본인확인 실패)
+        if telco and re.search(r"pcc\.siren24|cert\.kcp", a.match + " " + str(c.run_js(t, "location.href"))):  # KCP(11/16 대전 김은미)도 li.tel_item button 글자 그대로  # siren24: 버튼 글자 그대로(SKT/KT/LG U+/… 알뜰폰)
+            c.run_js(t, f"""setTimeout(()=>[...document.querySelectorAll("li.tel_item button")].find(b=>b.innerText.replace(/\\s+/g," ").trim()=={telco!r}).click(),10);1""")  # 'LG U+<br>알뜰폰' → innerText에 줄바꿈(11/14 김은미 본인확인 실패)
         else:
             # SKT 알뜰폰 (siren24 창은 data-telco가 없어 첫 save 버튼)
             c.press(t, sel="#telcomSM,li.tel_item.save button[data-telco=skt],li.tel_item.save button")  # #telcomSM = NICE checkplus
