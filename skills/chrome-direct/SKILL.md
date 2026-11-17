@@ -133,6 +133,7 @@ Output: one JSON object, then a last line `RESULT: <STATUS> ...`. Exit codes: 0 
 | `github_repo_delete.py owner/repo [--submit]` | Delete a private GitHub repo when the gh token lacks delete_repo. Dry-run by default, refuses public repos, stops BLOCKED at GitHub's sudo (password/passkey) screen | Submit | up to sudo screen (11/4) |
 | `ga_custom_dimension.py <계정ID> <속성ID> <param> <표시 이름> [--scope event|user]` | GA4 맞춤 측정기준 등록(서비스 계정은 뷰어라 API 403). 이름에 괄호 불가. 이미 있으면 EXISTS | Submit | yes (11/07) |
 | `cf_workers_build_trigger.py <worker> [--builds|--log uuid|--run branch|--add b --into w|--copy-env|--delete name]` | Cloudflare Workers Builds triggers / env vars / builds (dashboard /api/v4). tmux -L gh | Submit | yes (11/8) |
+| `cf_budget_alerts.py [금액...]` | Cloudflare 요금 예산 알림(billing_budget_alert)을 금액별로 만든다(기본 2·5·10·15·20·30·50달러, 있으면 건너뜀). dashboard /api/v4 | Submit | yes (11/17) |
 | `ncp_maps_web_url.py <app> <url> [--submit]` | NCP Maps Application 'Web 서비스 URL' add (email login from ~/.claude/.env) | Submit | yes (11/8) |
 | `play_privacy_url.py <app_id> <url> [--submit]` | Play Console 앱 콘텐츠 > 개인정보처리방침 URL 바꾸기(저장 후 다시 열어 확인, 심사 제출 불필요) | Submit | yes (11/10 먹맵) |
 | `disquiet_product.py --name N --tagline T --desc-file d --url U --thumb a.png [--image b.png] [--submit]` | 디스콰이엇 프로덕트 등록→승인 요청(이메일 매직링크 로그인, Turnstile은 탭 앞으로). 이미지 1장 이상 필수 | Submit | 흐름 yes (2026-11-11 먹맵·상권.kr 승인 대기), 스크립트 통짜 실행 미검증 |
