@@ -13,7 +13,8 @@ import sys
 
 V = os.path.expanduser('~/programming/vibecoding/')
 ALLOW = {
-    V + 'money-web': {'SSUM_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
+    # 11/18 썸판독기 키 넘김: 개인 → 회사 → 민구형 (사용자 11/18 "회사키 민구형키 이렇게넘어가게좀해둬")
+    V + 'money-web': {'SSUM_ANTHROPIC_API_KEY', 'AI_PAPER_GC_ANTHROPIC_API_KEY', 'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     # 상권.kr: 10/28부터 민구형 키 (사용자 10/28 "상권.kr 민구형 api 키값쓰도록바꿔주고")
     V + 'area-insight': {'AREA_INSIGHT_ANTHROPIC_API_KEY', 'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
     V + 'ai-paper': {'AI_PAPER_GC_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
