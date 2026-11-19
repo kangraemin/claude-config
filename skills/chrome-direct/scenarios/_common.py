@@ -182,7 +182,11 @@ def run(main, args, task, cwd=None):
 
 def submitted_evidence(cid):
     hits = []
+    # 짝 카드(<id>-em, 김은미)의 기록은 <id>(강래민) 제출 증거가 아니다 — 11/20 KPS 강래민 안이 김은미 .done에 막힘
+    sib = lambda p: not cid.endswith("-em") and p.name[len(cid):].startswith("-em")
     for p in JOBS.glob(f"{cid}*.done"):
+        if sib(p):
+            continue
         t = p.read_text(errors="ignore")[:500]
         if re.search(r"SUBMITTED|제출 ?완료|접수 ?완료", t):
             hits.append(f"{p.name}: {t.strip()[:80]}")
@@ -190,7 +194,7 @@ def submitted_evidence(cid):
     if hd.is_dir():
         # 이름에 submit이 있어도 BLOCKED(안 냄) 기록은 제외 — 11/08 hy 오판. 내용에 제출 증거가 있을 때만.
         for p in hd.glob(f"{cid}*"):
-            if "submit" not in p.name:
+            if "submit" not in p.name or sib(p):
                 continue
             t = p.read_text(errors="ignore")[:500].strip()
             if t.startswith("BLOCKED"):
@@ -205,8 +209,9 @@ def submitted_evidence(cid):
     return hits
 
 
-def guard_and_lock(cid, force_resubmit=False):
-    """Before the final click. Raises Blocked if already submitted or locked."""
+def guard_and_lock(cid, force_resubmit=False, held=False):
+    """Before the final click. Raises Blocked if already submitted or locked.
+    held=True: 지휘 세션이 잠금을 먼저 걸어 둔 제출 job — 잠금이 있고 SENT.txt가 없을 때만 이어받는다."""
     if not cid:
         return None
     if not force_resubmit:
@@ -214,6 +219,11 @@ def guard_and_lock(cid, force_resubmit=False):
         if ev:
             raise Blocked("ALREADY_SUBMITTED " + " / ".join(ev))
     lock = JOBS / f"{cid}.submit.lock"
+    if held:
+        if not lock.is_dir() or (lock / "SENT.txt").exists():
+            raise Blocked(f"LOCK_HELD_INVALID {lock} 없음 또는 이미 SENT.txt 있음")
+        (lock / "owner.txt").write_text(f"chrome-direct {Path(sys.argv[0]).name} (held) pid={os.getpid()} {datetime.now():%Y-%m-%d %H:%M:%S}\n")
+        return lock
     try:
         os.mkdir(lock)
     except FileExistsError:
@@ -251,6 +261,22 @@ def personal_info():
     }
     info["rrn7"] = info["birth6"] + "-1" if info["birth6"] else ""  # 1994년생 남 (MEMORY personal-info-fallback)
     info["phone_digits"] = info["phone"].replace("-", "")
+    info["birth8"] = birth.replace(".", "")  # YYYYMMDD
+    return info
+
+
+def personal_info_md(path):
+    """다른 응모자(예: 개인정보-김은미.md)의 이름·생년월일·휴대폰·이메일 줄을 읽는다 — 2026-11-16 김천 김은미 안.
+    personal_info()와 같은 키(name, birth, birth_iso, birth6, birth8, phone, phone_digits, email). 값은 출력하지 않는다."""
+    t = Path(path).expanduser().read_text()
+    g = lambda pat: (re.search(pat, t) or [None, ""])[1]  # noqa: E731
+    bi = g(r"- 생년월일:\s*(\d{4}-\d{2}-\d{2})")
+    ph = g(r"- 휴대폰:\s*(01\d-?\d{3,4}-?\d{4})")
+    info = {"name": g(r"- 이름:\s*([가-힣]{2,4})"), "birth_iso": bi, "birth": bi.replace("-", "."),
+            "birth6": bi[2:].replace("-", ""), "birth8": bi.replace("-", ""), "phone": ph,
+            "phone_digits": re.sub(r"\D", "", ph), "email": g(r"- 이메일:\s*([\w.+-]+@[\w.-]+\w)")}
+    if not all(info[k] for k in ("name", "phone", "email")):
+        raise Blocked(f"INFO_MISSING {path}: " + ",".join(k for k in ("name", "phone", "email") if not info[k]))
     return info
 
 
