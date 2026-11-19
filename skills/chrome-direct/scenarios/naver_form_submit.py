@@ -6,7 +6,8 @@ answers.json: {"items": [
   {"q": "^3\\.", "text": "권리나루"},                    # first visible textarea/input in that question
   {"q": "^2\\.", "file": "/abs/sample.jpg"},           # 사진 첨부 칸(질문 안 input[type=file]) — '1/1'+미리보기 뜰 때까지 대기
   {"ph": "이름을 입력", "text": "{name}"},               # input by placeholder (respondent fields)
-  {"ph": "연락처를 입력", "text": "{phone_digits}"}]}
+  {"ph": "연락처를 입력", "text": "{phone_digits}"},
+  {"q": "^4\\.", "addr": "{address_base}", "detail": "{address_detail}"}]}  # 주소검색 칸(같은 페이지 레이어, 결과 정확히 1건일 때만)
 `q` is matched against each question's title line (the line starting with 'N.'), `{placeholders}`
 come from _common.personal_info() and are never printed.
 
@@ -22,7 +23,7 @@ import json, re, sys, time
 from datetime import datetime
 from pathlib import Path
 
-from _common import (Blocked, c, emit, expand, guard_and_lock, parser, personal_info, poll, run,
+from _common import (Blocked, c, emit, expand, guard_and_lock, parser, personal_info, personal_info_md, poll, run,
                      submitted_evidence, tab)
 from _common import js as _js
 
@@ -42,6 +43,7 @@ ap.add_argument("url")
 ap.add_argument("answers")
 ap.add_argument("--marker")
 ap.add_argument("--lock-held", action="store_true")
+ap.add_argument("--info-md", help="다른 응모자 개인정보 md(예: ~/Documents/oguri-works/개인정보-김은미.md, --profile 'Profile 16'과 함께) — 11/16 김천 김은미")
 ap.add_argument("--proof")
 ap.add_argument("--add-response", action="store_true", help="'이미 참여한 설문'이면 '설문 추가 참여'로 새 응답 (여러 건 응모)")
 args = ap.parse_args()
@@ -69,7 +71,8 @@ def fill_page(tid, items, info):
     """Fill what is on the current page in ONE js call (each call costs ~5s with many tabs open).
     Returns list of (key, status) for items present on this page."""
     files = [it for it in items if "file" in it]
-    spec = [{**it, "text": expand(it["text"], info)} if "text" in it else it for it in items if "file" not in it]
+    addrs = [it for it in items if "addr" in it]
+    spec = [{**it, "text": expand(it["text"], info)} if "text" in it else it for it in items if "file" not in it and "addr" not in it]
     r = js(tid, HELP + f"""const spec={json.dumps(spec, ensure_ascii=False)};const res=[];
 for(const it of spec){{const key=it.q||it.ph;let r;
  if('text' in it){{let e;
@@ -107,6 +110,34 @@ return q&&/\\b1\\s*\\/\\s*1\\b/.test(q.innerText)&&!!q.querySelector('img')""", 
             err = js(tid, HELP + f"""const q=__items().find(i=>new RegExp({json.dumps(it['q'])}).test(__title(i)));return q?q.innerText.slice(0,300):''""")
             raise RuntimeError(f"{it['q']}: upload not shown ({err!r})")
         r.append([it["q"], "OK"])
+    for it in addrs:  # 주소검색 칸: 같은 페이지 레이어(.nsv_layer_postcode)에서 검색 → 결과 정확히 1건 누름 → 상세 주소 입력(11/20 단종)
+        base, detail = expand(it["addr"], info), expand(it.get("detail", ""), info)
+        if not base:
+            raise RuntimeError(f"{it['q']}: address_base empty (개인정보 md '- 거주지:' 줄 확인)")
+        st = js(tid, HELP + f"""const q=__items().find(i=>new RegExp({json.dumps(it['q'])}).test(__title(i)));if(!q)return 'noq';
+const b=q.querySelector('.nsv_button_question_respondent_address');if(!b)return 'nobtn';b.click();return 'ok'""")
+        if st == "noq":
+            continue
+        if st != "ok":
+            raise RuntimeError(f"{it['q']}: {st}")
+        poll(tid, "const L=document.querySelector('.nsv_layer_postcode');return !!(L&&L.getBoundingClientRect().width>0)", 15)
+        js(tid, f"""const L=document.querySelector('.nsv_layer_postcode');const i=L.querySelector('.nsv_layer_postcode_search_input');
+i.focus();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(i,{json.dumps(base)});
+i.dispatchEvent(new Event('input',{{bubbles:true}}));L.querySelector('.nsv_layer_button_postcode_search').click();return 1""")
+        n = poll(tid, "const L=document.querySelector('.nsv_layer_postcode');return L?L.querySelectorAll('.nsv_layer_address_item').length||(/결과가 없|검색 결과 없/.test(L.innerText)?-1:0):0", 15)
+        if n != 1:
+            raise RuntimeError(f"{it['q']}: address search results={n} (need exactly 1)")
+        js(tid, "document.querySelector('.nsv_layer_postcode .nsv_layer_button_address').click();return 1")
+        road = base.split()[-2] if len(base.split()) >= 2 else base
+        poll(tid, HELP + f"""const q=__items().find(i=>new RegExp({json.dumps(it['q'])}).test(__title(i)));
+const s=q.querySelector('.nsv_survey_question_respondent_basic_address');const d=q.querySelector('input[placeholder*=상세]');
+return !!(s&&s.innerText.includes({json.dumps(road)})&&d&&!d.disabled)""", 15)
+        if detail:
+            ok = js(tid, HELP + f"""const q=__items().find(i=>new RegExp({json.dumps(it['q'])}).test(__title(i)));
+return __setv(q.querySelector('input[placeholder*=상세]'),{json.dumps(detail)})""")
+            if not ok:
+                raise RuntimeError(f"{it['q']}: detail MISMATCH")
+        r.append([it["q"], "OK"])
     return r
 
 
@@ -117,7 +148,7 @@ def page_no(tid):
 def main():
     data = json.loads(Path(args.answers).read_text())
     items = data["items"]
-    info = personal_info()
+    info = personal_info_md(args.info_md) if args.info_md else personal_info()
     if args.marker and Path(args.marker + ".pressed").exists() and not Path(args.marker).exists():
         raise Blocked(f"UNCONFIRMED earlier press {args.marker}.pressed — check before pressing again")
     if args.marker and Path(args.marker).exists():

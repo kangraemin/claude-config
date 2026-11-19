@@ -277,6 +277,14 @@ def personal_info_md(path):
             "phone_digits": re.sub(r"\D", "", ph), "email": g(r"- 이메일:\s*([\w.+-]+@[\w.-]+\w)")}
     if not all(info[k] for k in ("name", "phone", "email")):
         raise Blocked(f"INFO_MISSING {path}: " + ",".join(k for k in ("name", "phone", "email") if not info[k]))
+    # 거주지 → address(전체), address_base(도로명+건물번호, 주소검색어), address_detail(동·호 등 나머지, 괄호 참고항목 제외) — 11/20 단종 김은미
+    addr = g(r"- 거주지[^:：\n]*[:：]\s*(.+)").strip()
+    info["address"] = addr
+    w = re.sub(r"\s*\(.*?\)\s*", " ", addr).split()
+    cut = next((i + 2 for i in range(len(w) - 1, -1, -1)
+                if re.search(r"(로|길)$", w[i]) and i + 1 < len(w) and re.fullmatch(r"\d+(-\d+)?,?", w[i + 1])), 0)
+    info["address_base"] = " ".join(w[:cut]).rstrip(",") if cut else ""
+    info["address_detail"] = " ".join(w[cut:]).strip(", ") if cut else ""
     return info
 
 
