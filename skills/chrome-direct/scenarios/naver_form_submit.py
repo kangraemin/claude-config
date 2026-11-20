@@ -53,7 +53,8 @@ var __vis=e=>{const b=e.getBoundingClientRect();return b.width>0&&b.height>0};
 var __press=e=>{e.scrollIntoView({block:'center'});const b=e.getBoundingClientRect();
  const o={bubbles:true,cancelable:true,view:window,clientX:b.left+b.width/2,clientY:b.top+b.height/2,button:0};
  for(const k of['pointerdown','mousedown','pointerup','mouseup','click'])e.dispatchEvent(new(k.startsWith('pointer')?PointerEvent:MouseEvent)(k,o))};
-var __setv=(e,v)=>{e.focus();const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
+var __setv=(e,v)=>{e.focus();if(e.type==='email'){e.select();document.execCommand('delete');document.execCommand('insertText',false,v);e.dispatchEvent(new Event('change',{bubbles:true}));e.blur();return e.value===v}  // 11/20 단종 강래민: type=email은 value setter로 넣으면 폼 상태에 안 들어가 '답변 필수입니다'로 제출이 막힘 → insertText
+ const p=e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;
  Object.getOwnPropertyDescriptor(p,'value').set.call(e,v);e.dispatchEvent(new Event('input',{bubbles:true}));
  e.dispatchEvent(new Event('change',{bubbles:true}));e.dispatchEvent(new Event('keyup',{bubbles:true}));e.blur();return e.value===v};
 var __items=()=>[...document.querySelectorAll('.nsv_survey_item')].filter(__vis);
@@ -214,6 +215,12 @@ def main():
         try:
             done = poll(tid, f"const t=document.body.innerText;return /{DONE_RE}/.test(t)?t.slice(0,400):''", 25)
         except Exception as e:
+            bad = js(tid, HELP + "return __items().filter(i=>/답변 필수입니다|올바른 형식/.test(i.innerText)).map(__title).join(' | ')")
+            if bad:  # 폼 자체 검증에 막혀 접수 안 됨(11/20 단종) — 칸 고친 뒤 다시 낼 수 있게 .pressed를 지운다
+                if args.marker:
+                    Path(args.marker + ".pressed").unlink(missing_ok=True)
+                emit(out, "NOT_SUBMITTED_VALIDATION", f"form validation blocked submit: {bad[:200]}")
+                sys.exit(3)
             emit(out, "UNCONFIRMED", f"pressed 제출 but no completion text ({e}) — do NOT press again, check first")
             sys.exit(2)
         step("completion text seen")
