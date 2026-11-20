@@ -15,13 +15,15 @@ import time
 from pathlib import Path
 
 from _common import Blocked, emit, expand, guard_and_lock, mark_not_sent, parser, personal_info, run, tab
-from _gform import fill_page, next_page, press_button, state
+from _gform import fill_page, next_page, press_button, state, upload_picker
 import chromectl as c
 
 ap = parser(__doc__, submit=True)
 ap.add_argument("url")
 ap.add_argument("answers")
 ap.add_argument("--proof", help="제출 완료 화면 저장 (.png/.pdf)")
+ap.add_argument("--lock-held", action="store_true",
+                help="지휘 세션이 _radar/jobs/<id>.submit.lock 을 미리 걸어 둔 job용: 기록 확인 후 기존 잠금(SENT.txt 없음)을 이어받음")
 a = ap.parse_args()
 RAW = json.loads(Path(a.answers).read_text())
 
@@ -39,6 +41,23 @@ def main():
             raise Blocked("ALREADY_RESPONDED 이 계정으로 이미 응답함 — 고치려면 응답 수정 링크로")
         for page in range(1, 21):
             res = fill_page(tid, answers)
+            if not res:  # 11/10 시장경제칼럼: 첫 쪽이 늦게 그려져 0칸 채움(임시저장 값이 남아 필수 통과처럼 보임) → 한 번 더
+                time.sleep(2)
+                res = fill_page(tid, answers)
+            # 11/20 Nitto: {"file": 경로} 값은 Google Picker에 바로 올린다(upload_picker). 값이 경로 아니면 아래에서 막힘
+            for r in res:
+                fv = answers.get(r["key"])
+                if r["status"] == "file" and isinstance(fv, dict) and fv.get("file"):
+                    paths = fv["file"] if isinstance(fv["file"], list) else [fv["file"]]
+                    want = [Path(p).name for p in paths]
+                    # 11/21 FiPA: 숨은 partialResponse(이전 쪽 답)도 [[[로 시작해 파일로 오인 → 파일 값(드라이브id 문자열)만 봄. 로그인 폼은 임시저장에 앞서 올린 파일이 남는다 → 이미 같은 파일이 붙어 있으면 다시 안 올림, 다르면 막음
+                    have = c.js_json(tid, """const h=[...document.querySelectorAll('input[type=hidden]')].find(x=>{if(x.name==='partialResponse'||!x.value.startsWith('[[['))return false;try{const v=JSON.parse(x.value);return typeof v[0][0][0]==='string'&&typeof v[0][0][1]==='string'}catch(e){return false}});return h?JSON.parse(h.value)[0].map(x=>x[1]):[]""") or []
+                    if have and sorted(have) != sorted(want):
+                        raise Blocked(f"폼에 다른 파일이 이미 붙어 있음 {have} — 직접 확인 필요")
+                    names = have or upload_picker(tid, paths, item_title=r["title"][:40])
+                    if sorted(names) != sorted(want):
+                        raise RuntimeError(f"파일 업로드 확인 실패: 올라간 {names} / 기대 {want}")
+                    r["status"] = "filled"
             time.sleep(0.6)
             st = state(tid)
             files = [r for r in res if r["status"] == "file"] + \
@@ -47,6 +66,10 @@ def main():
                 raise RuntimeError("파일 업로드 질문: " + ", ".join(sorted({f["title"] for f in files})))
             bad = [r for r in res if r["status"] not in ("filled",)]
             missing = [x["title"] for x in st["items"] if x["required"] and not x["answered"]]
+            if missing and not bad:  # 11/14 산림복지 국민제안: 체크박스 press 뒤 0.6초엔 aria-checked가 아직 안 바뀜 → 한 번 더 본다
+                time.sleep(2)
+                st = state(tid)
+                missing = [x["title"] for x in st["items"] if x["required"] and not x["answered"]]
             report.append({"page": page, "filled": [r["key"] for r in res if r["status"] == "filled"],
                            "problems": bad, "requiredUnanswered": missing})
             if bad or missing:
@@ -65,7 +88,7 @@ def main():
             return
         if unused:
             raise RuntimeError(f"answers 키가 폼에 없음: {unused}")
-        lock = guard_and_lock(a.contest_id)
+        lock = guard_and_lock(a.contest_id, held=a.lock_held)
         try:
             press_button(tid, "제출" if "제출" in st["buttons"] else "Submit")
         except Exception as e:

@@ -86,7 +86,13 @@ const out = [];
   const date = it.querySelector('input[type=date]');
   const txts = [...it.querySelectorAll('input[type=text],input[type=email],input[type=number],input[type=tel],input[type=url],input:not([type]),textarea')].filter(__vis);
   const lab = e => (e.getAttribute('data-value') || e.getAttribute('data-answer-value') || e.getAttribute('aria-label') || '').trim();
-  if (v && typeof v === 'object' && !Array.isArray(v) && v.file) st = 'file';
+  if (v && typeof v === 'object' && !Array.isArray(v) && v.grid !== undefined) {  // 11/20 Nitto: 객관식 그리드 {"grid": "열"} 또는 {"grid": {"행 일부": "열"}}
+    st = 'grid';
+    for (const g of it.querySelectorAll('[role=radiogroup]')) { const row = g.getAttribute('aria-label') || '';
+      const col = typeof v.grid === 'string' ? v.grid : (Object.entries(v.grid).find(([k]) => row.includes(k)) || [])[1];
+      const r = col && [...g.querySelectorAll('[role=radio]')].find(e => e.getAttribute('data-value') === col);
+      if (!r) { st = 'no-option'; continue; } if (r.getAttribute('aria-checked') !== 'true') __press(r); } }
+  else if (v && typeof v === 'object' && !Array.isArray(v) && v.file) st = 'file';
   else if (/파일 추가|Add file/.test(it.innerText)) st = 'file';
   else if (date) st = __setv(date, String(v)) ? 'filled' : 'mismatch';
   else if (radios.length) { const r = radios.find(e => lab(e) === String(v)) || radios.find(e => lab(e).includes(String(v)));
@@ -152,6 +158,13 @@ def fill_page(tid, answers):
         const h = it.querySelector('[role=heading]'); if (!h) return; const t = norm(h.innerText);
         const key = Object.keys(A).find(k => t === norm(k)) || Object.keys(A).filter(k => t.includes(norm(k))).sort((a, b) => norm(b).length - norm(a).length)[0]; if (!key) return;
         const opts = [...it.querySelectorAll('[role=radio],[role=checkbox]')]; if (!opts.length) return;
+        const gv = A[key]; if (gv && typeof gv === 'object' && !Array.isArray(gv) && gv.grid !== undefined) {
+          for (const g of it.querySelectorAll('[role=radiogroup]')) { const row = g.getAttribute('aria-label') || '';
+            const col = typeof gv.grid === 'string' ? gv.grid : (Object.entries(gv.grid).find(([k]) => row.includes(k)) || [])[1];
+            const o = col && [...g.querySelectorAll('[role=radio]')].find(e => e.getAttribute('data-value') === col);
+            if (o && o.getAttribute('aria-checked') !== 'true') o.setAttribute('data-cdrc', String(n++)); }
+          return; }
+        if (gv && typeof gv === 'object' && !Array.isArray(gv)) return;
         const want = Array.isArray(A[key]) ? A[key].map(String) : [String(A[key])];
         for (const w of want) { const o = opts.find(e => lab(e) === w) || opts.find(e => lab(e).includes(w));
           if (o && o.getAttribute('aria-checked') !== 'true') { o.setAttribute('data-cdrc', String(n++)); } }
@@ -168,6 +181,11 @@ def fill_page(tid, answers):
             except RuntimeError:
                 pass
             time.sleep(0.5)
+    for r in res:  # 그리드: 모든 행이 켜졌는지 확인
+        if r["status"] == "grid":
+            done = js(tid, f"""const it = [...document.querySelectorAll('div[role=listitem]')].filter(e => __vis(e) && e.innerText.includes({json.dumps(r['title'])}))[0];
+              return !!it && [...it.querySelectorAll('[role=radiogroup]')].every(g => g.querySelector('[role=radio][aria-checked=true]'));""")
+            r["status"] = "filled" if done else "mismatch"
     if any(r["key"] == "__record_email" for r in res):
         # 11/10 도서관의 날: 숨은 탭에서는 이 체크박스가 합성 이벤트로 안 켜진다 → 탭을 앞으로 올려 실제 마우스 클릭
         sel = "[role=checkbox][aria-label*='이메일로 기록']"
@@ -184,3 +202,43 @@ def fill_page(tid, answers):
             if r["key"] == "__record_email" and not js(tid, chk):
                 r["status"] = "mismatch"
     return res
+
+
+def upload_picker(tid, paths, item_title=None, timeout=90):
+    """구글폼 파일 칸: '파일 추가' → Google Picker iframe(docs.google.com, 같은 출처)의 input[type=file]에
+    DataTransfer로 여러 파일을 한 번에 넣는다(Codex 불필요, 11/16 광명 로고 3개 성공).
+    돌려줌: 폼 숨은 값에 붙은 파일 이름 목록. 제출은 안 누른다."""
+    import base64, mimetypes, os
+    import chromectl as c
+    sel = f"e.innerText.includes({json.dumps(item_title)})" if item_title else "[...e.querySelectorAll('[role=button]')].some(b=>b.innerText.includes('파일 추가'))"
+    c.front(tid)
+    ok = c.js_json(tid, f"""const it=[...document.querySelectorAll('div[role=listitem]')].filter(e=>{sel})[0]; if(!it) return false;
+      const b=[...it.querySelectorAll('[role=button]')].find(e=>e.innerText.includes('파일 추가')); if(!b) return false; b.click(); return true""")
+    if not ok:
+        raise RuntimeError("파일 추가 버튼 없음")
+    for _ in range(20):
+        time.sleep(1)
+        if c.js_json(tid, "const f=[...document.querySelectorAll('iframe')].find(x=>x.src.includes('picker'));return !!(f&&f.contentDocument&&f.contentDocument.querySelector('input[type=file]'))"):
+            break
+    else:
+        raise RuntimeError("Picker 파일 칸 안 뜸")
+    c.run_js(tid, "window.__cf=[];1")
+    for p in paths:
+        b64 = base64.b64encode(open(p, "rb").read()).decode()
+        mime = mimetypes.guess_type(p)[0] or ("application/haansofthwpx" if p.endswith(".hwpx") else "application/octet-stream")
+        c.run_js(tid, "window.__cu=[];1")
+        for i in range(0, len(b64), 300000):
+            c.run_js(tid, f"window.__cu.push({c.q(b64[i:i+300000])});1", 60)
+        c.run_js(tid, f"""(()=>{{const s=atob(window.__cu.join(''));window.__cu=null;const u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);
+          window.__cf.push(new File([u],{c.q(os.path.basename(p))},{{type:{c.q(mime)}}}));return 1}})()""", 120)
+    c.run_js(tid, """(()=>{const f=[...document.querySelectorAll('iframe')].find(x=>x.src.includes('picker'));const W=f.contentWindow,i=f.contentDocument.querySelector('input[type=file]');
+      const dt=new W.DataTransfer();window.__cf.forEach(x=>dt.items.add(new W.File([x],x.name,{type:x.type})));i.files=dt.files;
+      i.dispatchEvent(new W.Event('change',{bubbles:true}));window.__cf=null;return 1})()""", 60)
+    names = []
+    end = time.time() + timeout
+    while time.time() < end:
+        time.sleep(3)
+        names = c.js_json(tid, """const h=[...document.querySelectorAll('input[type=hidden]')].find(x=>{if(x.name==='partialResponse'||!x.value.startsWith('[[['))return false;try{const v=JSON.parse(x.value);return typeof v[0][0][0]==='string'&&typeof v[0][0][1]==='string'}catch(e){return false}});return h?JSON.parse(h.value)[0].map(x=>x[1]):[]""") or []
+        if len(names) >= len(paths):
+            break
+    return names
