@@ -17,6 +17,7 @@ completion screen. --marker f: refuse if f exists (already sent), write it after
 --lock-held: the contest lock was taken by the caller; check submit evidence but do not mkdir.
 --proof x.png: screenshot of the completion screen.
 --add-response: the form remembers this browser ('이미 참여한 설문입니다') — press '설문 추가 참여' for the next entry.
+연락처가 '숫자만 입력 가능합니다.' 칸이면 {phone_digits} — 하이픈({phone})은 '숫자만' 검증에 막혀 제출이 조용히 안 됨(11/21 밀양 UNCONFIRMED 원인).
 type=email 칸·aria-checked 동의 칸이 있는 폼은 여기서 안 된다(11/03 KIND: insertText·실제 ⌘V도 불안정) → naver_form_submit_pw.py.
 """
 import json, re, sys, time
@@ -80,7 +81,7 @@ for(const it of spec){{const key=it.q||it.ph;let r;
   if(it.q){{const q=__items().find(i=>new RegExp(it.q).test(__title(i)));
    e=q?[...q.querySelectorAll('textarea,input[type=text],input[type=tel],input[type=email],input:not([type])')].filter(__vis)[0]:null;}}
   else e=[...document.querySelectorAll('textarea,input')].filter(x=>__vis(x)&&(x.placeholder||'').includes(it.ph))[0];
-  if(!e)continue; r=__setv(e,it.text)?'OK':'MISMATCH:'+e.value.length;}}
+  if(!e)continue; r=__setv(e,it.text)?'OK':(e.getAttribute('inputmode')==='decimal'&&e.value===it.text.replace(/^0+/,'')?'OK_NUM':'MISMATCH:'+e.value.length);}}  // 11/21 밀양: '숫자만 입력' 칸(inputmode=decimal)은 blur 때 맨 앞 0을 지움(실제 키 입력도 같음), 하이픈 넣으면 검증에 막혀 제출 안 됨 → phone_digits로 넣고 앞 0 빠진 값은 통과
  else{{const q=__items().find(i=>new RegExp(it.q).test(__title(i)));if(!q)continue;
   const l=[...q.querySelectorAll('label')].find(l=>new RegExp(it.choose).test(l.innerText.trim()));
   if(!l)r='NOOPT';else{{const inp=document.getElementById(l.htmlFor)||l.querySelector('input');
@@ -88,7 +89,7 @@ for(const it of spec){{const key=it.q||it.ph;let r;
  res.push([key,r]);}}
 return res;""", 40)
     for key, st in r:
-        if st != "OK":
+        if st not in ("OK", "OK_NUM"):
             raise RuntimeError(f"{key}: {st}")
     for it in files:  # 사진 첨부 칸: 그 질문 안의 input[type=file]에 표시를 달고 chromectl.upload_file로 넣는다(11/08 hy)
         mark = js(tid, HELP + f"""const q=__items().find(i=>new RegExp({json.dumps(it['q'])}).test(__title(i)));if(!q)return 'noq';
