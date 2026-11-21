@@ -14,7 +14,7 @@ import json
 import time
 from pathlib import Path
 
-from _common import Blocked, emit, expand, guard_and_lock, mark_not_sent, parser, personal_info, run, tab
+from _common import Blocked, emit, expand, guard_and_lock, js, mark_not_sent, parser, personal_info, run, tab
 from _gform import fill_page, next_page, press_button, state, upload_picker
 import chromectl as c
 
@@ -103,8 +103,15 @@ def main():
         else:
             raise Blocked("UNCONFIRMED 제출은 눌렀으나 '응답이 기록되었습니다' 확인 못 함 — 재제출 금지, 메일함 '양식 응답 확인'·폼 화면을 사람이/확인용으로 볼 것")
         proof = c.shot(tid, a.proof) if a.proof else None
+        edit = None
+        try:  # 11/21 FiPA 김은미: 탭이 닫히면 응답 수정 링크를 다시 못 얻음 → 잠금 안에 저장
+            edit = js(tid, "const l=document.querySelector('a[href*=\\\"edit2=\\\"]'); return l ? l.href : null;")
+        except Exception:
+            pass
         if lock:
             (lock / "SENT.txt").write_text(f"{time.strftime('%Y-%m-%d %H:%M:%S')} gform {st['url']}\n")
+            if edit:
+                (lock / "EDIT_LINK.txt").write_text(edit + "\n")
         emit({"url": st["url"], "account": st["account"], "pages": report, "editLink": st["editLink"], "proof": proof},
              "SUBMITTED", a.contest_id or "")
 
