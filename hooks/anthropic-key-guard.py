@@ -36,7 +36,8 @@ ALLOW = {
     # 과학기록 사진 판독·수업일지·월간 보고서·공개 글 생성: 민구형 키 월 상한 $30 (사용자 10/31 "그 규칙 이것도써야지")
     # 글마감 일본판 공고 추출: 민구형 키 월 상한 $20 (사용자 10/31 "아니 api key 좀 쓰면대지", "그럼 지금 민구형꺼로 해봐")
     V + '글쓰기공모전': {'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
-    V + 'science-tutor': {'SCIENCE_TUTOR_ANTHROPIC_API_KEY', 'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
+    # 11/24 민구형 키 잔액 부족 → 개인 키로 (사용자 11/24 "개인키쓱게해")
+    V + 'science-tutor': {'SCIENCE_TUTOR_ANTHROPIC_API_KEY', 'SSUM_ANTHROPIC_API_KEY', 'MUKMAP_ANTHROPIC_API_KEY', 'ANTHROPIC_API_KEY'},
 }
 NAME = r'([A-Z][A-Z0-9_]*_)?ANTHROPIC_API_KEY'
 EXPAND = re.compile(r'\$\{?(' + NAME + r')\b')
