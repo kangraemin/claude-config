@@ -1,6 +1,7 @@
 # Global Rules
 
 ## 사용자 말 받는 법 (최우선) <!-- why: decisions/_global/process/answer-users-last-message-first-hooks-never-hijack-reply.md -->
+- 막는 장치: answer-question-first.py(답 먼저), ram-proxy-gate.py check_understood(욕·'아니' 뒤 '이해했어요' 줄 없으면 막음)
 - 답 첫 줄은 사용자의 **마지막 메시지**에 대한 답이다. 백그라운드 작업·훅·기록 점검 얘기로 시작하지 않는다(10/30~31 교정 70건 중 13건이 이것: "시장조사 해와" → "library 점검 띄웠어요").
 - library 점검·기록 에이전트의 시작과 완료는 사용자에게 말하지 않는다. 사용자 일의 결과만 말한다.
 - 짧은 말("1,2 합치라고", "이전 기록 누가 갖고 있어")이 가리키는 것은 **사용자의 직전 메시지들**에서 찾는다. 내 직전 답에서 찾지 않는다.
@@ -11,6 +12,7 @@
 - 웹·콘솔 조작(Chrome 직접·Codex 위임)이 들어간 작업을 끝내면 `web-scriptify` 스킬로 그 과정을 스크립트화한다(불가능하면 안 함).
 
 ## 묻지 말고 끝까지 한다 <!-- why: decisions/_global/process/finish-to-the-end-without-asking-user.md -->
+- 막는 장치: ram-proxy-gate.py check_ask('~할까요/알려 주세요'로 끝나면 막음, 인증번호 등 사람 몫만 통과)
 - 시킨 일은 중간에 "할까요?", "괜찮으면 '올려'라고 해 주세요", "어떻게 할지 정해 주세요"로 멈추지 않고 끝까지 한다.
 - 사용자가 결과물(사진·화면)을 보고 싶다고 한 경우에도 보여 주고 바로 다음 단계로 간다. 답을 기다리지 않는다.
 - **사용자 사전 동의(2026-10-22): "앞으로 니가 하는 거 전부 다 동의할 테니까 멈추지 마라."** 출시 버튼, 콘솔 약관·동의 체크, 서명형 확인 체크박스, 공개 글 발행까지 묻지 않고 진행한다.
@@ -21,6 +23,7 @@
 - 내가 고른 것(컨셉·아이템·이름·방식)은 "추천안으로 진행"이라고 쓴다. 사용자가 정한 것처럼 "정했어요"라고 쓰지 않는다(10/23 "내가 언제 이걸로 정했음").
 
 ## 사용자에게 넘기기 전 기존 스크립트부터 찾는다 <!-- why: decisions/_global/process/search-existing-scripts-before-handing-step-to-user.md -->
+- 막는 장치: ram-proxy-gate.py check_handoff(로그인·인증을 넘기는데 skills·scenarios grep 없으면 막음), check_blocked('막혔어요' 전에 검색·스크립트 찾기 없으면 막음)
 - 로그인·본인인증(PASS/문자)·보안문자·결제 전 단계처럼 "사람이 해야 할 것 같은" 단계를 사용자에게 넘기기 **전에** 아래를 먼저 찾는다.
 - 스크립트 위치: `~/.claude/skills/chrome-direct/scenarios/`(웹 조작 시나리오, 목록은 같은 폴더 `../SKILL.md` Scenarios 표), `~/.claude/skills/*/scripts/`.
 - 찾는 법: `grep -rli "<키워드>" ~/.claude/skills/*/scripts ~/.claude/skills/chrome-direct/scenarios ~/.claude/skills/chrome-direct/SKILL.md` (예: 본인인증·통신사·문자·mobile-ok·로그인).
@@ -64,6 +67,10 @@
 - 키체인 'Chrome Safe Storage' 창은 SecurityAgent kill로 닫는다(암호 입력 금지). 하단 경고 시트(UserNotificationCenter)도 kill.
 - 메모리 부족 '강제 종료' 창은 loginwindow 소유라 kill 금지, '강제 종료' 버튼·Enter 금지 → 닫기가 안 먹으면 드래그로 치운다.
 
+## Supabase·Turso 금지 <!-- why: decisions/_global/stack/never-use-supabase-or-turso.md -->
+- 어느 프로젝트에서도 Supabase·Turso를 새로 쓰지 않는다(11/27 "두번다시 supabase truso쓰지않도록해"). 유료 업그레이드도 금지.
+- DB·파일은 Cloudflare D1·R2 또는 로컬 SQLite. 기존 사용처는 옮길 기회에 D1·R2로.
+
 ## 환경변수 조회 순서 <!-- why: decisions/_global/process/lookup-project-then-global-env.md -->
 - 환경변수는 프로젝트 `.env` → `~/.claude/.env` 순으로 찾고, `source .env && <명령>`으로 주입한다.
 
@@ -85,6 +92,7 @@
 - 이미 사용자가 선택한 옵션을 다시 옵션 목록으로 되묻지 않는다. 결정됐으면 실행한다.
 
 ## 사용자가 읽는 모든 글은 `제목` + `- 줄` 형식 (최우선) <!-- why: decisions/_global/convention/explainer-ui-one-sentence-per-line.md -->
+- 막는 장치: ~/.claude/scripts/fmt_check.py — sns_tg.py·send_digest.py가 보내기 전 검사, 어기면 안 보냄
 - 답변·보고·텔레그램 리포트·자동 알림·설명 UI 전부 같다(11/1 "내가 두번다시 이야기안한다", 여러 번 반복된 지적).
 - 형태는 이것만 쓴다:
   ```
@@ -95,6 +103,10 @@
 - 한 줄에 의미 하나. 문단·긴 문장·괄호 설명 줄줄이·들여쓴 목록·`이름: a, b, c` 나열 줄 금지.
 - 제목 없는 줄, `- ` 없는 줄을 만들지 않는다. 숫자는 앞쪽에, 설명은 다음 줄로 나눈다.
 - 자동으로 보내는 글(리포트·알림 스크립트)은 보내기 전 코드 검사로 이 형식을 강제한다.
+
+## 하지 말라고 한 건 기계로 막힌다 (11/28 M8)
+- 막는 장치: session-bans.py — 사용자가 'X 하지 마'라고 하면 6시간 그 명령을 막고, '다시 해/써도 돼'면 푼다.
+- 사용자가 '훅으로/재발/두 번 다시'를 말하면 ram-proxy-gate.py check_mechanize가 장치 파일 수정 없이 끝내지 못하게 막는다.
 
 ## 실행 원칙 <!-- why: decisions/_global/process/execute-authorized-actions-in-same-turn.md -->
 - "권장 조치", "추가할 만한", "추천합니다", "제안드립니다", "고려해볼 만" 식으로 할 일을 나열만 하고 응답 끝내는 거 금지.
@@ -129,6 +141,7 @@
 
 <!-- learnings-for-claude:rules start -->
 ### 읽기
+- 막는 장치: require-library-search.py(사용자 말 뒤 library 검색 없이 파일 쓰면 첫 쓰기를 막음)
 - 기술 질문에 답하거나, 구현을 시작하거나, 에러가 나면 `library_search(query)`를 부른다. deferred tool이라 먼저 `ToolSearch("select:mcp__claude-library__library_search")`로 로드한다.
 - 결과가 있으면 `📚 library 참조: [topic]`로 시작하고 저장된 내용을 따른다. 이미 기록된 방향은 재제안하지 않는다.
 - 결정사항(`decisions/`)은 SessionStart에 자동 주입된다. 전문은 `decision_read`, 세션 중 추가분은 `decision_search`.
@@ -143,6 +156,7 @@
 <!-- learnings-for-claude:rules end -->
 
 ## claude -p 상한 (2026-11-04, 젠더 측정 -p 약 9,600회 이상으로 주간 한도 약 24% 소진(추정 18~25%))
+- 막는 장치: headless-guard-hook.py(상한 없는 claude -p 스크립트 쓰기를 막음, 11/28 등록)
 - 스크립트에서 `claude -p`를 부르면 파일에 `CLAUDE_P_MAX=<총 호출 수>`를 적고 코드로 그 수에서 멈춘다. 100회가 넘으면 서브에이전트나 모델 없는 방식으로 줄인다.
 - `~/.local/bin/claude` 앞단이 호출을 세어 상한을 넘으면 막는다(스크립트 시간당 100·하루 400, Opus·모델 미지정 시간당 40·하루 150, 전체 시간당 200·하루 800, 동시 8). 풀기는 사용자가 직접 `! ~/.claude/scripts/headless-allow <호출자> <수>`.
 - 사용량·토큰 질문에는 먼저 `python3 ~/.claude/scripts/headless_watch.py --report`로 호출자를 보고 답한다. 세션 비용 표시에는 `-p` 호출이 안 잡힌다.

@@ -552,6 +552,26 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ram/.claude/hooks/session-bans.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ram/.claude/hooks/require-codex-image.py",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -572,6 +592,15 @@
           {
             "type": "command",
             "command": "python3 /Users/ram/.claude/hooks/correction-capture.py"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ram/.claude/hooks/session-bans.py",
+            "timeout": 10
           }
         ]
       }
