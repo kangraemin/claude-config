@@ -208,9 +208,11 @@ def user_text(rows):
     for r in reversed(rows):
         if is_human_turn(r):
             c = (r.get("message") or {}).get("content")
-            if isinstance(c, str):
-                return c
-            return "\n".join(x.get("text", "") for x in c if x.get("type") == "text")
+            t = c if isinstance(c, str) else "\n".join(x.get("text", "") for x in c if x.get("type") == "text")
+            # 대화 요약(이전 욕 인용 포함)·정기 점검·시스템 알림은 사용자 말이 아니다(11/28 요약 속 욕으로 잘못 막음)
+            if t.lstrip().startswith(("This session is being continued", "정기 점검", "<")):
+                return ""
+            return t
     return ""
 
 
