@@ -2,6 +2,7 @@
 """launchd 5분마다: ① claude 업데이트로 앞단이 덮이면 다시 설치 ② 7일 사용량이 빨리 오르면 범인 목록과 함께 알림
 ③ 장부에 안 잡히는 -p 프로세스(우회) 알림. --report: 호출 집계 출력. --send: 텔레그램 전송."""
 import collections, json, os, re, shutil, subprocess, sys, time, urllib.parse, urllib.request
+import sys as _s; _s.path.insert(0, __import__("os").path.expanduser("~/.claude/scripts")); from fmt_check import fix as _fmtfix  # 11/28 사람이 읽는 글은 제목 + - 줄
 H = os.path.expanduser('~/.claude')
 BIN = os.path.expanduser('~/.local/bin/claude')
 SHIM, REAL = H + '/scripts/claude_shim.sh', H + '/.headless-real'
@@ -19,7 +20,7 @@ def send(text):
     tok, chat = env.get('RAM_NOTI_TG_TOKEN'), env.get('RAM_NOTI_TG_CHAT_ID')
     if not tok or not chat: return
     urllib.request.urlopen(f'https://api.telegram.org/bot{tok}/sendMessage',
-        urllib.parse.urlencode({'chat_id': chat, 'text': text}).encode(), timeout=20).read()
+        urllib.parse.urlencode({'chat_id': chat, 'text': _fmtfix(text)}).encode(), timeout=20).read()
 
 def rows(sec=86400):
     now, out = time.time(), []

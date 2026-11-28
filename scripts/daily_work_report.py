@@ -19,6 +19,7 @@ import sys
 import urllib.parse
 import urllib.request
 from pathlib import Path
+import sys as _s; _s.path.insert(0, __import__("os").path.expanduser("~/.claude/scripts")); from fmt_check import fix as _fmtfix  # 11/28 사람이 읽는 글은 제목 + - 줄
 
 HOME = Path.home()
 ENV = HOME / '.claude/.env'
@@ -229,7 +230,7 @@ def send(arg):
     chunks.append(cur)
     for ch in chunks:
         if ch.strip():
-            q = urllib.parse.urlencode({'chat_id': cid, 'text': ch[:4096]}).encode()
+            q = urllib.parse.urlencode({'chat_id': cid, 'text': _fmtfix(ch)[:4096]}).encode()
             urllib.request.urlopen(f'https://api.telegram.org/bot{token}/sendMessage', q, timeout=20)
     print(f'RESULT: OK {d} {len(chunks)}개 메시지')
 

@@ -129,7 +129,7 @@ def login(t):
         m = re.search(r"(?<!\d)(\d{4,6})(?!\d)", body)
         if m and not sent:
             subprocess.run(["curl", "-s", "-d", f"chat_id={os.environ.get('RAM_NOTI_TG_CHAT_ID', '')}", "--data-urlencode",
-                            f"text=[LINE 로그인] 폰 LINE 앱에 인증번호 {m.group(1)} 입력해주세요(3분)",
+                            f"text=[LINE 로그인]\n- 폰 LINE 앱에 인증번호 {m.group(1)} 입력\n- 3분 안에",
                             f"https://api.telegram.org/bot{os.environ.get('RAM_NOTI_TG_TOKEN', '')}/sendMessage"], capture_output=True)
             print("PIN sent to telegram")
             sent = True

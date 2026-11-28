@@ -340,6 +340,22 @@ def check_media(text, uses):
     )
 
 
+def check_format(text):
+    """사람이 읽는 답은 '짧은 제목 + - 한 줄'만(11/28 "내가수백번이야기했는데 이거읽으라고?", "후보올리기에만내가 저걸이야기함?").
+    ~/.claude/scripts/fmt_check.py 하나로 텔레그램·현황판·답을 똑같이 본다."""
+    if not text.strip():
+        return None
+    try:
+        sys.path.insert(0, os.path.expanduser("~/.claude/scripts"))
+        from fmt_check import check
+        e = check(text)
+    except Exception:
+        return None
+    if e:
+        return ("답 형식 위반 — 짧은 제목 다음 줄마다 '- ' 한 줄(문단·긴 문장·두 문장 한 줄 금지). 그대로 다시 써라: " + " | ".join(e[:3]))
+    return None
+
+
 def main():
     if os.environ.get("RAM_PROXY_GATE", "on") == "off":
         return
@@ -359,7 +375,7 @@ def main():
     user = user_text(rows_all)
     reasons = [r for r in (check_push(cwd, uses), check_verify(text, uses), check_ask(text), check_plain(text), check_media(text, uses),
                            check_handoff(text, uses), check_jargon(text), check_blocked(text, uses), check_understood(user, turn),
-                           check_mechanize(user, uses)) if r]
+                           check_mechanize(user, uses), check_format(text)) if r]
     if reasons:
         print(json.dumps({"decision": "block", "reason": "[ram-proxy] " + " / ".join(reasons)}, ensure_ascii=False))
 

@@ -34,6 +34,7 @@ from google.analytics.data_v1beta import BetaAnalyticsDataClient
 from google.analytics.data_v1beta.types import DateRange, Dimension, Filter, RunRealtimeReportRequest, FilterExpression, FilterExpressionList, Metric, OrderBy, RunReportRequest
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
+import sys as _s; _s.path.insert(0, __import__("os").path.expanduser("~/.claude/scripts")); from fmt_check import fix as _fmtfix  # 11/28 사람이 읽는 글은 제목 + - 줄
 
 HOME = Path.home()
 ENV = HOME / '.claude/.env'
@@ -307,7 +308,7 @@ GSC = {'https://kangraemin.github.io/oneul-kkum/': '꿈해몽', 'https://kangrae
        'https://eodisseot.pages.dev/': '어디썼', 'https://eodisseot.vercel.app/': '어디썼', 'sc-domain:paper-digest.app': 'AI 논문 요약',
        'https://koubonoshiori.com/': '公募の栞', 'https://threads-unfollow.pages.dev/': '스레드언팔확인',
        'https://kangraemin.github.io/bid-window-404/': '입찰 창구 404호', 'https://kangraemin.github.io/forge-survivor-play/': '강화 서바이버',
-       'https://gooreum.github.io/ttuk-chiro-clinic/': '뚝 카이로 클리닉', 'https://tax-watcher.remin1994.workers.dev/': '법카로 본 서울'}  # 11/1 일본판·언팔확인 빠져 있던 것
+       'https://gooreum.github.io/ttuk-chiro-clinic/': '뚝 카이로 클리닉', 'https://tax-watcher.remin1994.workers.dev/': '법카로 본 서울', 'https://testedmarkets.com/': 'Tested Markets'}  # 11/1 일본판·언팔확인 빠져 있던 것
 GSC_SKIP = {'https://kangraemin.github.io/': ['/oneul-kkum/', '/jeju-stay/', '/bid-window-404/', '/forge-survivor-play/']}
 
 
@@ -469,7 +470,7 @@ def send(text):
     chunks.append(cur)
     for ch in chunks:
         if ch.strip():
-            q = urllib.parse.urlencode({'chat_id': cid, 'text': ch, 'disable_web_page_preview': 'true'}).encode()
+            q = urllib.parse.urlencode({'chat_id': cid, 'text': _fmtfix(ch), 'disable_web_page_preview': 'true'}).encode()
             urllib.request.urlopen(f'https://api.telegram.org/bot{token}/sendMessage', q, timeout=20)
     if not env('GA_TG_CHAT_ID'):
         with ENV.open('a') as fp:

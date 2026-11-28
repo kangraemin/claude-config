@@ -47,7 +47,7 @@ def tg(text, photo=None):
         env = dict(re.findall(r"^(RAM_NOTI_TG_\w+)=['\"]?([^'\"\n]+)", Path.home().joinpath(".claude/.env").read_text(), re.M))
         base = f"https://api.telegram.org/bot{env['RAM_NOTI_TG_TOKEN']}/"
         if photo is None:
-            urllib.request.urlopen(base + "sendMessage", urllib.parse.urlencode({"chat_id": env["RAM_NOTI_TG_CHAT_ID"], "text": text}).encode(), timeout=20)
+            urllib.request.urlopen(base + "sendMessage", urllib.parse.urlencode({"chat_id": env["RAM_NOTI_TG_CHAT_ID"], "text": __import__("fmt_check").fix(text) if __import__("sys").path.insert(0, __import__("os").path.expanduser("~/.claude/scripts")) is None else text}).encode(), timeout=20)
             return
         b = uuid.uuid4().hex
         body = (f"--{b}\r\nContent-Disposition: form-data; name=\"chat_id\"\r\n\r\n{env['RAM_NOTI_TG_CHAT_ID']}\r\n"

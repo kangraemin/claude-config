@@ -92,7 +92,7 @@
 - 이미 사용자가 선택한 옵션을 다시 옵션 목록으로 되묻지 않는다. 결정됐으면 실행한다.
 
 ## 사용자가 읽는 모든 글은 `제목` + `- 줄` 형식 (최우선) <!-- why: decisions/_global/convention/explainer-ui-one-sentence-per-line.md -->
-- 막는 장치: ~/.claude/scripts/fmt_check.py — sns_tg.py·send_digest.py가 보내기 전 검사, 어기면 안 보냄
+- 막는 장치: ~/.claude/scripts/fmt_check.py 하나로 전부 — 채팅 답(Stop 훅 ram-proxy-gate check_format), 현황판·리스트 화면(모든 글 칸을 - 줄로 그림), 카드·후보 저장(sync.py·post_slot.py가 90자 넘는 조각 막음), 텔레그램 전부(sns_tg·send_digest는 막음, 나머지 자동 알림은 보내기 전 fix로 고쳐 씀)
 - 답변·보고·텔레그램 리포트·자동 알림·설명 UI 전부 같다(11/1 "내가 두번다시 이야기안한다", 여러 번 반복된 지적).
 - 형태는 이것만 쓴다:
   ```

@@ -12,6 +12,7 @@ import os
 import subprocess
 import sys
 import time
+import sys as _s; _s.path.insert(0, __import__("os").path.expanduser("~/.claude/scripts")); from fmt_check import fix as _fmtfix  # 11/28 사람이 읽는 글은 제목 + - 줄
 
 PROJECTS = os.path.expanduser("~/.claude/projects")
 STATE = os.path.expanduser("~/.claude/session-board/state.json")
@@ -117,7 +118,7 @@ def telegram(text):
     token, chat = env.get("CONTEST_TG_TOKEN"), env.get("CONTEST_TG_CHAT_ID")
     if token and chat:
         subprocess.run(
-            ["curl", "-s", "-o", "/dev/null", "-d", f"chat_id={chat}", "--data-urlencode", f"text={text}",
+            ["curl", "-s", "-o", "/dev/null", "-d", f"chat_id={chat}", "--data-urlencode", f"text={_fmtfix(text)}",
              f"https://api.telegram.org/bot{token}/sendMessage"],
             timeout=20,
         )
