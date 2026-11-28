@@ -10,12 +10,12 @@ import json, re, sys
 
 PLACE = re.compile(r"kakao-emoticon|drafts/anim|line-anim-sticker|sticker|emoticon|스티커|이모티콘", re.I)
 RIG_SCRIPT = re.compile(r"\b(rig2?|motions)\.py\b")
-PROMPT_FILE = re.compile(r"/(FIX|TASK|NEXT)[^/]*\.md$", re.I)
+PROMPT_FILE = re.compile(r"/(FIX|TASK|NEXT|NEW)[^/]*\.md$", re.I)
 PART_WORDS = re.compile(
     r"부품\s*(시트|조립|교체|을|를|으로|들)|parts?\s*sheet|part[- ]?based|assembl\w*\s+(the\s+)?(frames|parts)|"
     r"(팔|arm)\S*\s*(부품|part)|(팔|arm)\S*\s*(회전|rotate)|부품.{0,20}(회전|이동|붙여|조립)|"
     r"조립\s*(한다|해|하라|방식)|\brig\b|rigging|puppet|cut-?out\s+anim", re.I)
-NEGATED = re.compile(r"(부품|parts?|rig|조립|회전)[^\n]{0,30}(금지|하지\s*마|않는다|말고|\bno\b|\bnot\b|never|don't)", re.I)
+NEGATED = re.compile(r"(부품|parts?|rig|조립|회전)[^\n]{0,30}(금지|하지\s*마|않는다|말고|폐기|따르지|쓰지\s*않|\bno\b|\bnot\b|never|don't)", re.I)
 CODE_ROT = re.compile(r"(arm|팔|part|부품)\w*[^\n]{0,80}\.(rotate|transform)\(|affine.{0,40}(arm|part|팔|부품)", re.I)
 
 
@@ -34,6 +34,7 @@ def main():
     ti = d.get("tool_input") or {}
     path = ti.get("file_path") or ""
     body = ti.get("command") or ti.get("content") or ti.get("new_string") or ""
+    body = body.replace("block-sticker-part-rig", "")
     if "/.claude/hooks/" in path or "/claude-library/" in path or "/memory/" in path:
         return 0
     if not PLACE.search(path + "\n" + body):
