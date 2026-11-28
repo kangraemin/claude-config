@@ -5,6 +5,15 @@ check(text) -> 문제 목록(빈 목록이면 통과). CLI: fmt_check.py <파일
 import re, sys
 
 MAXLEN = 90
+# 11/28 "- 뿐만이아니라 한문장에 한줄": 문장 끝(마침표 없어도) 뒤에 말이 더 있거나, ' — '·';'로 두 말을 붙이면 두 문장
+END = r"(?:어요|아요|해요|에요|예요|니다|했다|된다|한다|있다|없다|였다|었다|았다|했음|됐음|있음|없음|했어|됐어|돼요|세요)"
+TWO = re.compile(END + r"(?:[.!?,]|\s*[—;:])?\s+(?=[가-힣A-Za-z0-9'\"(])")
+JOIN = re.compile(r"\s—\s\S.{6,}|;\s+\S.{6,}")
+
+
+def two_sentences(body):
+    b = re.sub(r"\([^)]*\)|`[^`]*`|'[^']*'|\"[^\"]*\"", "", body)
+    return bool(TWO.search(b) or re.search(r"[가-힣][.!?]\s+[가-힣]", b) or JOIN.search(b))
 
 
 def check(text):
@@ -22,7 +31,7 @@ def check(text):
                     errs.append(f"{bi + 1}번째 덩어리: 제목 없이 '- ' 줄로 시작")
                 if len(body) > MAXLEN:
                     errs.append(f"제목이 {len(body)}자(>{MAXLEN}): {s[:30]}…")
-                if re.search(r"[가-힣](다|요|음|함)\.\s+\S", body):
+                if two_sentences(body):
                     errs.append(f"제목에 문장 두 개: {s[:30]}…")
                 continue
             if l.startswith((" ", "\t")) and l.strip().startswith("- "):
@@ -31,13 +40,13 @@ def check(text):
                 errs.append(f"'- ' 없는 줄: {s[:30]}…")
             if len(body) > MAXLEN:
                 errs.append(f"줄이 {len(body)}자(>{MAXLEN}) — 의미 하나씩 나눠라: {s[:30]}…")
-            if len(re.findall(r"[가-힣](다|요|음|함)\.\s+\S", body)) >= 1:
-                errs.append(f"한 줄에 문장 두 개: {s[:30]}…")
+            if two_sentences(body[2:] if body.startswith("- ") else body):
+                errs.append(f"한 줄에 문장 두 개 — 한 문장에 한 줄: {s[:30]}…")
     return errs
 
 
 
-SPLIT = re.compile(r"(?<=[.!?])\s+(?!\d)|\s+(?=[①②③④⑤⑥⑦⑧⑨⑩])|\s+·\s+|\s+/\s+|\s+—\s+|\s+→\s+|;\s+|\s+(?=\[(?:일부|틀림|맞음|미확인|해당없음)\])|\s+(?=[△⚠])")
+SPLIT = re.compile(r"(?<=[.!?])\s+(?!\d)|(?<=어요|아요|해요|에요|예요|니다|돼요|세요)\s+|\s+(?=[①②③④⑤⑥⑦⑧⑨⑩])|\s+·\s+|\s+/\s+|\s+—\s+|\s+→\s+|;\s+|\s+(?=\[(?:일부|틀림|맞음|미확인|해당없음)\])|\s+(?=[△⚠])")
 ITEM_MAX = 90
 
 
