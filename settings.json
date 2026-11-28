@@ -15,7 +15,8 @@
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
     "CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION": "false",
     "CLAUDE_CODE_GOAL_CHECKIN_MINUTES": "0",
-    "CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION": "2000"
+    "CLAUDE_CODE_MAX_WEB_SEARCHES_PER_SESSION": "2000",
+    "CLAUDE_CODE_EXPERIMENTAL_CODE_MODE": "1"
   },
   "attribution": {
     "commit": "",
@@ -465,6 +466,25 @@
     ],
     "PreToolUse": [
       {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ~/.claude/hooks/answer-question-first.py",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.claude/hooks/block-suno-download.py\""
+          }
+        ]
+      },
+      {
         "matcher": "Bash|Edit|Write|MultiEdit",
         "hooks": [
           {
@@ -495,11 +515,11 @@
         ]
       },
       {
-        "matcher": "Bash|Write|Edit",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 /Users/ram/.claude/hooks/headless-guard-hook.py"
+            "command": "/usr/bin/python3 /Users/ram/.claude/hooks/sns-post-approval-gate.py"
           }
         ]
       },
@@ -508,7 +528,28 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/usr/bin/python3 /Users/ram/.claude/hooks/sns-post-approval-gate.py"
+            "command": "/opt/homebrew/bin/python3 /Users/ram/programming/vibecoding/my-sns/drafts/src/hooks/reply_post_gate.py",
+            "timeout": 300
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ram/.claude/hooks/require-library-search.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 /Users/ram/.claude/hooks/headless-guard-hook.py",
+            "timeout": 10
           }
         ]
       }
@@ -550,7 +591,8 @@
     "ait@apps-in-toss": true,
     "marketing-skills@marketingskills": true,
     "claude-seo@agricidaniel-claude-seo": true,
-    "openseo@openseo": true
+    "openseo@openseo": true,
+    "productivity@knowledge-work-plugins": true
   },
   "extraKnownMarketplaces": {
     "nyldn-plugins": {
@@ -581,6 +623,12 @@
       "source": {
         "source": "github",
         "repo": "every-app/open-seo"
+      }
+    },
+    "knowledge-work-plugins": {
+      "source": {
+        "source": "github",
+        "repo": "anthropics/knowledge-work-plugins"
       }
     }
   },

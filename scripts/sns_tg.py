@@ -141,4 +141,10 @@ if __name__ == '__main__':
         raise SystemExit(0)
     texts = [(os.path.basename(f), open(f, encoding='utf-8').read()) for f in a.text_file]
     head = {'done': '[업로드 완료] ', 'fail': '[게시 실패] '}.get(a.kind, '[게시 확인 요청] ')
+    import sys as _sys; _sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from fmt_check import check as _fmt  # 11/28 M16: 보내기 전 '제목 + - 줄' 형식 강제
+    _e = _fmt(head + a.msg)
+    if _e:
+        print('형식 위반(제목 + "- " 줄로 고쳐서 다시):'); [print(' -', x) for x in _e]
+        print('RESULT: FAIL fmt'); raise SystemExit(1)
     print('RESULT:', 'OK' if send(head + a.msg, texts, a.media) else 'FAIL')
